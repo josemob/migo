@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Builds
+dist/
+**/dist/
+.expo/
+**/.expo/
+web-build/
+
+# Secrets & env (NUNCA subir)
+.env
+**/.env
+.env.local
+**/.env.local
+!**/.env.example
+
+# Logs y temporales de dev
+*.log
+.srv.out
+.srv.err
+.vite.out
+.vite.err
+.expo.out
+.expo.err
+**/.srv.*
+**/.vite.*
+**/.expo.*
+
+# OS / editor
+.DS_Store
+Thumbs.db

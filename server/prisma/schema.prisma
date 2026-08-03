@@ -1,0 +1,877 @@
+// ════════════════════════════════════════════════════════════════════
+//  Migo PetTech — Data model
+//  One shared PostgreSQL database serving: App Cliente (B2C),
+//  Vet Dashboard (B2B), Super Admin, and the mobile apps.
+//
+//  Structured from the Figma "Migo Clínicas" Vet Dashboard screens:
+//  Comercio (Organization) -> Sucursales (Clinic/branch) -> Staff/Servicios.
+// ════════════════════════════════════════════════════════════════════
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────
+//  ENUMS
+// ─────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  PET_OWNER
+  VET // médico veterinario (staff de una sucursal)
+  CLINIC_ADMIN // dueño/admin del comercio o "Admin Local" de sucursal
+  SUPER_ADMIN // operaciones Migo
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+// Posición del miembro del staff dentro de la sucursal (pantalla "Equipo & Staff")
+enum StaffPosition {
+  VET // Veterinario (requiere carnet CMV)
+  GROOMER // Estética / Grooming ("Personal de Apoyo")
+  SUPPORT // Personal de apoyo general
+  RECEPTIONIST // Recepción / Admisión
+  BRANCH_ADMIN // "Admin Local" de la sucursal
+}
+
+// Turno de guardia (pantalla "Guardias & Especialistas Hoy")
+enum ShiftType {
+  MORNING // Mañana
+  AFTERNOON // Tarde
+  NIGHT // Noche
+  FULL_DAY
+  OFF // Libre
+}
+
+enum PetSpecies {
+  DOG
+  CAT
+  BIRD
+  RABBIT
+  REPTILE
+  RODENT
+  OTHER
+}
+
+enum PetSex {
+  MALE
+  FEMALE
+  UNKNOWN
+}
+
+// Estado clínico/operativo del paciente (pantalla "Pacientes & Historiales")
+enum PetStatus {
+  STABLE // Estable
+  IN_TREATMENT // Tratamiento
+  URGENT // Atención Urgente
+  CRITICAL // Paciente Crítico
+  INACTIVE // Inactivo
+}
+
+enum AllergySeverity {
+  MILD
+  MODERATE
+  SEVERE
+  CRITICAL // ej. Reacción Anafiláctica
+}
+
+// Estado de verificación B2B (comercios y médicos) — auditado por Super Admin
+enum VerificationStatus {
+  PENDING
+  UNDER_REVIEW
+  VERIFIED
+  REJECTED
+}
+
+// Categorías = pestañas del "Catálogo de Servicios" (Consultas, Vacunas, Estética, Laboratorio, Cirugías)
+enum ServiceCategory {
+  CONSULTATION
+  VACCINATION
+  GROOMING
+  SURGERY
+  LAB
+  IMAGING
+  DENTAL
+  EMERGENCY
+  DEWORMING
+  OTHER
+}
+
+enum AppointmentStatus {
+  PENDING // solicitada, "Confirmar Turno"
+  CONFIRMED // "Confirmado"
+  IN_PROGRESS // "En Sala" / Iniciar Atención
+  COMPLETED // "Completar Consulta"
+  CANCELLED
+  NO_SHOW
+}
+
+// Nivel de triaje asignado por Migo AI (Gemini)
+enum TriageLevel {
+  GREEN // orientación / no urgente
+  YELLOW // atención pronta
+  ORANGE // urgente
+  RED // crítico / life-threatening
+}
+
+enum EmergencyStatus {
+  TRIAGING // IA analizando síntomas
+  BROADCASTING // alertando a sucursales cercanas
+  ACCEPTED // una sucursal aceptó
+  EN_ROUTE // dueño/paciente en camino
+  ATTENDED // paciente atendido -> genera CPL
+  HOSPITALIZED // "Hospitalizado"
+  CANCELLED
+  EXPIRED // nadie respondió a tiempo
+}
+
+enum EmergencyAlertStatus {
+  SENT
+  SEEN
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum TeleconsultType {
+  SUBSCRIPTION // incluida en Migo Care
+  PAY_PER_EVENT
+}
+
+enum TeleconsultStatus {
+  SCHEDULED
+  WAITING
+  ONGOING
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum SubscriptionPlan {
+  MIGO_CARE_MONTHLY
+  MIGO_CARE_ANNUAL
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+}
+
+// Fuente de ingreso Migo (motor contable)
+enum RevenueType {
+  CPL // pay-per-lead de emergencia (clínica -> Migo)
+  BOOKING_COMMISSION // comisión sobre reserva (Migo retiene)
+  PRO_PLAN // cuota mensual del plan Pro B2B (clínica -> Migo)
+  SUBSCRIPTION // Migo Care (dueño B2C -> Migo)
+  TELECONSULT // pago por teleconsulta
+}
+
+// Plan B2B de la sucursal (Freemium operativo vs Pro/Premium)
+enum ClinicPlan {
+  FREEMIUM // $0/mes — pago solo por leads de urgencia
+  PRO // ~$29-49/mes — prioridad en radar, comisión reducida, insignia Pro
+}
+
+// Ciclo de corte de la facturación postpago de leads
+enum BillingCycle {
+  MONTHLY
+  BIWEEKLY
+}
+
+// Estado de la factura que Migo emite a la clínica (cuentas por cobrar)
+enum InvoiceStatus {
+  OPEN // acumulando cargos del período en curso
+  ISSUED // emitida, pendiente de pago
+  PAID
+  OVERDUE // en mora -> dispara suspensión del radar
+  VOID
+}
+
+enum LedgerStatus {
+  PENDING
+  BILLED
+  PAID
+  DISPUTED
+  WAIVED
+}
+
+enum PayoutStatus {
+  DRAFT
+  PROCESSING
+  PAID
+  FAILED
+}
+
+// Datos de liquidación local (pantalla "Finanzas") — contexto Venezuela
+enum BankAccountType {
+  CHECKING // Corriente
+  SAVINGS // Ahorro
+}
+
+// ─────────────────────────────────────────────────────────────────────
+//  IDENTITY & USERS
+// ─────────────────────────────────────────────────────────────────────
+
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  phone        String?    @unique
+  nationalId   String?    @unique // cédula (ej. V-19.452.123) — búsqueda en Historiales
+  passwordHash String
+  fullName     String
+  avatarUrl    String?
+  role         UserRole   @default(PET_OWNER)
+  status       UserStatus @default(ACTIVE)
+
+  // relaciones
+  pets               Pet[]
+  ownedOrganizations Organization[] @relation("OrgOwner")
+  staffProfile       ClinicStaff?
+  emergencies        Emergency[]    @relation("EmergencyOwner")
+  appointments       Appointment[]  @relation("AppointmentBookedBy")
+  teleconsults       Teleconsult[]  @relation("TeleconsultOwner")
+  reviews            Review[]
+  subscriptions      Subscription[]
+  refreshTokens      RefreshToken[]
+  auditLogsActor     AuditLog[]     @relation("AuditActor")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role])
+  @@index([status])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  userAgent String?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+//  PETS & MEDICAL RECORD (Expediente Médico Digital)
+// ─────────────────────────────────────────────────────────────────────
+
+model Pet {
+  id           String     @id @default(uuid())
+  owner        User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId      String
+  name         String
+  species      PetSpecies
+  breed        String?
+  sex          PetSex     @default(UNKNOWN)
+  birthDate    DateTime?
+  weightKg     Decimal?   @db.Decimal(6, 2)
+  bloodType    String? // ej. "DEA 1.1 Positivo"
+  color        String?
+  photoUrl     String?
+  microchip    String?    @unique
+  isSterilized Boolean    @default(false)
+  status       PetStatus  @default(STABLE)
+  notes        String?
+
+  allergies     Allergy[]
+  conditions    PetCondition[] // preexistencias
+  vaccinations  Vaccination[]
+  prescriptions Prescription[]
+  records       MedicalRecord[]
+  emergencies   Emergency[]
+  appointments  Appointment[]
+  teleconsults  Teleconsult[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([species])
+  @@index([status])
+}
+
+model Allergy {
+  id        String          @id @default(uuid())
+  pet       Pet             @relation(fields: [petId], references: [id], onDelete: Cascade)
+  petId     String
+  substance String // ej. "Penicilina", "Ivermectina"
+  severity  AllergySeverity @default(MODERATE)
+  reaction  String? // ej. "Reacción Anafiláctica"
+  notes     String?
+  createdAt DateTime        @default(now())
+
+  @@index([petId])
+}
+
+// Preexistencias / condiciones crónicas (pantalla Urgencias: "PREEXISTENCIAS")
+model PetCondition {
+  id        String    @id @default(uuid())
+  pet       Pet       @relation(fields: [petId], references: [id], onDelete: Cascade)
+  petId     String
+  name      String // ej. "Epilepsia idiopática en tratamiento"
+  notes     String?
+  since     DateTime?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+
+  @@index([petId])
+}
+
+model Vaccination {
+  id          String       @id @default(uuid())
+  pet         Pet          @relation(fields: [petId], references: [id], onDelete: Cascade)
+  petId       String
+  vaccineName String // ej. "Séxtuple Canina", "Rabia Canina", "Tos de Perreras"
+  lotNumber   String?
+  appliedAt   DateTime
+  nextDueAt   DateTime? // "Vencido hace 30d" / "Al Día" se derivan de esto
+  appliedBy   ClinicStaff? @relation(fields: [appliedById], references: [id])
+  appliedById String?
+  clinic      Clinic?      @relation(fields: [clinicId], references: [id])
+  clinicId    String?
+  createdAt   DateTime     @default(now())
+
+  @@index([petId])
+  @@index([nextDueAt])
+}
+
+// Prescripciones estructuradas (pantalla Historiales: "Últimas Prescripciones")
+model Prescription {
+  id           String         @id @default(uuid())
+  pet          Pet            @relation(fields: [petId], references: [id], onDelete: Cascade)
+  petId        String
+  record       MedicalRecord? @relation(fields: [recordId], references: [id])
+  recordId     String?
+  drug         String // ej. "Prednisolona 5mg"
+  dose         String? // ej. "1 tab"
+  frequency    String? // ej. "c/12h"
+  durationDays Int? // ej. 5
+  instructions String?
+  prescribedBy ClinicStaff?   @relation(fields: [prescribedById], references: [id])
+  prescribedById String?
+  createdAt    DateTime       @default(now())
+
+  @@index([petId])
+}
+
+// Historial de consultas / entradas clínicas ("Historial de Visitas")
+model MedicalRecord {
+  id            String       @id @default(uuid())
+  pet           Pet          @relation(fields: [petId], references: [id], onDelete: Cascade)
+  petId         String
+  clinic        Clinic?      @relation(fields: [clinicId], references: [id])
+  clinicId      String?
+  vet           ClinicStaff? @relation(fields: [vetId], references: [id])
+  vetId         String?
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id])
+  appointmentId String?      @unique
+
+  visitedAt   DateTime @default(now())
+  reason      String? // ej. "Ingreso Emergencia", "Control Alergia", "Vacuna Anual"
+  symptoms    String?
+  diagnosis   String?
+  treatment   String?
+  weightKg    Decimal? @db.Decimal(6, 2)
+  temperature Decimal? @db.Decimal(4, 1)
+  notes       String?
+  attachments Json? // urls a exámenes/imágenes
+
+  prescriptions Prescription[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([petId])
+  @@index([clinicId])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+//  B2B: ORGANIZATION (Comercio / Marca) -> CLINIC (Sucursal)
+// ─────────────────────────────────────────────────────────────────────
+
+// El comercio legal — "Migo Clínicas". Es lo que audita el Super Admin (RIF).
+model Organization {
+  id        String @id @default(uuid())
+  owner     User   @relation("OrgOwner", fields: [ownerId], references: [id])
+  ownerId   String
+  name      String // marca comercial, ej. "Migo Clínicas"
+  legalName String?
+  rif       String? @unique // registro fiscal (auditado por Super Admin)
+  email     String?
+  phone     String?
+  logoUrl   String?
+
+  verificationStatus VerificationStatus @default(PENDING)
+  verifiedAt         DateTime?
+
+  clinics Clinic[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([verificationStatus])
+}
+
+// La sucursal operativa — "Sucursal: Las Mercedes". Todo el Vet Dashboard opera aquí.
+model Clinic {
+  id             String       @id @default(uuid())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+
+  name        String // nombre de sucursal, ej. "Las Mercedes"
+  description String? // "Descripción del Establecimiento"
+  logoUrl     String? // "Subir Logotipo"
+  coverUrl    String? // "Foto de Fachada"
+  phone       String?
+  email       String?
+
+  // ubicación (geolocalización de emergencias / "Ubicación GPS & Cobertura Móvil")
+  address   String? // "Av. Principal de Las Mercedes, Edificio Migo, Caracas."
+  city      String?
+  state     String?
+  country   String   @default("VE")
+  latitude  Decimal? @db.Decimal(9, 6)
+  longitude Decimal? @db.Decimal(9, 6)
+
+  isOpen24_7         Boolean @default(false)
+  acceptsEmergencies Boolean @default(true)
+  staffCapacity      Int     @default(5) // "Capacidad: 3/5 Asesores" (según plan)
+
+  // ── Plan B2B (Freemium / Pro) ──
+  plan                  ClinicPlan   @default(FREEMIUM)
+  planRenewsAt          DateTime?
+  radarPriority         Int          @default(0) // mayor = más arriba/VIP en el radar (Pro)
+  bookingCommissionRate Decimal?     @db.Decimal(4, 3) // override (Pro = comisión reducida); null = tarifa global
+  billingCycle          BillingCycle @default(MONTHLY)
+
+  // ── Regla de suspensión por mora (impaga -> fuera del radar) ──
+  radarSuspended Boolean   @default(false)
+  suspendedAt    DateTime?
+
+  // badge público de sucursal (deriva de la verificación del comercio)
+  verificationStatus VerificationStatus @default(PENDING)
+  verifiedAt         DateTime?
+  ratingAvg          Decimal            @default(0) @db.Decimal(3, 2)
+  ratingCount        Int                @default(0)
+
+  staff               ClinicStaff[]
+  hours               ClinicHours[]
+  services            Service[]
+  appointments        Appointment[]
+  emergencyAlerts     EmergencyAlert[]
+  emergenciesAccepted Emergency[]        @relation("EmergencyAcceptedClinic")
+  records             MedicalRecord[]
+  vaccinations        Vaccination[]
+  reviews             Review[]
+  ledgerEntries       LedgerEntry[]
+  payouts             Payout[]
+  invoices            Invoice[]
+  settlementAccount   SettlementAccount?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([verificationStatus])
+  @@index([city])
+  @@index([latitude, longitude])
+}
+
+// Horario de atención / guardia por día ("Horarios de Atención Semanal")
+model ClinicHours {
+  id        String  @id @default(uuid())
+  clinic    Clinic  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  clinicId  String
+  dayOfWeek Int // 0 = domingo ... 6 = sábado
+  opensAt   String // "08:00"
+  closesAt  String // "20:00"
+  isOpen    Boolean @default(true) // "Abierto"
+  isOnCall  Boolean @default(false) // guardia de urgencias
+
+  @@unique([clinicId, dayOfWeek])
+  @@index([clinicId])
+}
+
+// Staff de la sucursal ("Gestión de Equipo & Staff")
+model ClinicStaff {
+  id       String @id @default(uuid())
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId   String @unique
+  clinic   Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  clinicId String
+
+  position  StaffPosition @default(SUPPORT)
+  roleLabel String? // ej. "Estética & Grooming Profesional", "Atención al Cliente"
+
+  // credenciales médicas (solo VET)
+  cmvLicense         String? // carnet del Colegio de Médicos Veterinarios
+  collegiateNumber   String? // "Colegiado: #4152"
+  specialty          String? // "Cirugía & Medicina Interna"
+  verificationStatus VerificationStatus @default(PENDING) // "CMV Verificado"
+  verifiedAt         DateTime?
+
+  isActive Boolean @default(true)
+
+  vaccinations  Vaccination[]
+  prescriptions Prescription[]
+  records       MedicalRecord[]
+  appointments  Appointment[]  @relation("AppointmentVet")
+  teleconsults  Teleconsult[]  @relation("TeleconsultVet")
+  shifts        StaffShift[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clinicId])
+  @@index([position])
+  @@index([verificationStatus])
+}
+
+// Guardias / turnos del staff ("Guardias & Especialistas Hoy")
+model StaffShift {
+  id       String      @id @default(uuid())
+  staff    ClinicStaff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  staffId  String
+  date     DateTime    @db.Date
+  shift    ShiftType   @default(FULL_DAY)
+  isOnCall Boolean     @default(false)
+  notes    String?
+
+  @@unique([staffId, date, shift])
+  @@index([date])
+}
+
+// Catálogo de servicios con precios ("Catálogo de Servicios & Precios")
+model Service {
+  id          String          @id @default(uuid())
+  clinic      Clinic          @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  clinicId    String
+  name        String
+  category    ServiceCategory @default(CONSULTATION)
+  description String?
+  priceUsd    Decimal         @db.Decimal(10, 2)
+  priceLocal  Decimal?        @db.Decimal(14, 2)
+  durationMin Int             @default(30) // "Duración: 45 min"
+  requiresVet Boolean         @default(false) // servicios médicos/quirúrgicos requieren VET con CMV
+  isActive    Boolean         @default(true)
+
+  appointments Appointment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clinicId])
+  @@index([category])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+//  APPOINTMENTS ("Agenda & Citas")
+// ─────────────────────────────────────────────────────────────────────
+
+model Appointment {
+  id         String       @id @default(uuid())
+  clinic     Clinic       @relation(fields: [clinicId], references: [id])
+  clinicId   String
+  pet        Pet          @relation(fields: [petId], references: [id])
+  petId      String
+  bookedBy   User         @relation("AppointmentBookedBy", fields: [bookedById], references: [id])
+  bookedById String
+  service    Service?     @relation(fields: [serviceId], references: [id])
+  serviceId  String?
+  vet        ClinicStaff? @relation("AppointmentVet", fields: [vetId], references: [id])
+  vetId      String?
+
+  scheduledAt  DateTime
+  status       AppointmentStatus @default(PENDING)
+  reason       String? // "Motivo": ej. "Vacuna Séxtuple de Refuerzo"
+  priceUsd     Decimal?          @db.Decimal(10, 2)
+  paidInApp    Boolean           @default(false)
+  notes        String?
+  cancelReason String?
+
+  record      MedicalRecord?
+  ledgerEntry LedgerEntry?
+  review      Review?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clinicId, scheduledAt])
+  @@index([petId])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+//  EMERGENCIES (Radar 24/7 — el diferencial de Migo)
+// ─────────────────────────────────────────────────────────────────────
+
+model Emergency {
+  id      String @id @default(uuid())
+  owner   User   @relation("EmergencyOwner", fields: [ownerId], references: [id])
+  ownerId String
+  pet     Pet    @relation(fields: [petId], references: [id])
+  petId   String
+
+  // triaje IA (Migo AI / Gemini)
+  symptoms    String?
+  photoUrls   Json?
+  triageLevel TriageLevel?
+  aiSummary   String? // "Reporte IA Migo: Dificultad respiratoria aguda..."
+  aiFirstAid  String? // recomendaciones de primeros auxilios
+
+  // geolocalización del incidente
+  latitude  Decimal? @db.Decimal(9, 6)
+  longitude Decimal? @db.Decimal(9, 6)
+
+  status           EmergencyStatus @default(TRIAGING)
+  acceptedClinic   Clinic?         @relation("EmergencyAcceptedClinic", fields: [acceptedClinicId], references: [id])
+  acceptedClinicId String?
+  acceptedAt       DateTime?
+  attendedAt       DateTime?
+
+  alerts      EmergencyAlert[]
+  ledgerEntry LedgerEntry?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([triageLevel])
+}
+
+// Broadcast de una emergencia a cada sucursal cercana candidata
+model EmergencyAlert {
+  id          String               @id @default(uuid())
+  emergency   Emergency            @relation(fields: [emergencyId], references: [id], onDelete: Cascade)
+  emergencyId String
+  clinic      Clinic               @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  clinicId    String
+  status      EmergencyAlertStatus @default(SENT)
+  distanceKm  Decimal?             @db.Decimal(6, 2) // "1.2 km"
+  etaMinutes  Int? // "~4 min de llegada"
+  seenAt      DateTime?
+  respondedAt DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime             @default(now())
+
+  @@unique([emergencyId, clinicId])
+  @@index([clinicId, status])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+//  TELECONSULTS (Agora.io) — Migo Care / pago por evento
+// ─────────────────────────────────────────────────────────────────────
+
+model Teleconsult {
+  id      String       @id @default(uuid())
+  owner   User         @relation("TeleconsultOwner", fields: [ownerId], references: [id])
+  ownerId String
+  pet     Pet          @relation(fields: [petId], references: [id])
+  petId   String
+  vet     ClinicStaff? @relation("TeleconsultVet", fields: [vetId], references: [id])
+  vetId   String?
+
+  type         TeleconsultType   @default(PAY_PER_EVENT)
+  status       TeleconsultStatus @default(SCHEDULED)
+  scheduledAt  DateTime?
+  startedAt    DateTime?
+  endedAt      DateTime?
+  agoraChannel String?
+  priceUsd     Decimal?          @db.Decimal(10, 2)
+  notes        String?
+
+  ledgerEntry LedgerEntry?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([vetId])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+//  REVIEWS
+// ─────────────────────────────────────────────────────────────────────
+
+model Review {
+  id            String       @id @default(uuid())
+  clinic        Clinic       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  clinicId      String
+  author        User         @relation(fields: [authorId], references: [id])
+  authorId      String
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id])
+  appointmentId String?      @unique
+  rating        Int // 1..5
+  comment       String?
+  createdAt     DateTime     @default(now())
+
+  @@index([clinicId])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+//  MONETIZATION — Migo Care + Ledger contable + Payouts + Liquidación
+// ─────────────────────────────────────────────────────────────────────
+
+model Subscription {
+  id          String             @id @default(uuid())
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  plan        SubscriptionPlan
+  status      SubscriptionStatus @default(ACTIVE)
+  priceUsd    Decimal            @db.Decimal(10, 2)
+  startedAt   DateTime           @default(now())
+  renewsAt    DateTime?
+  cancelledAt DateTime?
+  provider    String? // pasarela de pago
+  externalId  String? // id de la suscripción en la pasarela
+
+  ledgerEntries LedgerEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+// Motor contable: cada línea de ingreso Migo (CPL, comisión, suscripción, teleconsulta)
+model LedgerEntry {
+  id     String       @id @default(uuid())
+  type   RevenueType
+  status LedgerStatus @default(PENDING)
+
+  // sucursal asociada (a quién se cobra / de dónde proviene)
+  clinic   Clinic? @relation(fields: [clinicId], references: [id])
+  clinicId String?
+
+  // montos
+  grossUsd   Decimal @db.Decimal(12, 2) // valor de la transacción
+  migoFeeUsd Decimal @db.Decimal(12, 2) // comisión/CPL de Migo (ver nota de dirección CPL)
+  currency   String  @default("USD")
+
+  // origen (uno de estos según el tipo)
+  emergency      Emergency?    @relation(fields: [emergencyId], references: [id])
+  emergencyId    String?       @unique
+  appointment    Appointment?  @relation(fields: [appointmentId], references: [id])
+  appointmentId  String?       @unique
+  teleconsult    Teleconsult?  @relation(fields: [teleconsultId], references: [id])
+  teleconsultId  String?       @unique
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+  subscriptionId String?
+
+  // agrupación contable: payout (Migo -> clínica) o invoice (clínica -> Migo)
+  payout    Payout?  @relation(fields: [payoutId], references: [id])
+  payoutId  String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id])
+  invoiceId String?
+
+  billedAt DateTime?
+  paidAt   DateTime?
+  notes    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clinicId, status])
+  @@index([type])
+}
+
+// Factura postpago que Migo emite a la sucursal (cuentas por cobrar):
+// agrupa los leads CPL del período + la cuota del plan Pro.
+model Invoice {
+  id          String        @id @default(uuid())
+  clinic      Clinic        @relation(fields: [clinicId], references: [id])
+  clinicId    String
+  periodStart DateTime
+  periodEnd   DateTime
+  status      InvoiceStatus @default(OPEN)
+
+  leadCount       Int     @default(0) // # de leads CPL en el período
+  cplSubtotalUsd  Decimal @default(0) @db.Decimal(12, 2)
+  planSubtotalUsd Decimal @default(0) @db.Decimal(12, 2) // cuota Pro del período
+  totalUsd        Decimal @default(0) @db.Decimal(12, 2)
+
+  issuedAt DateTime?
+  dueAt    DateTime?
+  paidAt   DateTime?
+  reference String? // referencia de pago (Pago Móvil / transferencia)
+
+  ledgerEntries LedgerEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clinicId, status])
+  @@index([dueAt])
+}
+
+// Liquidación / payout a comercios
+model Payout {
+  id          String       @id @default(uuid())
+  clinic      Clinic       @relation(fields: [clinicId], references: [id])
+  clinicId    String
+  periodStart DateTime
+  periodEnd   DateTime
+  amountUsd   Decimal      @db.Decimal(12, 2)
+  status      PayoutStatus @default(DRAFT)
+  processedAt DateTime?
+  reference   String?
+
+  ledgerEntries LedgerEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clinicId, status])
+}
+
+// Datos de liquidación local ("Datos de Liquidación local" — Venezuela)
+model SettlementAccount {
+  id                String          @id @default(uuid())
+  clinic            Clinic          @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  clinicId          String          @unique
+  bankName          String // "Banco Nacional de Descuento"
+  accountType       BankAccountType @default(CHECKING)
+  accountLast4      String? // "****4521"
+  holderName        String?
+  holderIdNumber    String? // cédula/RIF del titular
+  c2pEnabled        Boolean         @default(false) // "Pago C2P Interbancario Habilitado"
+  mobilePayPhone    String? // Pago Móvil
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────────────
+//  AUDIT LOG (Super Admin)
+// ─────────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id])
+  actorId    String?
+  action     String // ej. "CLINIC_VERIFIED", "STAFF_REJECTED"
+  entityType String // ej. "Organization"
+  entityId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+}
