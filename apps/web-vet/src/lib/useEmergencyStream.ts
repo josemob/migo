@@ -24,12 +24,19 @@ export function useEmergencyStream(onAlert?: () => void) {
       if (!token) return;
       es = new EventSource(`${BASE}/emergencies/stream?token=${encodeURIComponent(token)}`);
 
-      es.addEventListener('emergency', () => {
+      const invalidate = () => {
         qc.invalidateQueries({ queryKey: ['emg-active'] });
         qc.invalidateQueries({ queryKey: ['emg-recent'] });
         qc.invalidateQueries({ queryKey: ['dashboard'] });
+      };
+
+      // Nueva urgencia -> refresca + alarma
+      es.addEventListener('emergency', () => {
+        invalidate();
         cbRef.current?.();
       });
+      // Actualización (p. ej. cancelada) -> solo refresca, sin alarma
+      es.addEventListener('refresh', invalidate);
 
       es.onerror = () => {
         es?.close();

@@ -9,6 +9,7 @@ import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-quer
 
 import { AuthProvider, useAuth } from './src/lib/auth';
 import { api } from './src/lib/api';
+import { DialogHost } from './src/lib/dialog';
 import { Loading } from './src/components/ui';
 import { TabBar } from './src/components/TabBar';
 import { colors } from './src/theme';
@@ -113,6 +114,7 @@ export default function App() {
         <AuthProvider>
           <StatusBar style="dark" />
           <Root />
+          <DialogHost />
         </AuthProvider>
       </QueryClientProvider>
     </SafeAreaProvider>

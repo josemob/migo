@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../lib/auth';
+import { appAlert } from '../lib/dialog';
 import { Button, Input, Screen } from '../components/ui';
 import { Logo } from '../components/Logo';
 import { colors } from '../theme';
@@ -60,7 +61,7 @@ export default function LoginScreen() {
         <Button title={mode === 'login' ? 'Iniciar sesión' : 'Crear cuenta'} onPress={submit} loading={busy} />
 
         {mode === 'login' && (
-          <Text style={styles.forgot} onPress={() => Alert.alert('Recuperar', 'Función disponible próximamente.')}>
+          <Text style={styles.forgot} onPress={() => appAlert('Recuperar', 'Función disponible próximamente.')}>
             ¿Olvidaste tu contraseña?
           </Text>
         )}
@@ -74,7 +75,7 @@ export default function LoginScreen() {
         <Button
           title="Continuar con Google"
           variant="outline"
-          onPress={() => Alert.alert('Google', 'Inicio con Google: pendiente de configurar OAuth.')}
+          onPress={() => appAlert('Google', 'Inicio con Google: pendiente de configurar OAuth.')}
         />
 
         <Text style={styles.switch} onPress={() => setMode(mode === 'login' ? 'register' : 'login')}>

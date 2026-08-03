@@ -1,7 +1,7 @@
 import { prisma } from '../../config/prisma';
 import { ApiError } from '../../utils/ApiError';
 import { distanceKm, etaMinutes } from '../../lib/geo';
-import { bus, EMERGENCY_NEW } from '../../lib/events';
+import { bus, EMERGENCY_NEW, EMERGENCY_UPDATE } from '../../lib/events';
 import { runTriage } from './triage.service';
 
 const BROADCAST_RADIUS_KM = 15;
@@ -133,5 +133,35 @@ export const emergencyService = {
     });
     if (!emergency) throw ApiError.notFound('Urgencia no encontrada');
     return emergency;
+  },
+
+  /** El dueño cancela su urgencia (solo antes de ser atendida). */
+  async cancelByOwner(ownerId: string, id: string) {
+    const emergency = await prisma.emergency.findFirst({
+      where: { id, ownerId },
+      include: { alerts: { select: { clinicId: true } } },
+    });
+    if (!emergency) throw ApiError.notFound('Urgencia no encontrada');
+
+    const CANCELLABLE = ['TRIAGING', 'BROADCASTING', 'ACCEPTED', 'EN_ROUTE'];
+    if (!CANCELLABLE.includes(emergency.status)) {
+      throw ApiError.badRequest('Esta urgencia ya no se puede cancelar');
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const u = await tx.emergency.update({ where: { id }, data: { status: 'CANCELLED' } });
+      await tx.emergencyAlert.updateMany({
+        where: { emergencyId: id, status: { in: ['SENT', 'SEEN', 'ACCEPTED'] } },
+        data: { status: 'EXPIRED' },
+      });
+      return u;
+    });
+
+    // Avisa a las clínicas alertadas para que la quiten del panel (SSE)
+    const clinicIds = [...new Set(emergency.alerts.map((a) => a.clinicId))];
+    for (const clinicId of clinicIds) {
+      bus.emit(EMERGENCY_UPDATE, { clinicId, emergencyId: id });
+    }
+    return updated;
   },
 };

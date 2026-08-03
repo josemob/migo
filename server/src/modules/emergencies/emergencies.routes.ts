@@ -8,7 +8,7 @@ import { withClinicContext } from '../../middleware/clinicContext';
 import { ApiError } from '../../utils/ApiError';
 import { env } from '../../config/env';
 import { verifyAccessToken } from '../../utils/jwt';
-import { bus, EMERGENCY_NEW, type EmergencyEvent } from '../../lib/events';
+import { bus, EMERGENCY_NEW, EMERGENCY_UPDATE, type EmergencyEvent } from '../../lib/events';
 import { emergencyService } from './emergency.service';
 
 const router = Router();
@@ -46,7 +46,14 @@ router.get(
         res.write(`event: emergency\ndata: ${JSON.stringify({ emergencyId: evt.emergencyId })}\n\n`);
       }
     };
+    // Actualización sin alarma (p. ej. cancelada por el dueño) -> refrescar panel
+    const onUpdate = (evt: EmergencyEvent) => {
+      if (evt.clinicId === clinicId) {
+        res.write(`event: refresh\ndata: ${JSON.stringify({ emergencyId: evt.emergencyId })}\n\n`);
+      }
+    };
     bus.on(EMERGENCY_NEW, onEmergency);
+    bus.on(EMERGENCY_UPDATE, onUpdate);
 
     // heartbeat para mantener viva la conexión (proxies/Cloud Run)
     const heartbeat = setInterval(() => res.write(': ping\n\n'), 25000);
@@ -54,6 +61,7 @@ router.get(
     req.on('close', () => {
       clearInterval(heartbeat);
       bus.off(EMERGENCY_NEW, onEmergency);
+      bus.off(EMERGENCY_UPDATE, onUpdate);
       res.end();
     });
   }),
@@ -97,6 +105,15 @@ router.get(
   validate({ params: z.object({ id: z.string().uuid() }) }),
   asyncHandler(async (req, res) => {
     res.json(await emergencyService.getForOwner(req.user!.id, req.params.id!));
+  }),
+);
+
+// POST /emergencies/:id/cancel -> el dueño cancela antes de ser atendida
+router.post(
+  '/:id/cancel',
+  validate({ params: z.object({ id: z.string().uuid() }) }),
+  asyncHandler(async (req, res) => {
+    res.json(await emergencyService.cancelByOwner(req.user!.id, req.params.id!));
   }),
 );
 

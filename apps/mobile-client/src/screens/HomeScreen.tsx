@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react';
 import {
-  Alert,
   Dimensions,
   Image,
   Pressable,
@@ -9,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { appAlert } from '../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
@@ -62,7 +62,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             </View>
             <Text style={styles.hi}>Hola, {firstName}</Text>
           </Pressable>
-          <Pressable style={styles.bell} onPress={() => Alert.alert('Notificaciones', 'Sin novedades por ahora.')}>
+          <Pressable style={styles.bell} onPress={() => appAlert('Notificaciones', 'Sin novedades por ahora.')}>
             <TabIcon name="bell" color={colors.brand} size={24} />
           </Pressable>
         </View>
@@ -124,7 +124,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         </View>
 
         {/* Banner publicitario (slot fijo de 62px) */}
-        <Pressable style={styles.banner} onPress={() => Alert.alert('Publicidad', 'Espacio para banner de patrocinador.')}>
+        <Pressable style={styles.banner} onPress={() => appAlert('Publicidad', 'Espacio para banner de patrocinador.')}>
           {/* Sustituye este contenido por <Image source={...} style={{width:'100%',height:'100%'}} /> cuando tengas el banner */}
           <Text style={styles.bannerBrand}>BARK BITES</Text>
           <Text style={styles.bannerSub}>Natural & Delicious</Text>
@@ -138,7 +138,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             <Pressable
               key={s.key}
               style={styles.shortcut}
-              onPress={() => (s.key === 'vax' ? navigation.navigate('Expediente') : Alert.alert('Migo', 'Función disponible próximamente.'))}
+              onPress={() => (s.key === 'vax' ? navigation.navigate('Expediente') : appAlert('Migo', 'Función disponible próximamente.'))}
             >
               <View style={styles.shortcutIcon}>
                 <TabIcon name={s.icon} color={colors.brand} size={22} />

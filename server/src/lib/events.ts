@@ -17,3 +17,4 @@ export interface EmergencyEvent {
 }
 
 export const EMERGENCY_NEW = 'emergency:new';
+export const EMERGENCY_UPDATE = 'emergency:update'; // cancelada / cambio de estado

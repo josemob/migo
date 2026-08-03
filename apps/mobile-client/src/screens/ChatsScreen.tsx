@@ -1,4 +1,5 @@
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { appAlert } from '../lib/dialog';
 import { Card, Muted, Screen } from '../components/ui';
 import { TabIcon } from '../components/TabIcon';
 import { colors, radius } from '../theme';
@@ -8,7 +9,7 @@ export default function ChatsScreen() {
     <Screen>
       <Text style={styles.title}>Chats</Text>
 
-      <Pressable onPress={() => Alert.alert('Migo AI', 'El asistente conversacional llega pronto.')}>
+      <Pressable onPress={() => appAlert('Migo AI', 'El asistente conversacional llega pronto.')}>
         <Card style={styles.migoCard}>
           <View style={[styles.icon, { backgroundColor: colors.red }]}>
             <TabIcon name="medical" color={colors.white} size={24} />

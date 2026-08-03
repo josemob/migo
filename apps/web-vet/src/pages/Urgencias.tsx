@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { Card, PageHeader, SectionTitle, Spinner, Badge, ErrorNote } from '../components/ui';
@@ -26,19 +27,31 @@ interface Alert {
 
 export default function Urgencias() {
   const qc = useQueryClient();
+  const [feedback, setFeedback] = useState<{ tone: 'ok' | 'err'; msg: string } | null>(null);
+  const flash = (tone: 'ok' | 'err', msg: string) => {
+    setFeedback({ tone, msg });
+    setTimeout(() => setFeedback(null), 5000);
+  };
+
   const active = useQuery({ queryKey: ['emg-active'], queryFn: () => api<{ data: Alert[] }>('/emergencies/active'), refetchInterval: 30000 });
   const recent = useQuery({ queryKey: ['emg-recent'], queryFn: () => api<{ data: { id: string; status: string; symptoms?: string; pet: { name: string; breed?: string } }[] }>('/emergencies/recent') });
 
   const accept = useMutation({
     mutationFn: (alertId: string) => api(`/emergencies/alerts/${alertId}/accept`, { method: 'POST' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['emg-active'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['emg-active'] });
+      flash('ok', 'Urgencia aceptada. Contacta al dueño y prepara la llegada.');
+    },
+    onError: (e) => flash('err', e instanceof Error ? e.message : 'No se pudo aceptar la urgencia'),
   });
   const attended = useMutation({
     mutationFn: (emgId: string) => api(`/emergencies/${emgId}/attended`, { method: 'POST', body: {} }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['emg-active'] });
       qc.invalidateQueries({ queryKey: ['emg-recent'] });
+      flash('ok', '✅ Paciente marcado como atendido. Se registró el lead CPL ($5) en Finanzas.');
     },
+    onError: (e) => flash('err', e instanceof Error ? e.message : 'No se pudo marcar como atendido'),
   });
 
   const alert = active.data?.data[0];
@@ -46,6 +59,18 @@ export default function Urgencias() {
   return (
     <div>
       <PageHeader title="Urgencias & Guardia Médica" subtitle="Canalización inmediata de pacientes en estado crítico y monitoreo de ruta." />
+
+      {feedback && (
+        <div
+          className={`mb-6 rounded-card border px-5 py-3 text-sm font-semibold ${
+            feedback.tone === 'ok'
+              ? 'border-green-200 bg-green-50 text-green-700'
+              : 'border-red-200 bg-red-50 text-red-700'
+          }`}
+        >
+          {feedback.msg}
+        </div>
+      )}
 
       {active.isLoading && <Spinner className="mx-auto mt-10" />}
       {active.error && <ErrorNote error={active.error} />}
@@ -124,8 +149,17 @@ export default function Urgencias() {
                     <Icon name="check" className="h-4 w-4" /> Aceptar Urgencia
                   </button>
                 ) : (
-                  <button className="btn-green flex-1" onClick={() => attended.mutate(alert.emergency.id)} disabled={attended.isPending}>
-                    <Icon name="hospital" className="h-4 w-4" /> Marcar Paciente Atendido
+                  <button
+                    className="btn-green flex-1"
+                    onClick={() => {
+                      if (confirm('¿Marcar como atendido? Esto cierra la urgencia y registra el lead CPL ($5).')) {
+                        attended.mutate(alert.emergency.id);
+                      }
+                    }}
+                    disabled={attended.isPending}
+                  >
+                    <Icon name="hospital" className="h-4 w-4" />{' '}
+                    {attended.isPending ? 'Marcando…' : 'Marcar Paciente Atendido'}
                   </button>
                 )}
                 <button className="btn border border-red-300 text-red-600 hover:bg-red-50">

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -9,6 +8,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { appAlert } from '../lib/dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useQueryClient } from '@tanstack/react-query';
@@ -43,13 +43,13 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
 
   const pickPhoto = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return Alert.alert('Permiso', 'Necesitamos acceso a tus fotos.');
+    if (!perm.granted) return appAlert('Permiso', 'Necesitamos acceso a tus fotos.');
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [1, 1], quality: 0.6 });
     if (!res.canceled) setPhoto(res.assets[0].uri);
   };
 
   const save = async () => {
-    if (!name.trim()) return Alert.alert('Falta el nombre', 'Dinos cómo se llama tu mascota.');
+    if (!name.trim()) return appAlert('Falta el nombre', 'Dinos cómo se llama tu mascota.');
     setBusy(true);
     try {
       const notesParts = [alias && `Alias: ${alias}`, size && `Tamaño: ${size}`].filter(Boolean);
@@ -71,7 +71,7 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
       qc.invalidateQueries({ queryKey: ['pets'] });
       done();
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'No se pudo guardar');
+      appAlert('Error', e instanceof Error ? e.message : 'No se pudo guardar');
     } finally {
       setBusy(false);
     }
