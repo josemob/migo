@@ -14,9 +14,10 @@ const INACTIVE = '#C7C7C7';
 
 export function TabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  // Insertamos el botón "Alerta" en el centro (posición 2 de 5)
+  // El botón central "Alerta" ES la pestaña en el índice 2
   const left = state.routes.slice(0, 2);
-  const right = state.routes.slice(2);
+  const alerta = state.routes[2];
+  const right = state.routes.slice(3);
 
   const renderTab = (route: (typeof state.routes)[number], index: number) => {
     const focused = state.index === index;
@@ -27,7 +28,10 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
         style={styles.tab}
         onPress={() => {
           const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-          if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
+          if (!focused && !event.defaultPrevented) {
+            // Al entrar por la pestaña Directorio se muestran TODAS (limpia el filtro por servicio)
+            navigation.navigate(route.name, route.name === 'Directorio' ? { category: null } : undefined);
+          }
         }}
       >
         <MigoTabIcon name={ICONS[route.name] ?? 'home'} color={color} size={24} />
@@ -40,15 +44,15 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
     <View style={[styles.wrap, { paddingBottom: insets.bottom || 8 }]}>
       {left.map((r, i) => renderTab(r, i))}
 
-      {/* Botón central Alerta (pánico) */}
+      {/* Botón central Alerta (pestaña de urgencias cercanas) */}
       <View style={styles.centerSlot}>
-        <Pressable style={styles.alertBtn} onPress={() => navigation.navigate('Panic' as never)}>
+        <Pressable style={styles.alertBtn} onPress={() => navigation.navigate(alerta!.name)}>
           <MigoTabIcon name="paw" color={colors.brand} size={30} />
         </Pressable>
         <Text style={styles.alertLabel}>Alerta</Text>
       </View>
 
-      {right.map((r, i) => renderTab(r, i + 2))}
+      {right.map((r, i) => renderTab(r, i + 3))}
     </View>
   );
 }

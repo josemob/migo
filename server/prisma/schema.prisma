@@ -288,6 +288,12 @@ model Pet {
   status       PetStatus  @default(STABLE)
   notes        String?
 
+  // Campos editables del perfil (App Cliente)
+  alias            String? // "Alias de Cariño"
+  size             String? // "Tamaño aproximado" (Pequeño/Mediano/Grande)
+  specialCondition String? // "Condición Especial"
+  frequentVet      String? // "Veterinaria Frecuente"
+
   allergies     Allergy[]
   conditions    PetCondition[] // preexistencias
   vaccinations  Vaccination[]
@@ -704,6 +710,54 @@ model Teleconsult {
   @@index([ownerId])
   @@index([vetId])
   @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────────────
+//  CHAT dueño ↔ clínica (el chat IA de Migo es stateless, no se persiste)
+// ─────────────────────────────────────────────────────────────────────
+
+enum ChatSender {
+  OWNER
+  CLINIC
+  SYSTEM
+}
+
+model ChatMessage {
+  id        String     @id @default(uuid())
+  ownerId   String
+  clinicId  String
+  sender    ChatSender
+  text      String
+  createdAt DateTime   @default(now())
+
+  @@index([ownerId, clinicId, createdAt])
+}
+
+// Nivel de urgencia percibido, extraído del chat con Migo AI
+enum ChatUrgency {
+  CRITICA
+  MODERADA
+  BAJA
+}
+
+// Resumen estructurado extraído por Migo AI al finalizar la interacción
+model ChatSummary {
+  id                    String      @id @default(uuid())
+  ownerId               String
+  petId                 String?
+  consultationReason    String
+  symptoms              String[]
+  durationOfSymptoms    String?
+  perceivedUrgency      ChatUrgency
+  possibleTriggers      String?
+  firstAidGiven         String[]
+  recommendedAction     String
+  keyObservationsForVet String
+  source                String      @default("gemini") // "gemini" | "fallback"
+  createdAt             DateTime    @default(now())
+
+  @@index([ownerId, createdAt])
+  @@index([petId])
 }
 
 // ─────────────────────────────────────────────────────────────────────

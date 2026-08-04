@@ -259,6 +259,57 @@ async function main() {
     ],
   });
 
+  console.log('🏢 Clínicas adicionales del directorio...');
+  const extraClinics = [
+    {
+      ownerEmail: 'contacto@pawshair.com', ownerName: 'Administración Paws & Hair',
+      orgName: 'Paws & Hair', legalName: 'Paws & Hair Studio C.A.', rif: 'J-41222333-4',
+      clinicName: 'Paws & Hair Studio',
+      description: 'Peluquería y spa canino especializado en cortes de raza, con estilistas profesionales certificados.',
+      address: 'Calle París, Edif. Miranda, Los Palos Grandes', city: 'Caracas', state: 'Distrito Capital',
+      latitude: 10.4975, longitude: -66.843, phone: '0212-2661234',
+      isOpen24_7: false, acceptsEmergencies: false, plan: 'FREEMIUM' as const, ratingAvg: 4.7, ratingCount: 85,
+      hours: [1, 2, 3, 4, 5, 6].map((d) => ({ dayOfWeek: d, opensAt: '09:00', closesAt: '18:00', isOpen: true, isOnCall: false })),
+      services: [
+        { name: 'Baño y Corte Completo', category: 'GROOMING' as const, description: 'Baño, secado, corte de raza, corte de uñas y limpieza de oídos.', priceUsd: 18, durationMin: 90, requiresVet: false },
+        { name: 'Vacuna Múltiple Canina', category: 'VACCINATION' as const, description: 'Aplicación de vacuna polivalente con constancia sellada.', priceUsd: 16, durationMin: 15, requiresVet: true },
+        { name: 'Desparasitación Integral', category: 'DEWORMING' as const, description: 'Tratamiento interno y externo contra parásitos.', priceUsd: 12, durationMin: 20, requiresVet: false },
+      ],
+    },
+    {
+      ownerEmail: 'contacto@petstyleboutique.com', ownerName: 'Administración Pet Style',
+      orgName: 'Pet Style Boutique', legalName: 'Pet Style Boutique C.A.', rif: 'J-41777888-9',
+      clinicName: 'Pet Style Boutique',
+      description: 'Boutique de estética y salud para mascotas con servicios premium y consultas veterinarias.',
+      address: 'Centro Comercial Paseo, Nivel PB, Chacao', city: 'Caracas', state: 'Miranda',
+      latitude: 10.47, longitude: -66.879, phone: '0212-9552020',
+      isOpen24_7: false, acceptsEmergencies: true, plan: 'PRO' as const, ratingAvg: 4.5, ratingCount: 42,
+      hours: [0, 1, 2, 3, 4, 5, 6].map((d) => ({ dayOfWeek: d, opensAt: '10:00', closesAt: '19:00', isOpen: true, isOnCall: false })),
+      services: [
+        { name: 'Spa & Estética Premium', category: 'GROOMING' as const, description: 'Tratamiento spa completo con hidratación de pelaje y aromaterapia.', priceUsd: 20, durationMin: 120, requiresVet: false },
+        { name: 'Consulta Veterinaria General', category: 'CONSULTATION' as const, description: 'Evaluación clínica integral por veterinario colegiado.', priceUsd: 22, durationMin: 40, requiresVet: true },
+        { name: 'Limpieza Dental Profesional', category: 'DENTAL' as const, description: 'Profilaxis dental con ultrasonido bajo sedación ligera.', priceUsd: 45, durationMin: 60, requiresVet: true },
+      ],
+    },
+  ];
+  for (const c of extraClinics) {
+    const cOwner = await prisma.user.create({
+      data: { email: c.ownerEmail, passwordHash: pw(), fullName: c.ownerName, role: 'CLINIC_ADMIN' },
+    });
+    const cOrg = await prisma.organization.create({
+      data: { ownerId: cOwner.id, name: c.orgName, legalName: c.legalName, rif: c.rif, verificationStatus: 'VERIFIED', verifiedAt: new Date() },
+    });
+    const cClinic = await prisma.clinic.create({
+      data: {
+        organizationId: cOrg.id, name: c.clinicName, description: c.description, address: c.address, city: c.city, state: c.state,
+        phone: c.phone, latitude: c.latitude, longitude: c.longitude, isOpen24_7: c.isOpen24_7, acceptsEmergencies: c.acceptsEmergencies,
+        plan: c.plan, verificationStatus: 'VERIFIED', verifiedAt: new Date(), ratingAvg: c.ratingAvg, ratingCount: c.ratingCount,
+      },
+    });
+    await prisma.clinicHours.createMany({ data: c.hours.map((h) => ({ ...h, clinicId: cClinic.id })) });
+    for (const s of c.services) await prisma.service.create({ data: { ...s, clinicId: cClinic.id } });
+  }
+
   console.log('✅ Seed completado.');
   console.log('   Login demo (Admin Local): maria.perez@migoclinicas.com / Migo1234');
 }

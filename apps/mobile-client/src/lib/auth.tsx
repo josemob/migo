@@ -7,6 +7,7 @@ export interface AuthUser {
   fullName: string;
   role: string;
   phone?: string | null;
+  avatarUrl?: string | null;
 }
 
 interface AuthCtx {
@@ -15,6 +16,7 @@ interface AuthCtx {
   login: (email: string, password: string) => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 interface RegisterInput {
@@ -70,7 +72,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  const refreshUser = async () => {
+    if (tokens.access) setUser(await api<AuthUser>('/auth/me'));
+  };
+
   return (
-    <Ctx.Provider value={{ user, loading, login, register, logout }}>{children}</Ctx.Provider>
+    <Ctx.Provider value={{ user, loading, login, register, logout, refreshUser }}>
+      {children}
+    </Ctx.Provider>
   );
 }

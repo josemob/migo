@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Dimensions,
   Image,
@@ -9,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { appAlert } from '../lib/dialog';
+import { pickPhotoAsDataUri } from '../lib/photo';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
@@ -24,9 +26,9 @@ interface EmergencyMine { id: string; status: string }
 const ACTIVE = ['TRIAGING', 'BROADCASTING', 'ACCEPTED', 'EN_ROUTE'];
 
 const SERVICES = [
-  { key: 'ai', title: 'Asistente Médico Virtual', sub: 'Analiza síntomas en segundos', icon: 'medical', color: colors.red, cta: 'Chatear con Migo', to: 'Chats' },
-  { key: 'groom', title: 'Estilo y Cuidado', sub: 'Encuentra peluquerías en Caracas', icon: 'scissors', color: '#22B8C4', cta: 'Encontrar', to: 'Directorio' },
-  { key: 'care', title: 'Migo Care', sub: 'Teleconsultas ilimitadas y descuentos', icon: 'medical', color: colors.brand, cta: 'Conocer plan', to: 'Perfil' },
+  { key: 'ai', title: 'Asistente Médico Virtual', sub: 'Analiza síntomas en segundos', icon: 'medical', color: colors.red, cta: 'Chatear con Migo', to: 'AiChat', params: undefined as any },
+  { key: 'groom', title: 'Estilo y Cuidado', sub: 'Encuentra peluquerías en Caracas', icon: 'scissors', color: '#22B8C4', cta: 'Encontrar', to: 'Directorio', params: { category: 'GROOMING' } },
+  { key: 'care', title: 'Migo Care', sub: 'Teleconsultas ilimitadas y descuentos', icon: 'medical', color: colors.brand, cta: 'Conocer plan', to: 'Perfil', params: undefined as any },
 ];
 
 const SHORTCUTS = [
@@ -39,6 +41,18 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const { user } = useAuth();
   const [page, setPage] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
+  const [banner, setBanner] = useState<string | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem('migo_banner').then(setBanner);
+  }, []);
+
+  const changeBanner = async () => {
+    const uri = await pickPhotoAsDataUri([16, 5]); // recorte ancho para banner
+    if (!uri) return;
+    setBanner(uri);
+    AsyncStorage.setItem('migo_banner', uri);
+  };
 
   const pets = useQuery({ queryKey: ['pets'], queryFn: () => api<{ data: Pet[] }>('/me/pets') });
   const emergencies = useQuery({
@@ -56,7 +70,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
         {/* Header */}
         <View style={styles.header}>
-          <Pressable style={styles.userRow} onPress={() => navigation.navigate('Perfil')}>
+          <Pressable style={styles.userRow} onPress={() => navigation.navigate('Configuracion')}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{firstName[0] ?? 'U'}</Text>
             </View>
@@ -73,7 +87,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             <TabIcon name="scissors" color={colors.brand} size={22} />
           </View>
           <Text style={styles.reminderText}>A {petName} le toca un corte de pelo la próxima semana</Text>
-          <Pressable style={styles.reminderBtn} onPress={() => navigation.navigate('Directorio')}>
+          <Pressable style={styles.reminderBtn} onPress={() => navigation.navigate('Directorio', { category: 'GROOMING' })}>
             <Text style={styles.reminderBtnText}>Agendar cita</Text>
           </Pressable>
         </View>
@@ -99,7 +113,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                   <Text style={styles.svcSub}>{s.sub}</Text>
                 </View>
               </View>
-              <Pressable style={styles.svcBtn} onPress={() => navigation.navigate(s.to)}>
+              <Pressable style={styles.svcBtn} onPress={() => navigation.navigate(s.to, s.params)}>
                 <Text style={styles.svcBtnText}>{s.cta}</Text>
               </Pressable>
             </View>
@@ -117,19 +131,29 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           <View style={styles.urgBody}>
             <Text style={styles.urgTitle}>Urgencias Médicas</Text>
             <Text style={styles.urgSub}>Clínicas 24/7 abiertas y rutas de auxilio inmediato</Text>
-            <Pressable style={styles.urgBtn} onPress={() => navigation.navigate(active ? 'Tracking' : 'Panic', active ? { id: active.id } : undefined)}>
+            <Pressable style={styles.urgBtn} onPress={() => navigation.navigate(active ? 'Tracking' : 'Alerta', active ? { id: active.id } : undefined)}>
               <Text style={styles.urgBtnText}>{active ? 'Ver mi urgencia' : 'Ir a la Clínica'}</Text>
             </Pressable>
           </View>
         </View>
 
-        {/* Banner publicitario (slot fijo de 62px) */}
-        <Pressable style={styles.banner} onPress={() => appAlert('Publicidad', 'Espacio para banner de patrocinador.')}>
-          {/* Sustituye este contenido por <Image source={...} style={{width:'100%',height:'100%'}} /> cuando tengas el banner */}
-          <Text style={styles.bannerBrand}>BARK BITES</Text>
-          <Text style={styles.bannerSub}>Natural & Delicious</Text>
-          <Text style={styles.bannerCta}>Comprar →</Text>
-        </Pressable>
+        {/* Banner publicitario (slot fijo de 62px) — reemplazable */}
+        <View style={styles.bannerWrap}>
+          <Pressable style={styles.banner} onPress={() => appAlert('Publicidad', 'Espacio para banner de patrocinador.')}>
+            {banner ? (
+              <Image source={{ uri: banner }} style={styles.bannerImg} resizeMode="cover" />
+            ) : (
+              <>
+                <Text style={styles.bannerBrand}>BARK BITES</Text>
+                <Text style={styles.bannerSub}>Natural & Delicious</Text>
+                <Text style={styles.bannerCta}>Comprar →</Text>
+              </>
+            )}
+          </Pressable>
+          <Pressable style={styles.bannerEdit} onPress={changeBanner}>
+            <TabIcon name="edit" color={colors.white} size={13} />
+          </Pressable>
+        </View>
 
         {/* Atajos */}
         <Text style={styles.shortcutsTitle}>Atajos</Text>
@@ -188,8 +212,11 @@ const styles = StyleSheet.create({
   urgBtn: { backgroundColor: colors.red, paddingVertical: 12, borderRadius: radius.full, alignItems: 'center' },
   urgBtnText: { color: colors.white, fontWeight: '700', fontSize: 15 },
 
-  // Banner ad slot: altura fija de 62px
-  banner: { height: 62, flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginTop: 18, backgroundColor: '#C97B3C', borderRadius: radius.md, paddingHorizontal: 16, overflow: 'hidden' },
+  // Banner ad slot: altura fija de 62px, reemplazable
+  bannerWrap: { position: 'relative', marginHorizontal: 20, marginTop: 18 },
+  banner: { height: 62, flexDirection: 'row', alignItems: 'center', backgroundColor: '#C97B3C', borderRadius: radius.md, paddingHorizontal: 16, overflow: 'hidden' },
+  bannerImg: { position: 'absolute', width: '100%', height: '100%' },
+  bannerEdit: { position: 'absolute', top: -8, right: -8, width: 28, height: 28, borderRadius: 14, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.white },
   bannerBrand: { color: colors.white, fontSize: 18, fontWeight: '900', letterSpacing: 0.5 },
   bannerSub: { color: '#FFE9D2', fontSize: 12, marginLeft: 8, flex: 1 },
   bannerCta: { color: colors.white, fontSize: 13, fontWeight: '800' },

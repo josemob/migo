@@ -52,7 +52,6 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
     if (!name.trim()) return appAlert('Falta el nombre', 'Dinos cómo se llama tu mascota.');
     setBusy(true);
     try {
-      const notesParts = [alias && `Alias: ${alias}`, size && `Tamaño: ${size}`].filter(Boolean);
       const birthDate = age && Number(age) > 0 ? new Date(new Date().setFullYear(new Date().getFullYear() - Number(age))) : undefined;
       const pet = await api<{ id: string }>('/me/pets', {
         method: 'POST',
@@ -62,7 +61,8 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
           breed: breed || undefined,
           color: color || undefined,
           birthDate,
-          notes: notesParts.length ? notesParts.join(' · ') : undefined,
+          alias: alias || undefined,
+          size: size || undefined,
         },
       });
       if (allergy.trim()) {

@@ -6,6 +6,8 @@ import { validate } from '../../middleware/validate';
 import { authenticate, requireRole } from '../../middleware/auth';
 import { withClinicContext } from '../../middleware/clinicContext';
 import { ApiError } from '../../utils/ApiError';
+import { randomUUID } from 'node:crypto';
+import { createStreamCredentials, streamConfigured, clinicStreamUserId, createRingingCall } from '../stream/stream.service';
 
 const router = Router();
 router.use(authenticate, withClinicContext);
@@ -54,6 +56,44 @@ router.patch(
   }),
 );
 
+// PATCH /clinic/organization -> "Datos Legales del Comercio" (razón social + RIF, auditado por Super Admin)
+// RIF venezolano: letra fiscal (J/G/V/E/P) + dígitos, ej. J-40123456-7
+const RIF_RE = /^[VEJPGvejpg]-?\d{7,9}-?\d?$/;
+const orgSchema = z.object({
+  legalName: z.string().min(2, 'Razón social muy corta').optional(),
+  rif: z.string().regex(RIF_RE, 'RIF inválido. Formato esperado: J-40123456-7').optional(),
+  email: z.string().email('Correo inválido').optional().or(z.literal('')),
+  phone: z.string().optional(),
+});
+
+router.patch(
+  '/organization',
+  requireRole('CLINIC_ADMIN', 'SUPER_ADMIN'),
+  validate({ body: orgSchema }),
+  asyncHandler(async (req, res) => {
+    const clinic = await prisma.clinic.findUnique({
+      where: { id: req.clinicId! },
+      select: { organizationId: true },
+    });
+    if (!clinic) throw ApiError.notFound('Sucursal no encontrada');
+
+    const { email, rif, ...rest } = req.body as { email?: string; rif?: string; [k: string]: unknown };
+    const data: Record<string, unknown> = { ...rest };
+    if (email !== undefined) data.email = email === '' ? null : email;
+    if (rif !== undefined) data.rif = rif.toUpperCase();
+
+    try {
+      const org = await prisma.organization.update({ where: { id: clinic.organizationId }, data });
+      res.json(org);
+    } catch (e) {
+      if (e && typeof e === 'object' && (e as { code?: string }).code === 'P2002') {
+        throw ApiError.conflict('Ese RIF ya está registrado por otro comercio.');
+      }
+      throw e;
+    }
+  }),
+);
+
 // PUT /clinic/hours -> "Horarios de Atención Semanal" (reemplaza los 7 días)
 const daySchema = z.object({
   dayOfWeek: z.number().int().min(0).max(6),
@@ -80,6 +120,115 @@ router.put(
       orderBy: { dayOfWeek: 'asc' },
     });
     res.json({ data: hours });
+  }),
+);
+
+// GET /clinic/stream-token -> credenciales de GetStream con la IDENTIDAD DE LA CLÍNICA
+// (todo el staff opera el chat/llamadas bajo la marca de la sucursal ante el cliente)
+router.get(
+  '/stream-token',
+  asyncHandler(async (req, res) => {
+    if (!streamConfigured()) throw ApiError.badRequest('GetStream no está configurado en el servidor.');
+    const clinic = await prisma.clinic.findUnique({
+      where: { id: req.clinicId! },
+      select: { id: true, name: true, logoUrl: true },
+    });
+    if (!clinic) throw ApiError.notFound('Sucursal no encontrada');
+    const cred = await createStreamCredentials({
+      id: clinicStreamUserId(clinic.id),
+      name: clinic.name,
+      image: clinic.logoUrl,
+      migoRole: 'vet',
+    });
+    res.json({ ...cred, clinicUserId: clinicStreamUserId(clinic.id) });
+  }),
+);
+
+// POST /clinic/teleconsults -> SOLO la clínica inicia una llamada: crea la sala y "anilla" al dueño
+router.post(
+  '/teleconsults',
+  requireRole('CLINIC_ADMIN', 'VET', 'SUPER_ADMIN'),
+  validate({ body: z.object({ ownerId: z.string().uuid(), video: z.boolean().default(true) }) }),
+  asyncHandler(async (req, res) => {
+    if (!streamConfigured()) throw ApiError.badRequest('GetStream no está configurado en el servidor.');
+    const clinic = await prisma.clinic.findUnique({
+      where: { id: req.clinicId! },
+      select: { id: true, name: true, logoUrl: true },
+    });
+    if (!clinic) throw ApiError.notFound('Sucursal no encontrada');
+    const owner = await prisma.user.findUnique({ where: { id: req.body.ownerId }, select: { id: true } });
+    if (!owner) throw ApiError.notFound('Cliente no encontrado');
+
+    const callId = randomUUID();
+    const call = await createRingingCall({ callId, clinic, ownerId: owner.id, video: req.body.video });
+    res.status(201).json(call);
+  }),
+);
+
+// ─────────────────────────────────────────────────────────────────────
+//  CHAT clínica ↔ dueños (el Vet Dashboard responde a los clientes)
+// ─────────────────────────────────────────────────────────────────────
+
+// GET /clinic/chats -> conversaciones (dueños que han escrito a esta sucursal)
+router.get(
+  '/chats',
+  asyncHandler(async (req, res) => {
+    const clinicId = req.clinicId!;
+    const msgs = await prisma.chatMessage.findMany({ where: { clinicId }, orderBy: { createdAt: 'desc' } });
+    const last = new Map<string, (typeof msgs)[number]>();
+    for (const m of msgs) if (!last.has(m.ownerId)) last.set(m.ownerId, m);
+    const owners = await prisma.user.findMany({
+      where: { id: { in: [...last.keys()] } },
+      select: { id: true, fullName: true, avatarUrl: true, phone: true },
+    });
+    const omap = new Map(owners.map((o) => [o.id, o]));
+    const data = [...last.entries()]
+      .map(([ownerId, m]) => ({
+        ownerId,
+        owner: omap.get(ownerId) ?? { id: ownerId, fullName: 'Cliente', avatarUrl: null, phone: null },
+        lastMessage: m.text,
+        lastSender: m.sender,
+        lastAt: m.createdAt,
+      }))
+      .sort((a, b) => b.lastAt.getTime() - a.lastAt.getTime());
+    res.json({ data });
+  }),
+);
+
+// GET /clinic/chats/:ownerId -> hilo con un dueño (+ sus mascotas como contexto)
+router.get(
+  '/chats/:ownerId',
+  validate({ params: z.object({ ownerId: z.string().uuid() }) }),
+  asyncHandler(async (req, res) => {
+    const clinicId = req.clinicId!;
+    const ownerId = req.params.ownerId!;
+    const owner = await prisma.user.findUnique({
+      where: { id: ownerId },
+      select: { id: true, fullName: true, avatarUrl: true, phone: true },
+    });
+    if (!owner) throw ApiError.notFound('Cliente no encontrado');
+    const [messages, pets] = await Promise.all([
+      prisma.chatMessage.findMany({ where: { ownerId, clinicId }, orderBy: { createdAt: 'asc' } }),
+      prisma.pet.findMany({ where: { ownerId }, select: { name: true, species: true, breed: true } }),
+    ]);
+    res.json({ owner, pets, messages });
+  }),
+);
+
+// POST /clinic/chats/:ownerId/messages -> la clínica responde al dueño
+router.post(
+  '/chats/:ownerId/messages',
+  validate({
+    params: z.object({ ownerId: z.string().uuid() }),
+    body: z.object({ text: z.string().min(1).max(1000) }),
+  }),
+  asyncHandler(async (req, res) => {
+    const clinicId = req.clinicId!;
+    const ownerId = req.params.ownerId!;
+    const owner = await prisma.user.findUnique({ where: { id: ownerId }, select: { id: true } });
+    if (!owner) throw ApiError.notFound('Cliente no encontrado');
+    const msg = await prisma.chatMessage.create({ data: { ownerId, clinicId, sender: 'CLINIC', text: req.body.text } });
+    res.status(201).json(msg);
   }),
 );
 

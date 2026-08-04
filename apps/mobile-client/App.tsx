@@ -1,6 +1,8 @@
+import 'react-native-gesture-handler';
 import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -8,8 +10,10 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 
 import { AuthProvider, useAuth } from './src/lib/auth';
+import { StreamProvider } from './src/lib/stream';
 import { api } from './src/lib/api';
 import { DialogHost } from './src/lib/dialog';
+import { EditFieldHost } from './src/lib/editField';
 import { Loading } from './src/components/ui';
 import { TabBar } from './src/components/TabBar';
 import { colors } from './src/theme';
@@ -22,8 +26,16 @@ import TrackingScreen from './src/screens/TrackingScreen';
 import PetsScreen from './src/screens/PetsScreen';
 import PetDetailScreen from './src/screens/PetDetailScreen';
 import DirectoryScreen from './src/screens/DirectoryScreen';
+import ClinicDetailScreen from './src/screens/ClinicDetailScreen';
+import BookAppointmentScreen from './src/screens/BookAppointmentScreen';
+import ConfirmPayScreen from './src/screens/ConfirmPayScreen';
+import AiChatScreen from './src/screens/AiChatScreen';
+import ClinicChatScreen from './src/screens/ClinicChatScreen';
 import ChatsScreen from './src/screens/ChatsScreen';
+import EmergencyClinicsScreen from './src/screens/EmergencyClinicsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import PetProfileScreen from './src/screens/PetProfileScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
 import RegisterPetScreen from './src/screens/RegisterPetScreen';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
@@ -36,6 +48,7 @@ function Tabs() {
     <Tab.Navigator tabBar={(props) => <TabBar {...props} />} screenOptions={{ headerShown: false }}>
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Directorio" component={DirectoryScreen} />
+      <Tab.Screen name="Alerta" component={EmergencyClinicsScreen} />
       <Tab.Screen name="Chats" component={ChatsScreen} />
       <Tab.Screen name="Expediente" component={PetsScreen} />
     </Tab.Navigator>
@@ -57,7 +70,14 @@ function MainApp() {
         <Stack.Screen name="Tracking" component={TrackingScreen} options={{ title: 'Seguimiento', headerBackVisible: false }} />
         <Stack.Screen name="PetDetail" component={PetDetailScreen} options={({ route }: any) => ({ title: route.params?.name ?? 'Ficha' })} />
         <Stack.Screen name="RegisterPet" component={RegisterPetScreen} options={{ headerShown: false, presentation: 'modal' }} />
-        <Stack.Screen name="Perfil" component={ProfileScreen} options={{ title: 'Mi Perfil' }} />
+        <Stack.Screen name="Configuracion" component={SettingsScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Perfil" component={ProfileScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="PetProfile" component={PetProfileScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="ClinicDetail" component={ClinicDetailScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="BookAppointment" component={BookAppointmentScreen} options={{ headerShown: false, presentation: 'modal' }} />
+        <Stack.Screen name="ConfirmPay" component={ConfirmPayScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="AiChat" component={AiChatScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="ClinicChat" component={ClinicChatScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -83,7 +103,11 @@ function MainGate() {
   if (!prompted && (pets.data?.data.length ?? 0) === 0) {
     return <RegisterPetScreen onComplete={finish} onSkip={finish} />;
   }
-  return <MainApp />;
+  return (
+    <StreamProvider>
+      <MainApp />
+    </StreamProvider>
+  );
 }
 
 function Root() {
@@ -109,14 +133,17 @@ function Root() {
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <StatusBar style="dark" />
-          <Root />
-          <DialogHost />
-        </AuthProvider>
-      </QueryClientProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <StatusBar style="dark" />
+            <Root />
+            <DialogHost />
+            <EditFieldHost />
+          </AuthProvider>
+        </QueryClientProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

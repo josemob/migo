@@ -16,6 +16,7 @@ const NAV: {
       { to: '/agenda', label: 'Agenda & Citas', icon: 'calendar' },
       { to: '/urgencias', label: 'Urgencias & Guardia', icon: 'emergency' },
       { to: '/pacientes', label: 'Pacientes & Historiales', icon: 'paw' },
+      { to: '/chats', label: 'Mensajes', icon: 'chat' },
     ],
   },
   {

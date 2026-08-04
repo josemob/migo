@@ -10,7 +10,13 @@ import { distanceKm } from '../../lib/geo';
 const router = Router();
 router.use(authenticate);
 
-// GET /clinics?lat=&lng=&city=&q=  -> directorio (ordenado por cercanía si hay coords)
+const SERVICE_CATEGORIES = [
+  'CONSULTATION', 'VACCINATION', 'GROOMING', 'SURGERY', 'LAB',
+  'IMAGING', 'DENTAL', 'EMERGENCY', 'DEWORMING', 'OTHER',
+] as const;
+
+// GET /clinics?lat=&lng=&city=&q=&category=  -> directorio (ordenado por cercanía si hay coords)
+// Sin category => todas las clínicas. Con category => solo las que ofrecen ese servicio.
 router.get(
   '/',
   validate({
@@ -19,15 +25,20 @@ router.get(
       lng: z.coerce.number().optional(),
       city: z.string().optional(),
       q: z.string().optional(),
+      category: z.enum(SERVICE_CATEGORIES).optional(),
     }),
   }),
   asyncHandler(async (req, res) => {
-    const { lat, lng, city, q } = req.query as { lat?: number; lng?: number; city?: string; q?: string };
+    const { lat, lng, city, q, category } = req.query as {
+      lat?: number; lng?: number; city?: string; q?: string; category?: (typeof SERVICE_CATEGORIES)[number];
+    };
 
     const clinics = await prisma.clinic.findMany({
       where: {
         verificationStatus: 'VERIFIED',
         city: city ? { equals: city, mode: 'insensitive' } : undefined,
+        // Filtro por servicio: solo clínicas con al menos un servicio activo de esa categoría
+        services: category ? { some: { category, isActive: true } } : undefined,
         OR: q
           ? [
               { name: { contains: q, mode: 'insensitive' } },
@@ -41,17 +52,26 @@ router.get(
         isOpen24_7: true, acceptsEmergencies: true, ratingAvg: true, ratingCount: true, plan: true,
         organization: { select: { name: true } },
         _count: { select: { services: true } },
+        services: { where: { isActive: true }, select: { priceUsd: true, category: true } },
       },
       take: 100,
     });
 
-    let data = clinics.map((c) => ({
-      ...c,
-      distanceKm:
-        lat != null && lng != null && c.latitude != null && c.longitude != null
-          ? Number(distanceKm({ lat, lng }, { lat: Number(c.latitude), lng: Number(c.longitude) }).toFixed(2))
-          : null,
-    }));
+    let data = clinics.map((c) => {
+      const { services, ...rest } = c;
+      // Precio base "Desde $X": mínimo entre los servicios relevantes al filtro (o todos si no hay filtro)
+      const relevant = category ? services.filter((s) => s.category === category) : services;
+      const prices = relevant.map((s) => Number(s.priceUsd)).filter((n) => !Number.isNaN(n));
+      return {
+        ...rest,
+        categories: Array.from(new Set(services.map((s) => s.category))),
+        fromPriceUsd: prices.length ? Math.min(...prices) : null,
+        distanceKm:
+          lat != null && lng != null && c.latitude != null && c.longitude != null
+            ? Number(distanceKm({ lat, lng }, { lat: Number(c.latitude), lng: Number(c.longitude) }).toFixed(2))
+            : null,
+      };
+    });
 
     // Orden: Pro primero, luego por cercanía (si hay), luego rating
     data = data.sort((a, b) => {

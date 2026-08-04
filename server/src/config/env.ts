@@ -15,10 +15,14 @@ const schema = z.object({
   JWT_REFRESH_TTL: z.string().default('30d'),
 
   GEMINI_API_KEY: z.string().optional(),
-  GEMINI_MODEL: z.string().default('gemini-1.5-flash'),
+  GEMINI_MODEL: z.string().default('gemini-flash-latest'),
   GOOGLE_MAPS_API_KEY: z.string().optional(),
   AGORA_APP_ID: z.string().optional(),
   AGORA_APP_CERTIFICATE: z.string().optional(),
+
+  // GetStream (Chat + Video). El Secret solo vive en el servidor.
+  STREAM_API_KEY: z.string().optional(),
+  STREAM_API_SECRET: z.string().optional(),
 
   CPL_FEE_USD: z.coerce.number().default(5),
   BOOKING_COMMISSION_RATE: z.coerce.number().default(0.09),

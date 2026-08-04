@@ -11,6 +11,7 @@ import Equipo from './pages/Equipo';
 import Servicios from './pages/Servicios';
 import Finanzas from './pages/Finanzas';
 import Configuracion from './pages/Configuracion';
+import Chats from './pages/Chats';
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="/agenda" element={<Agenda />} />
         <Route path="/urgencias" element={<Urgencias />} />
         <Route path="/pacientes" element={<Pacientes />} />
+        <Route path="/chats" element={<Chats />} />
         <Route path="/equipo" element={<Equipo />} />
         <Route path="/servicios" element={<Servicios />} />
         <Route path="/finanzas" element={<Finanzas />} />

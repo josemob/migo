@@ -40,6 +40,16 @@ export function Card({ children, style }: { children: ReactNode; style?: object 
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
+type ButtonVariant = 'primary' | 'outline' | 'danger' | 'dangerOutline' | 'green';
+
+const VARIANTS: Record<ButtonVariant, { bg: string; fg: string; border: string }> = {
+  primary: { bg: colors.brand, fg: colors.white, border: 'transparent' },
+  green: { bg: colors.green, fg: colors.white, border: 'transparent' },
+  danger: { bg: colors.red, fg: colors.white, border: 'transparent' },
+  outline: { bg: colors.white, fg: colors.brand, border: colors.brand },
+  dangerOutline: { bg: colors.white, fg: colors.red, border: colors.red },
+};
+
 export function Button({
   title,
   onPress,
@@ -49,30 +59,29 @@ export function Button({
 }: {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'outline' | 'danger' | 'green';
+  variant?: ButtonVariant;
   loading?: boolean;
   disabled?: boolean;
 }) {
-  const bg =
-    variant === 'primary' ? colors.brand
-    : variant === 'danger' ? colors.red
-    : variant === 'green' ? colors.green
-    : 'transparent';
-  const fg = variant === 'outline' ? colors.text : colors.white;
+  const v = VARIANTS[variant];
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled || loading}
       style={({ pressed }) => [
         styles.btn,
-        { backgroundColor: bg, opacity: disabled ? 0.5 : pressed ? 0.85 : 1 },
-        variant === 'outline' && styles.btnOutline,
+        {
+          backgroundColor: v.bg,
+          borderColor: v.border,
+          borderWidth: v.border === 'transparent' ? 0 : 1.5,
+          opacity: disabled ? 0.5 : pressed ? 0.9 : 1,
+        },
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={fg} />
+        <ActivityIndicator color={v.fg} />
       ) : (
-        <Text style={[styles.btnText, { color: fg }]}>{title}</Text>
+        <Text style={[styles.btnText, { color: v.fg }]}>{title}</Text>
       )}
     </Pressable>
   );
@@ -122,14 +131,13 @@ const styles = StyleSheet.create({
     boxShadow: cardShadow,
   },
   btn: {
-    height: 52,
-    borderRadius: radius.md,
+    height: 56,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
   },
-  btnOutline: { borderWidth: 1, borderColor: colors.border },
-  btnText: { fontSize: 16, fontWeight: '700' },
+  btnText: { fontSize: 16, fontWeight: '800' },
   label: { fontSize: 14, fontWeight: '600', color: colors.text, marginBottom: 6 },
   input: {
     backgroundColor: colors.white,
