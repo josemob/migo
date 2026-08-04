@@ -84,12 +84,12 @@ export async function ensureChatChannel(params: {
     migo_clinic_id: params.clinic.id,
     migo_owner_id: params.owner.id,
   } as never);
-  const created = await channel.create();
+  await channel.create();
 
-  // Canal nuevo (sin mensajes): la clínica saluda para que el cliente vea la conversación
-  // iniciada e invite a responder/escribir.
-  const msgs = (created as { messages?: unknown[] }).messages;
-  if (!msgs || msgs.length === 0) {
+  // Solo saluda si el canal está REALMENTE vacío. query() es fiable para contar mensajes
+  // (channel.create() no siempre devuelve `messages` al reabrir un canal existente).
+  const state = await channel.query({ messages: { limit: 1 } });
+  if (!state.messages || state.messages.length === 0) {
     await channel.sendMessage({
       text: `¡Hola! 👋 Bienvenido al chat de ${params.clinic.name}. Cuéntanos, ¿en qué podemos ayudarte con tu mascota?`,
       user_id: clinicUserId,

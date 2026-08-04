@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Channel as StreamChannel } from 'stream-chat';
 import { Channel, MessageList, MessageComposer } from 'stream-chat-expo';
 import { api } from '../lib/api';
@@ -11,6 +11,7 @@ import { cardShadow, colors } from '../theme';
 export default function ClinicChatScreen({ navigation, route }: any) {
   const { clinicId, clinicName } = route.params as { clinicId: string; clinicName?: string };
   const { chatClient, ready } = useStream();
+  const insets = useSafeAreaInsets();
   const [channel, setChannel] = useState<StreamChannel | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -36,7 +37,7 @@ export default function ClinicChatScreen({ navigation, route }: any) {
   }, [ready, chatClient, clinicId]);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={[styles.safe, { paddingBottom: insets.bottom + 40 }]} edges={['top']}>
       <View style={styles.topbar}>
         <Pressable style={styles.back} onPress={() => navigation.goBack()}>
           <Text style={styles.backArrow}>‹</Text>
@@ -52,6 +53,7 @@ export default function ClinicChatScreen({ navigation, route }: any) {
       ) : (
         <Channel
           channel={channel}
+          bottomInset={insets.bottom}
           hasFilePicker={false}
           hasImagePicker
           hasCameraPicker
