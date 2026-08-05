@@ -3,12 +3,16 @@ import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
+import * as Notifications from 'expo-notifications';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
+import { useFonts } from 'expo-font';
 
+import { OUTFIT_FONTS, enableOutfit } from './src/lib/fonts';
+import { registerForPush } from './src/lib/push';
 import { AuthProvider, useAuth } from './src/lib/auth';
 import { StreamProvider } from './src/lib/stream';
 import { api } from './src/lib/api';
@@ -31,6 +35,8 @@ import BookAppointmentScreen from './src/screens/BookAppointmentScreen';
 import ConfirmPayScreen from './src/screens/ConfirmPayScreen';
 import AiChatScreen from './src/screens/AiChatScreen';
 import ClinicChatScreen from './src/screens/ClinicChatScreen';
+import RatingScreen from './src/screens/RatingScreen';
+import CareCalendarScreen from './src/screens/CareCalendarScreen';
 import ChatsScreen from './src/screens/ChatsScreen';
 import EmergencyClinicsScreen from './src/screens/EmergencyClinicsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
@@ -42,6 +48,7 @@ const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } 
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+const navigationRef = createNavigationContainerRef();
 
 function Tabs() {
   return (
@@ -50,14 +57,29 @@ function Tabs() {
       <Tab.Screen name="Directorio" component={DirectoryScreen} />
       <Tab.Screen name="Alerta" component={EmergencyClinicsScreen} />
       <Tab.Screen name="Chats" component={ChatsScreen} />
-      <Tab.Screen name="Expediente" component={PetsScreen} />
+      <Tab.Screen name="Citas" component={CareCalendarScreen} />
     </Tab.Navigator>
   );
 }
 
 function MainApp() {
+  useEffect(() => {
+    registerForPush();
+    try {
+      const sub = Notifications.addNotificationResponseReceivedListener((resp) => {
+        const data = resp.notification.request.content.data as { type?: string };
+        if (data?.type === 'appointment' && navigationRef.isReady()) {
+          (navigationRef as never as { navigate: (n: string, p: object) => void }).navigate('Tabs', { screen: 'Citas' });
+        }
+      });
+      return () => sub.remove();
+    } catch (e) {
+      console.log('[push] listener no disponible:', e instanceof Error ? e.message : e);
+    }
+  }, []);
+
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
         screenOptions={{
           headerStyle: { backgroundColor: colors.canvas },
@@ -68,6 +90,7 @@ function MainApp() {
         <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
         <Stack.Screen name="Panic" component={PanicScreen} options={{ title: 'Emergencia', presentation: 'modal' }} />
         <Stack.Screen name="Tracking" component={TrackingScreen} options={{ title: 'Seguimiento', headerBackVisible: false }} />
+        <Stack.Screen name="Expediente" component={PetsScreen} options={{ title: 'Expediente' }} />
         <Stack.Screen name="PetDetail" component={PetDetailScreen} options={({ route }: any) => ({ title: route.params?.name ?? 'Ficha' })} />
         <Stack.Screen name="RegisterPet" component={RegisterPetScreen} options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="Configuracion" component={SettingsScreen} options={{ headerShown: false }} />
@@ -78,6 +101,7 @@ function MainApp() {
         <Stack.Screen name="ConfirmPay" component={ConfirmPayScreen} options={{ headerShown: false }} />
         <Stack.Screen name="AiChat" component={AiChatScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ClinicChat" component={ClinicChatScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Rating" component={RatingScreen} options={{ headerShown: false, presentation: 'modal' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -132,13 +156,17 @@ function Root() {
 }
 
 export default function App() {
+  const [fontsLoaded] = useFonts(OUTFIT_FONTS);
+  // Activa Outfit global una vez cargadas las fuentes, antes de renderizar la app.
+  if (fontsLoaded) enableOutfit();
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <StatusBar style="dark" />
-            <Root />
+            {fontsLoaded ? <Root /> : <Loading />}
             <DialogHost />
             <EditFieldHost />
           </AuthProvider>

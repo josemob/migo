@@ -7,6 +7,7 @@ import { useAuth } from '../lib/auth';
 import { appAlert } from '../lib/dialog';
 import { Button } from '../components/ui';
 import { TabIcon } from '../components/TabIcon';
+import { BackButton } from '../components/BackButton';
 import { cardShadow, colors, radius } from '../theme';
 
 interface Pet { id: string; name: string }
@@ -87,9 +88,7 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
     <SafeAreaView style={styles.safe} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable style={styles.back} onPress={() => navigation.goBack()}>
-          <Text style={styles.backArrow}>←</Text>
-        </Pressable>
+        <BackButton onPress={() => navigation.goBack()} />
         <Text style={styles.headerTitle}>Configuración</Text>
         <Pressable style={styles.skip} onPress={() => navigation.goBack()}>
           <Text style={styles.skipText}>Saltar</Text>

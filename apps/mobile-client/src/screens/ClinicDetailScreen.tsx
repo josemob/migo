@@ -1,18 +1,17 @@
 import { useState } from 'react';
 import { Image, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import Constants from 'expo-constants';
+import { Map as MapLibreMap, Camera, Marker as MapMarker } from '@maplibre/maplibre-react-native';
 
-// Solo montamos el mapa nativo si hay una API key REAL de Google Maps (evita crash con placeholder)
-const MAPS_KEY = String((Constants.expoConfig?.android as any)?.config?.googleMaps?.apiKey ?? '');
-const MAPS_ENABLED = MAPS_KEY.length > 0 && MAPS_KEY !== 'PON_AQUI_TU_GOOGLE_MAPS_API_KEY';
+// OpenFreeMap: tiles vectoriales gratis, SIN API key ni facturación (vía MapLibre).
+const OPENFREEMAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { appAlert } from '../lib/dialog';
 import { Loading, Muted } from '../components/ui';
 import { TabIcon } from '../components/TabIcon';
 import { categoryMeta } from '../lib/serviceCategories';
+import { BackButton } from '../components/BackButton';
 import { cardShadow, colors, radius } from '../theme';
 
 interface Service { id: string; name: string; category: string; description?: string; priceUsd: string; durationMin: number }
@@ -77,7 +76,7 @@ export default function ClinicDetailScreen({ navigation, route }: any) {
   const lat = Number(clinic.latitude);
   const lng = Number(clinic.longitude);
   const hasCoords = clinic.latitude != null && clinic.longitude != null && !Number.isNaN(lat) && !Number.isNaN(lng);
-  const showMap = hasCoords && MAPS_ENABLED;
+  const showMap = hasCoords;
 
   const tabs: { key: TabKey; label: string }[] = [
     { key: 'info', label: 'Información' },
@@ -89,9 +88,7 @@ export default function ClinicDetailScreen({ navigation, route }: any) {
     <SafeAreaView style={styles.safe} edges={['top']}>
       {/* Barra superior */}
       <View style={styles.topbar}>
-        <Pressable style={styles.back} onPress={() => navigation.goBack()}>
-          <Text style={styles.backArrow}>‹</Text>
-        </Pressable>
+        <BackButton onPress={() => navigation.goBack()} />
         <Text style={styles.topTitle} numberOfLines={1}>Veterinaria</Text>
         <Pressable style={styles.back} onPress={() => Share.share({ message: `Mira ${clinic.name} en Migo 🐾` })}>
           <TabIcon name="share" color={colors.brand} size={18} />
@@ -102,22 +99,20 @@ export default function ClinicDetailScreen({ navigation, route }: any) {
         {/* Mapa real (con marcador de la clínica). Sin API key válida → pin placeholder. */}
         <View style={styles.map}>
           {showMap ? (
-            <MapView
-              style={StyleSheet.absoluteFill}
-              provider={PROVIDER_GOOGLE}
-              pointerEvents="none"
-              initialRegion={{ latitude: lat, longitude: lng, latitudeDelta: 0.008, longitudeDelta: 0.008 }}
-            >
-              <Marker coordinate={{ latitude: lat, longitude: lng }}>
-                <View style={styles.pin}>
-                  {clinic.logoUrl ? (
-                    <Image source={{ uri: clinic.logoUrl }} style={styles.pinLogo} />
-                  ) : (
-                    <TabIcon name="medical" color={colors.brand} size={26} />
-                  )}
-                </View>
-              </Marker>
-            </MapView>
+            <View style={StyleSheet.absoluteFill} pointerEvents="none">
+              <MapLibreMap style={StyleSheet.absoluteFill} mapStyle={OPENFREEMAP_STYLE}>
+                <Camera initialViewState={{ center: [lng, lat], zoom: 14 }} />
+                <MapMarker id="clinic" lngLat={[lng, lat]}>
+                  <View style={styles.pin}>
+                    {clinic.logoUrl ? (
+                      <Image source={{ uri: clinic.logoUrl }} style={styles.pinLogo} />
+                    ) : (
+                      <TabIcon name="medical" color={colors.brand} size={26} />
+                    )}
+                  </View>
+                </MapMarker>
+              </MapLibreMap>
+            </View>
           ) : (
             <View style={styles.pin}>
               {clinic.logoUrl ? (

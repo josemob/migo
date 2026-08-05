@@ -15,19 +15,54 @@ const SPECIES_ES: Record<string, string> = {
   DOG: 'perro', CAT: 'gato', BIRD: 'ave', RABBIT: 'conejo', REPTILE: 'reptil', RODENT: 'roedor', OTHER: 'mascota',
 };
 
+// Acción sugerida que la app renderiza como botón bajo la respuesta de Migo IA
+export interface ChatSuggestion {
+  action: 'emergency' | 'grooming' | 'consult';
+  label: string;
+}
+
 /**
  * Migo IA — asistente veterinario conversacional.
  * Usa Gemini si hay API key; si no, cae a respuestas heurísticas para no bloquear el chat.
+ * Además, según el contexto, sugiere acciones (alerta de emergencia, peluquerías, agendar).
  */
-export async function migoAiReply(input: AiChatInput): Promise<{ text: string; source: 'gemini' | 'fallback' }> {
+export async function migoAiReply(
+  input: AiChatInput,
+): Promise<{ text: string; source: 'gemini' | 'fallback'; suggestions: ChatSuggestion[] }> {
+  let text: string;
+  let source: 'gemini' | 'fallback';
   if (env.GEMINI_API_KEY) {
     try {
-      return { text: await geminiChat(input), source: 'gemini' };
+      text = await geminiChat(input);
+      source = 'gemini';
     } catch (err) {
       console.error('Gemini chat falló, usando fallback:', (err as Error).message);
+      text = fallbackReply(input);
+      source = 'fallback';
     }
+  } else {
+    text = fallbackReply(input);
+    source = 'fallback';
   }
-  return { text: fallbackReply(input), source: 'fallback' };
+
+  const lastUser = [...input.messages].reverse().find((m) => m.role === 'user')?.text ?? '';
+  return { text, source, suggestions: computeSuggestions(lastUser, text) };
+}
+
+// Deriva acciones sugeridas del último mensaje del dueño + la respuesta de la IA.
+const EMERGENCY_KW = ['no respira', 'respirac', 'convuls', 'sangr', 'hemorrag', 'veneno', 'intoxic', 'atropell', 'inconsc', 'asfixia', 'ahog', 'colaps', 'emergencia', 'urgente', 'grave', 'crítico'];
+const GROOMING_KW = ['peludo', 'pelo', 'corte', 'baño', 'bano', 'estétic', 'estetic', 'uña', 'cepill', 'grooming', 'enredad', 'despein', 'sucio', 'peluquer'];
+const CONSULT_KW = ['vómit', 'vomit', 'diarrea', 'fiebre', 'decaíd', 'no come', 'dolor', 'cojea', 'rasca', 'alergia', 'piel', 'consulta', 'vacun', 'desparasit', 'revis'];
+
+function computeSuggestions(userText: string, replyText: string): ChatSuggestion[] {
+  const u = userText.toLowerCase();
+  const all = `${userText} ${replyText}`.toLowerCase();
+  const out: ChatSuggestion[] = [];
+  // Emergencia: SOLO según lo que describe el dueño (no por la cautela de la IA en su respuesta)
+  if (EMERGENCY_KW.some((k) => u.includes(k))) out.push({ action: 'emergency', label: '🚨 Activar alerta de emergencia' });
+  if (GROOMING_KW.some((k) => all.includes(k))) out.push({ action: 'grooming', label: '✂️ Ver peluquerías cercanas' });
+  if (out.length === 0 && CONSULT_KW.some((k) => all.includes(k))) out.push({ action: 'consult', label: '📅 Agendar una consulta' });
+  return out.slice(0, 2);
 }
 
 // ─── Gemini ───────────────────────────────────────────────

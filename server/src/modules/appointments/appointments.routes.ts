@@ -7,6 +7,7 @@ import { authenticate } from '../../middleware/auth';
 import { withClinicContext } from '../../middleware/clinicContext';
 import { ApiError } from '../../utils/ApiError';
 import { env } from '../../config/env';
+import { sendPush } from '../push/push.service';
 
 const router = Router();
 router.use(authenticate, withClinicContext);
@@ -173,6 +174,20 @@ router.post(
       }
       return result;
     });
+
+    // Notifica al dueño el cambio de estado (no bloquea la respuesta)
+    const ownerId = updated.pet?.owner?.id;
+    const petName = updated.pet?.name ?? 'tu mascota';
+    if (ownerId) {
+      const NOTIF: Partial<Record<string, { title: string; body: string }>> = {
+        CONFIRMED: { title: 'Cita confirmada ✅', body: `La cita de ${petName} fue confirmada por la clínica.` },
+        IN_PROGRESS: { title: 'En atención 🩺', body: `${petName} está siendo atendido(a) ahora.` },
+        COMPLETED: { title: '¡Cita completada! 🎉', body: `La cita de ${petName} finalizó. Cuéntanos cómo te fue y califícala.` },
+        CANCELLED: { title: 'Cita cancelada', body: `La cita de ${petName} fue cancelada.` },
+      };
+      const n = NOTIF[req.body.status];
+      if (n) void sendPush(ownerId, { ...n, data: { type: 'appointment', appointmentId: updated.id, status: req.body.status } });
+    }
 
     res.json(updated);
   }),

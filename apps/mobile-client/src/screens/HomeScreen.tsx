@@ -16,7 +16,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { TabIcon } from '../components/TabIcon';
-import { cardShadow, colors, radius } from '../theme';
+import { cardShadow, colors, control, radius, type } from '../theme';
 
 const { width: W } = Dimensions.get('window');
 const CARD_W = W * 0.8;
@@ -60,6 +60,14 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     queryFn: () => api<{ data: EmergencyMine[] }>('/emergencies/mine'),
     refetchInterval: 8000,
   });
+  const pendingReview = useQuery({
+    queryKey: ['pending-review'],
+    queryFn: () =>
+      api<{ appointment: { id: string; scheduledAt: string; clinic: { name: string }; service?: { name: string }; pet: { name: string } } | null }>(
+        '/me/appointments/pending-review',
+      ),
+  });
+  const toRate = pendingReview.data?.appointment ?? null;
 
   const firstName = user?.fullName?.split(' ')[0] ?? '';
   const petName = pets.data?.data[0]?.name ?? 'tu mascota';
@@ -80,6 +88,29 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             <TabIcon name="bell" color={colors.brand} size={24} />
           </Pressable>
         </View>
+
+        {/* Califica tu cita (aparece si hay una cita completada sin calificar) */}
+        {toRate && (
+          <Pressable
+            style={styles.rateCard}
+            onPress={() =>
+              navigation.navigate('Rating', {
+                appointmentId: toRate.id,
+                clinicName: toRate.clinic.name,
+                serviceName: toRate.service?.name,
+                petName: toRate.pet.name,
+                timeLabel: new Date(toRate.scheduledAt).toLocaleDateString('es-VE', { day: 'numeric', month: 'short' }),
+              })
+            }
+          >
+            <View style={styles.rateIcon}><Text style={{ fontSize: 22 }}>⭐</Text></View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rateTitle}>Califica tu cita</Text>
+              <Text style={styles.rateSub}>{toRate.clinic.name} · {toRate.pet.name}</Text>
+            </View>
+            <Text style={styles.rateCta}>Calificar →</Text>
+          </Pressable>
+        )}
 
         {/* Recordatorio */}
         <View style={styles.reminder}>
@@ -168,7 +199,11 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 <TabIcon name={s.icon} color={colors.brand} size={22} />
               </View>
               <Text style={styles.shortcutLabel}>{s.label}</Text>
-              <Text style={styles.dotsMenu}>•••</Text>
+              <View style={styles.dotsMenu}>
+                <View style={styles.menuDot} />
+                <View style={styles.menuDot} />
+                <View style={styles.menuDot} />
+              </View>
             </Pressable>
           ))}
         </View>
@@ -186,19 +221,25 @@ const styles = StyleSheet.create({
   hi: { fontSize: 18, fontWeight: '700', color: colors.text },
   bell: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#F1ECF5', alignItems: 'center', justifyContent: 'center' },
 
+  rateCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 20, marginBottom: 14, padding: 14, backgroundColor: '#FEFBEA', borderRadius: radius.lg, borderWidth: 2, borderColor: colors.accent, boxShadow: cardShadow },
+  rateIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#FFF3C4', alignItems: 'center', justifyContent: 'center' },
+  rateTitle: { fontSize: 15, fontWeight: '800', color: colors.text },
+  rateSub: { fontSize: 13, color: colors.muted, marginTop: 2 },
+  rateCta: { color: colors.brand, fontWeight: '800', fontSize: 14 },
+
   reminder: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 20, marginBottom: 18, padding: 12, backgroundColor: colors.white, borderRadius: radius.lg, borderWidth: 2, borderColor: colors.accent, boxShadow: cardShadow },
   reminderIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#F1ECF5', alignItems: 'center', justifyContent: 'center' },
   reminderText: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.text },
-  reminderBtn: { backgroundColor: colors.accent, paddingHorizontal: 14, paddingVertical: 10, borderRadius: radius.full },
-  reminderBtnText: { fontWeight: '700', color: colors.text, fontSize: 13 },
+  reminderBtn: { backgroundColor: colors.accent, paddingHorizontal: control.pill.paddingH, paddingVertical: control.pill.paddingV, borderRadius: control.pill.radius, alignItems: 'center', justifyContent: 'center' },
+  reminderBtnText: { ...type.bodySmall, color: colors.text },
 
   svcCard: { backgroundColor: colors.white, borderRadius: radius.lg, padding: 16, justifyContent: 'space-between', gap: 16, boxShadow: cardShadow },
   svcTop: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   svcIcon: { width: 46, height: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   svcTitle: { fontSize: 17, fontWeight: '800', color: colors.text },
   svcSub: { fontSize: 13, color: colors.muted, marginTop: 2 },
-  svcBtn: { backgroundColor: colors.brand, paddingVertical: 13, borderRadius: radius.full, alignItems: 'center' },
-  svcBtnText: { color: colors.white, fontWeight: '700', fontSize: 15 },
+  svcBtn: { backgroundColor: colors.brand, height: control.medium.height, borderRadius: control.medium.radius, alignItems: 'center', justifyContent: 'center' },
+  svcBtnText: { ...type.h4, color: colors.white },
 
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginVertical: 14 },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.accent },
@@ -209,8 +250,8 @@ const styles = StyleSheet.create({
   urgBody: { flex: 1, padding: 14, paddingLeft: 4 },
   urgTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
   urgSub: { fontSize: 13, color: colors.muted, marginTop: 2, marginBottom: 12 },
-  urgBtn: { backgroundColor: colors.red, paddingVertical: 12, borderRadius: radius.full, alignItems: 'center' },
-  urgBtnText: { color: colors.white, fontWeight: '700', fontSize: 15 },
+  urgBtn: { backgroundColor: colors.red, height: control.medium.height, borderRadius: control.medium.radius, alignItems: 'center', justifyContent: 'center' },
+  urgBtnText: { ...type.h4, color: colors.white },
 
   // Banner ad slot: altura fija de 62px, reemplazable
   bannerWrap: { position: 'relative', marginHorizontal: 20, marginTop: 18 },
@@ -222,8 +263,10 @@ const styles = StyleSheet.create({
   bannerCta: { color: colors.white, fontSize: 13, fontWeight: '800' },
 
   shortcutsTitle: { fontSize: 20, fontWeight: '800', color: colors.text, marginHorizontal: 20, marginTop: 22, marginBottom: 12 },
-  shortcut: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: colors.white, borderRadius: radius.lg, padding: 14, boxShadow: cardShadow },
-  shortcutIcon: { width: 40, height: 40, borderRadius: 10, backgroundColor: '#F1ECF5', alignItems: 'center', justifyContent: 'center' },
-  shortcutLabel: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text },
-  dotsMenu: { color: colors.brand, fontWeight: '900', fontSize: 16 },
+  // Card de atajo (Figma node 112-80): padding 8/8/8/14 · gap 12 · radio 16
+  shortcut: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.white, borderRadius: radius.lg, paddingVertical: 8, paddingLeft: 8, paddingRight: 14, boxShadow: cardShadow },
+  shortcutIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(138,47,160,0.14)', alignItems: 'center', justifyContent: 'center' },
+  shortcutLabel: { flex: 1, ...type.h4, color: '#444444' },
+  dotsMenu: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  menuDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.brand },
 });

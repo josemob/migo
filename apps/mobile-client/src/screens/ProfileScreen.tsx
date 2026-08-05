@@ -10,6 +10,7 @@ import { editField } from '../lib/editField';
 import { pickPhotoAsDataUri } from '../lib/photo';
 import { Button } from '../components/ui';
 import { TabIcon } from '../components/TabIcon';
+import { BackButton } from '../components/BackButton';
 import { cardShadow, colors, radius } from '../theme';
 
 interface Pet {
@@ -68,9 +69,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Pressable style={styles.back} onPress={() => navigation.goBack()}>
-          <Text style={styles.backArrow}>←</Text>
-        </Pressable>
+        <BackButton onPress={() => navigation.goBack()} />
         <Text style={styles.headerTitle}>Mi Perfil</Text>
         <View style={{ width: 44 }} />
       </View>

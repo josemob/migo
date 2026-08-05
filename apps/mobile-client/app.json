@@ -19,11 +19,6 @@
     },
     "android": {
       "package": "com.migo.client",
-      "config": {
-        "googleMaps": {
-          "apiKey": "PON_AQUI_TU_GOOGLE_MAPS_API_KEY"
-        }
-      },
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -67,7 +62,9 @@
       ],
       "expo-audio",
       "expo-video",
-      "expo-sharing"
+      "expo-sharing",
+      "@maplibre/maplibre-react-native",
+      "expo-font"
     ],
     "extra": {
       "eas": {

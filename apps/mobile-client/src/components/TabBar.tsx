@@ -8,7 +8,7 @@ const ICONS: Record<string, string> = {
   Home: 'home',
   Directorio: 'directory',
   Chats: 'chat',
-  Expediente: 'expediente',
+  Citas: 'citas',
 };
 const INACTIVE = '#C7C7C7';
 
@@ -66,7 +66,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#F0ECF3',
     alignItems: 'flex-start',
   },
-  tab: { flex: 1, alignItems: 'center', gap: 3 },
+  tab: { flex: 1, alignItems: 'center', gap: 12 },
   label: { fontSize: 11, fontWeight: '600' },
   centerSlot: { flex: 1, alignItems: 'center' },
   alertBtn: {

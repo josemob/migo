@@ -244,6 +244,7 @@ model User {
   reviews            Review[]
   subscriptions      Subscription[]
   refreshTokens      RefreshToken[]
+  pushTokens         PushToken[]
   auditLogsActor     AuditLog[]     @relation("AuditActor")
 
   createdAt DateTime @default(now())
@@ -262,6 +263,19 @@ model RefreshToken {
   revokedAt DateTime?
   userAgent String?
   createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// Tokens de Expo Push para notificaciones (uno por device/instalación)
+model PushToken {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  token     String   @unique // ExponentPushToken[xxx]
+  platform  String? // "ios" | "android"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
 }

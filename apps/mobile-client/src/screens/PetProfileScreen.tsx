@@ -8,6 +8,7 @@ import { editField } from '../lib/editField';
 import { pickPhotoAsDataUri } from '../lib/photo';
 import { Loading } from '../components/ui';
 import { TabIcon } from '../components/TabIcon';
+import { BackButton } from '../components/BackButton';
 import { cardShadow, colors, radius } from '../theme';
 
 interface Ficha {
@@ -96,9 +97,7 @@ export default function PetProfileScreen({ route, navigation }: { route: any; na
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Pressable style={styles.back} onPress={() => navigation.goBack()}>
-          <Text style={styles.backArrow}>←</Text>
-        </Pressable>
+        <BackButton onPress={() => navigation.goBack()} />
         <Text style={styles.headerTitle}>Perfil de {data.name}</Text>
         <View style={{ width: 44 }} />
       </View>

@@ -6,6 +6,7 @@ import { Channel, MessageList, MessageComposer } from 'stream-chat-expo';
 import { api } from '../lib/api';
 import { useStream } from '../lib/stream';
 import { Loading, Muted } from '../components/ui';
+import { BackButton } from '../components/BackButton';
 import { cardShadow, colors } from '../theme';
 
 export default function ClinicChatScreen({ navigation, route }: any) {
@@ -39,9 +40,7 @@ export default function ClinicChatScreen({ navigation, route }: any) {
   return (
     <SafeAreaView style={[styles.safe, { paddingBottom: insets.bottom + 40 }]} edges={['top']}>
       <View style={styles.topbar}>
-        <Pressable style={styles.back} onPress={() => navigation.goBack()}>
-          <Text style={styles.backArrow}>‹</Text>
-        </Pressable>
+        <BackButton onPress={() => navigation.goBack()} />
         <Text style={styles.topTitle} numberOfLines={1}>{clinicName ?? 'Clínica'}</Text>
         <View style={{ width: 40 }} />
       </View>

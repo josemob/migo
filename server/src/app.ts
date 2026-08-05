@@ -16,6 +16,7 @@ import clinicRoutes from './modules/clinic/clinic.routes';
 import financeRoutes from './modules/finance/finance.routes';
 import meRoutes from './modules/me/me.routes';
 import directoryRoutes from './modules/clinics/directory.routes';
+import adminRoutes from './modules/admin/admin.routes';
 
 export const app = express();
 
@@ -46,6 +47,8 @@ api.use('/finance', financeRoutes);
 // App Cliente (B2C)
 api.use('/me', meRoutes);
 api.use('/clinics', directoryRoutes);
+// Super Admin (MIGO Sistema Operativo)
+api.use('/admin', adminRoutes);
 app.use('/api/v1', api);
 
 app.use(notFoundHandler);

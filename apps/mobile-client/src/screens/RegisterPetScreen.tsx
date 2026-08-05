@@ -14,6 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { TabIcon } from '../components/TabIcon';
+import { BackButton } from '../components/BackButton';
 import { colors, radius } from '../theme';
 
 interface Props {
@@ -81,9 +82,7 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
     <SafeAreaView style={styles.safe} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable style={styles.back} onPress={skip}>
-          <Text style={styles.backArrow}>←</Text>
-        </Pressable>
+        <BackButton onPress={skip} />
         <Text style={styles.headerTitle}>Registrar Mascota</Text>
         <Pressable style={styles.skip} onPress={skip}>
           <Text style={styles.skipText}>Saltar</Text>

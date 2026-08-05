@@ -5,6 +5,7 @@ import * as Clipboard from 'expo-clipboard';
 import { api } from '../lib/api';
 import { appAlert } from '../lib/dialog';
 import { TabIcon } from '../components/TabIcon';
+import { BackButton } from '../components/BackButton';
 import { cardShadow, colors, radius } from '../theme';
 
 interface Service { id: string; name: string; priceUsd: string | number }
@@ -87,9 +88,7 @@ export default function ConfirmPayScreen({ navigation, route }: any) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.topbar}>
-        <Pressable style={styles.back} onPress={() => navigation.goBack()}>
-          <Text style={styles.backArrow}>‹</Text>
-        </Pressable>
+        <BackButton onPress={() => navigation.goBack()} />
         <Text style={styles.topTitle}>Confirmar y Pagar</Text>
         <View style={{ width: 40 }} />
       </View>

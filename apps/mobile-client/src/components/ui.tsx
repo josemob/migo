@@ -10,7 +10,7 @@ import {
   type TextInputProps,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { cardShadow, colors, radius, spacing } from '../theme';
+import { cardShadow, colors, control, radius, spacing, type } from '../theme';
 
 export function Screen({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) {
   return (
@@ -50,40 +50,77 @@ const VARIANTS: Record<ButtonVariant, { bg: string; fg: string; border: string }
   dangerOutline: { bg: colors.white, fg: colors.red, border: colors.red },
 };
 
+type ButtonSize = 'lg' | 'md';
+
 export function Button({
   title,
   onPress,
   variant = 'primary',
+  size = 'lg',
   loading,
   disabled,
+  style,
 }: {
   title: string;
   onPress: () => void;
   variant?: ButtonVariant;
+  size?: ButtonSize;
   loading?: boolean;
   disabled?: boolean;
+  style?: object;
 }) {
   const v = VARIANTS[variant];
+  // medium (design system): alto 32 · radio 8 · texto h4
+  const isMd = size === 'md';
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled || loading}
       style={({ pressed }) => [
         styles.btn,
+        isMd && { height: control.medium.height, borderRadius: control.medium.radius, paddingHorizontal: spacing.md },
         {
           backgroundColor: v.bg,
           borderColor: v.border,
           borderWidth: v.border === 'transparent' ? 0 : 1.5,
           opacity: disabled ? 0.5 : pressed ? 0.9 : 1,
         },
+        style,
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={v.fg} />
+        <ActivityIndicator color={v.fg} size={isMd ? 'small' : undefined} />
       ) : (
-        <Text style={[styles.btnText, { color: v.fg }]}>{title}</Text>
+        <Text style={[isMd ? styles.btnTextMd : styles.btnText, { color: v.fg }]}>{title}</Text>
       )}
     </Pressable>
+  );
+}
+
+// Pill / botón pill (design system): alto 26 · radio 13 · texto body small
+export function Pill({
+  label,
+  color = colors.brand,
+  onPress,
+  filled = false,
+  tint,
+}: {
+  label: string;
+  color?: string;
+  onPress?: () => void;
+  filled?: boolean;
+  tint?: string;
+}) {
+  const bg = filled ? color : tint ?? color + '1F';
+  const fg = filled ? colors.white : color;
+  const inner = <Text style={[styles.pillText, { color: fg }]}>{label}</Text>;
+  const pillStyle = [styles.pill, { backgroundColor: bg }];
+  return onPress ? (
+    <Pressable onPress={onPress} style={({ pressed }) => [...pillStyle, { opacity: pressed ? 0.85 : 1 }]}>
+      {inner}
+    </Pressable>
+  ) : (
+    <View style={pillStyle}>{inner}</View>
   );
 }
 
@@ -138,6 +175,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   btnText: { fontSize: 16, fontWeight: '800' },
+  btnTextMd: { ...type.h4 },
+  pill: {
+    borderRadius: control.pill.radius,
+    paddingHorizontal: control.pill.paddingH,
+    paddingVertical: control.pill.paddingV,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'flex-start',
+  },
+  pillText: { ...type.bodySmall },
   label: { fontSize: 14, fontWeight: '600', color: colors.text, marginBottom: 6 },
   input: {
     backgroundColor: colors.white,
@@ -149,6 +196,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.text,
   },
-  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full, alignSelf: 'flex-start' },
-  badgeText: { fontSize: 12, fontWeight: '700' },
+  // Badge = pill compacto para etiquetas/estados (IA, urgencia): menos padding horizontal.
+  badge: {
+    paddingHorizontal: 12,
+    paddingVertical: control.pill.paddingV,
+    borderRadius: control.pill.radius,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'flex-start',
+  },
+  badgeText: { ...type.bodySmall },
 });

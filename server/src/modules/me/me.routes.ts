@@ -8,6 +8,7 @@ import { ApiError } from '../../utils/ApiError';
 import { migoAiReply } from '../chat/aiChat.service';
 import { extractChatSummary } from '../chat/chatSummary.service';
 import { createStreamCredentials, streamConfigured, ensureChatChannel } from '../stream/stream.service';
+import { registerPushToken, removePushToken } from '../push/push.service';
 
 const router = Router();
 router.use(authenticate);
@@ -179,6 +180,84 @@ router.get(
   }),
 );
 
+// POST /me/push-token -> registra el Expo push token del device
+router.post(
+  '/push-token',
+  validate({ body: z.object({ token: z.string().min(1), platform: z.string().optional() }) }),
+  asyncHandler(async (req, res) => {
+    await registerPushToken(req.user!.id, req.body.token, req.body.platform);
+    res.status(204).end();
+  }),
+);
+
+// DELETE /me/push-token -> baja el token (logout)
+router.delete(
+  '/push-token',
+  validate({ body: z.object({ token: z.string().min(1) }) }),
+  asyncHandler(async (req, res) => {
+    await removePushToken(req.body.token);
+    res.status(204).end();
+  }),
+);
+
+// GET /me/care-calendar -> eventos del calendario de cuidados
+//   type "appointment": citas reales (barra morada, "Ver Cita")
+//   type "suggestion":  refuerzos/vacunas que tocan según el esquema (barra ámbar, "Agendar Ahora")
+router.get(
+  '/care-calendar',
+  asyncHandler(async (req, res) => {
+    const ownerId = req.user!.id;
+    const now = new Date();
+    const from = new Date(now.getTime() - 45 * 24 * 3600_000); // 45 días atrás
+    const to = new Date(now.getTime() + 90 * 24 * 3600_000); // 90 días adelante
+
+    const [appts, vaccines] = await Promise.all([
+      prisma.appointment.findMany({
+        where: { bookedById: ownerId, status: { not: 'CANCELLED' } },
+        orderBy: { scheduledAt: 'asc' },
+        include: {
+          clinic: { select: { id: true, name: true } },
+          service: { select: { name: true } },
+          pet: { select: { id: true, name: true } },
+        },
+      }),
+      // Vacunas con refuerzo próximo (o recién vencido) => sugerencia de Migo
+      prisma.vaccination.findMany({
+        where: { nextDueAt: { gte: from, lte: to }, pet: { ownerId } },
+        orderBy: { nextDueAt: 'asc' },
+        include: { pet: { select: { id: true, name: true } }, clinic: { select: { id: true, name: true } } },
+      }),
+    ]);
+
+    const events = [
+      ...appts.map((a) => ({
+        kind: 'appointment' as const,
+        id: a.id,
+        title: a.service?.name ?? a.reason ?? 'Cita veterinaria',
+        date: a.scheduledAt.toISOString(),
+        status: a.status,
+        petId: a.pet.id,
+        petName: a.pet.name,
+        clinicId: a.clinic.id,
+        clinicName: a.clinic.name,
+      })),
+      ...vaccines.map((v) => ({
+        kind: 'suggestion' as const,
+        id: v.id,
+        title: `Refuerzo: ${v.vaccineName}`,
+        date: v.nextDueAt!.toISOString(),
+        petId: v.pet.id,
+        petName: v.pet.name,
+        clinicId: v.clinic?.id ?? null,
+        clinicName: v.clinic?.name ?? null,
+        description: 'Migo detectó que le toca este refuerzo según su esquema de vacunación.',
+      })),
+    ].sort((x, y) => x.date.localeCompare(y.date));
+
+    res.json({ events });
+  }),
+);
+
 // POST /me/appointments -> el dueño reserva una cita en una clínica del directorio
 router.post(
   '/appointments',
@@ -244,6 +323,68 @@ router.post(
       },
     });
     res.status(201).json(appt);
+  }),
+);
+
+// GET /me/appointments/pending-review -> última cita COMPLETADA sin calificar (para pedir reseña)
+router.get(
+  '/appointments/pending-review',
+  asyncHandler(async (req, res) => {
+    const appointment = await prisma.appointment.findFirst({
+      where: { bookedById: req.user!.id, status: 'COMPLETED', review: { is: null } },
+      orderBy: { scheduledAt: 'desc' },
+      include: {
+        clinic: { select: { id: true, name: true, logoUrl: true } },
+        service: { select: { name: true } },
+        pet: { select: { name: true } },
+      },
+    });
+    res.json({ appointment });
+  }),
+);
+
+// POST /me/appointments/:id/review -> calificar una cita (crea Review + actualiza el rating de la clínica)
+router.post(
+  '/appointments/:id/review',
+  validate({
+    params: z.object({ id: z.string().uuid() }),
+    body: z.object({
+      rating: z.number().int().min(1).max(5),
+      comment: z.string().max(500).optional(),
+      tags: z.array(z.string()).max(6).optional(),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const appt = await prisma.appointment.findFirst({
+      where: { id: req.params.id, bookedById: req.user!.id },
+      include: { review: true, clinic: { select: { id: true, ratingAvg: true, ratingCount: true } } },
+    });
+    if (!appt) throw ApiError.notFound('Cita no encontrada');
+    if (appt.review) throw ApiError.conflict('Esta cita ya fue calificada.');
+
+    const { rating, comment, tags } = req.body as { rating: number; comment?: string; tags?: string[] };
+    const fullComment = [comment?.trim(), tags?.length ? tags.join(' · ') : undefined].filter(Boolean).join('\n');
+
+    const result = await prisma.$transaction(async (tx) => {
+      const review = await tx.review.create({
+        data: {
+          appointmentId: appt.id,
+          clinicId: appt.clinicId,
+          authorId: req.user!.id,
+          rating,
+          comment: fullComment || undefined,
+        },
+      });
+      // Recalcula el promedio de la clínica de forma incremental
+      const oldCount = appt.clinic.ratingCount;
+      const oldAvg = Number(appt.clinic.ratingAvg);
+      const ratingCount = oldCount + 1;
+      const ratingAvg = Number(((oldAvg * oldCount + rating) / ratingCount).toFixed(2));
+      await tx.clinic.update({ where: { id: appt.clinicId }, data: { ratingAvg, ratingCount } });
+      return { review, ratingAvg, ratingCount };
+    });
+
+    res.status(201).json(result);
   }),
 );
 

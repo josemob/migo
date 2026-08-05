@@ -6,9 +6,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { BackButton } from '../components/BackButton';
 import { cardShadow, colors, radius } from '../theme';
 
-interface Msg { role: 'user' | 'assistant'; text: string }
+interface Suggestion { action: 'emergency' | 'grooming' | 'consult'; label: string }
+interface Msg { role: 'user' | 'assistant'; text: string; suggestions?: Suggestion[] }
 interface Pet { id: string; name: string }
 
 export default function AiChatScreen({ navigation }: { navigation: any }) {
@@ -46,11 +48,11 @@ export default function AiChatScreen({ navigation }: { navigation: any }) {
     setBusy(true);
     toEnd();
     try {
-      const res = await api<{ text: string; source: string }>('/me/ai-chat', {
+      const res = await api<{ text: string; source: string; suggestions?: Suggestion[] }>('/me/ai-chat', {
         method: 'POST',
         body: { messages: next.slice(-16), petId: pet?.id },
       });
-      setMessages((m) => [...m, { role: 'assistant', text: res.text }]);
+      setMessages((m) => [...m, { role: 'assistant', text: res.text, suggestions: res.suggestions }]);
     } catch {
       setMessages((m) => [...m, { role: 'assistant', text: 'Ups, no pude responder ahora. Intenta de nuevo en un momento. 🐾' }]);
     } finally {
@@ -59,12 +61,18 @@ export default function AiChatScreen({ navigation }: { navigation: any }) {
     }
   };
 
+  // Navega según la acción sugerida por Migo IA. Directorio/Alerta viven dentro del
+  // navegador de Tabs, así que hay que usar la navegación anidada { screen, params }.
+  const onSuggestion = (s: Suggestion) => {
+    if (s.action === 'emergency') navigation.navigate('Tabs', { screen: 'Alerta' });
+    else if (s.action === 'grooming') navigation.navigate('Tabs', { screen: 'Directorio', params: { category: 'GROOMING' } });
+    else navigation.navigate('Tabs', { screen: 'Directorio' });
+  };
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.topbar}>
-        <Pressable style={styles.back} onPress={() => navigation.goBack()}>
-          <Text style={styles.backArrow}>‹</Text>
-        </Pressable>
+        <BackButton onPress={() => navigation.goBack()} />
         <Text style={styles.topTitle}>Migo IA</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -73,8 +81,19 @@ export default function AiChatScreen({ navigation }: { navigation: any }) {
         <ScrollView ref={scroller} contentContainerStyle={{ padding: 16, gap: 12 }} onContentSizeChange={toEnd} showsVerticalScrollIndicator={false}>
           <View style={styles.dayChip}><Text style={styles.dayChipText}>HOY</Text></View>
           {messages.map((m, i) => (
-            <View key={i} style={[styles.bubble, m.role === 'user' ? styles.user : styles.ai]}>
-              <Text style={[styles.msgText, m.role === 'user' && { color: colors.white }]}>{m.text}</Text>
+            <View key={i} style={{ gap: 8, alignItems: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+              <View style={[styles.bubble, m.role === 'user' ? styles.user : styles.ai]}>
+                <Text style={[styles.msgText, m.role === 'user' && { color: colors.white }]}>{m.text}</Text>
+              </View>
+              {m.suggestions?.map((s, j) => (
+                <Pressable
+                  key={j}
+                  style={[styles.suggestion, s.action === 'emergency' && styles.suggestionDanger]}
+                  onPress={() => onSuggestion(s)}
+                >
+                  <Text style={[styles.suggestionText, s.action === 'emergency' && styles.suggestionDangerText]}>{s.label}</Text>
+                </Pressable>
+              ))}
             </View>
           ))}
           {busy && (
@@ -86,10 +105,10 @@ export default function AiChatScreen({ navigation }: { navigation: any }) {
 
         {/* Acciones rápidas */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quick} style={{ flexGrow: 0 }}>
-          <Pressable style={[styles.qBtn, styles.qDanger]} onPress={() => navigation.navigate('Alerta')}>
+          <Pressable style={[styles.qBtn, styles.qDanger]} onPress={() => navigation.navigate('Tabs', { screen: 'Alerta' })}>
             <Text style={styles.qDangerText}>🚨 Es una emergencia</Text>
           </Pressable>
-          <Pressable style={styles.qBtn} onPress={() => navigation.navigate('Directorio')}>
+          <Pressable style={styles.qBtn} onPress={() => navigation.navigate('Tabs', { screen: 'Directorio' })}>
             <Text style={styles.qText}>📍 ¿Dónde están?</Text>
           </Pressable>
           <Pressable style={styles.qBtn} onPress={() => send('Quiero agendar una consulta')}>
@@ -132,6 +151,11 @@ const styles = StyleSheet.create({
   user: { alignSelf: 'flex-end', backgroundColor: colors.brand, borderTopRightRadius: 6 },
   msgText: { fontSize: 15, color: colors.text, lineHeight: 21 },
   typing: { fontSize: 14, color: colors.muted, fontStyle: 'italic' },
+
+  suggestion: { alignSelf: 'flex-start', maxWidth: '92%', flexDirection: 'row', alignItems: 'center', backgroundColor: colors.brandLight, borderWidth: 1.5, borderColor: colors.brand, borderRadius: radius.full, paddingHorizontal: 16, paddingVertical: 11 },
+  suggestionText: { color: colors.brand, fontWeight: '800', fontSize: 14 },
+  suggestionDanger: { backgroundColor: '#FDECEC', borderColor: colors.red },
+  suggestionDangerText: { color: colors.red },
 
   quick: { paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
   qBtn: { borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.full, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: colors.white },
