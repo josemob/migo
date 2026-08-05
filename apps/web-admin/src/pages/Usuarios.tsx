@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { Badge, Card, ErrorNote, PageHeader, SectionTitle, Spinner } from '../components/ui';
+import { Icon } from '../components/Icon';
 
 interface Pet { name: string; species: string }
 interface User {
@@ -105,7 +106,7 @@ export default function Usuarios() {
 
                 <div className="mt-4 rounded-xl border px-4 py-3 text-sm" style={{ borderColor: selected.subscription ? '#C6E9D2' : '#E2E8F0', background: selected.subscription ? '#E8F6ED' : '#F8FAFC' }}>
                   {selected.subscription ? (
-                    <div className="flex items-center justify-between"><span className="font-semibold text-green-700">🛡️ Migo Care Activa</span><span className="font-bold text-green-700">${Number(selected.subscription.priceUsd).toFixed(2)}/mes</span></div>
+                    <div className="flex items-center justify-between"><span className="flex items-center gap-1.5 font-semibold text-green-700"><Icon name="shield" className="h-4 w-4" />Migo Care Activa</span><span className="font-bold text-green-700">${Number(selected.subscription.priceUsd).toFixed(2)}/mes</span></div>
                   ) : (
                     <span className="text-slate-500">Sin suscripción activa</span>
                   )}
@@ -114,19 +115,20 @@ export default function Usuarios() {
                 <div className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400">Mascotas registradas ({selected.pets.length})</div>
                 <div className="mt-2 space-y-2">
                   {selected.pets.map((p, i) => (
-                    <div key={i} className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm"><span>🐾</span><span className="font-medium text-slate-700">{p.name}</span><span className="text-xs text-slate-400">· {p.species}</span></div>
+                    <div key={i} className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm"><Icon name="paw" className="h-4 w-4 text-migo-purple" /><span className="font-medium text-slate-700">{p.name}</span><span className="text-xs text-slate-400">· {p.species}</span></div>
                   ))}
                   {selected.pets.length === 0 && <p className="text-sm text-slate-400">Sin mascotas.</p>}
                 </div>
 
                 <div className="mt-5 space-y-2">
-                  <button onClick={() => sendPush(selected)} disabled={push.isPending} className="w-full rounded-xl bg-brand-500 py-2.5 font-semibold text-white hover:bg-brand-600 disabled:opacity-60">✉️ Enviar Notificación Push</button>
+                  <button onClick={() => sendPush(selected)} disabled={push.isPending} className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-500 py-2.5 font-semibold text-white hover:bg-brand-600 disabled:opacity-60"><Icon name="bell" className="h-5 w-5" />Enviar Notificación Push</button>
                   <button
                     onClick={() => suspend.mutate({ id: selected.id, suspend: selected.status !== 'SUSPENDED' })}
                     disabled={suspend.isPending}
-                    className={`w-full rounded-xl border py-2.5 font-semibold disabled:opacity-60 ${selected.status === 'SUSPENDED' ? 'border-green-300 text-green-700 hover:bg-green-50' : 'border-red-300 text-red-600 hover:bg-red-50'}`}
+                    className={`flex w-full items-center justify-center gap-2 rounded-xl border py-2.5 font-semibold disabled:opacity-60 ${selected.status === 'SUSPENDED' ? 'border-green-300 text-green-700 hover:bg-green-50' : 'border-red-300 text-red-600 hover:bg-red-50'}`}
                   >
-                    {selected.status === 'SUSPENDED' ? '✓ Reactivar Cuenta' : '⚠ Suspender Cuenta de Usuario'}
+                    <Icon name={selected.status === 'SUSPENDED' ? 'check' : 'warning'} className="h-5 w-5" />
+                    {selected.status === 'SUSPENDED' ? 'Reactivar Cuenta' : 'Suspender Cuenta de Usuario'}
                   </button>
                   {push.isSuccess && <p className="text-center text-xs text-green-600">Notificación enviada.</p>}
                 </div>

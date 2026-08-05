@@ -1,16 +1,17 @@
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
+import { Icon, type IconName } from './Icon';
 
-const NAV = [
-  { to: '/', label: 'General & Métricas', icon: '📊', end: true },
-  { to: '/comercios', label: 'Gestión de Comercios', icon: '🏪' },
-  { to: '/veterinarios', label: 'Verificación de Veterinarios', icon: '🩺' },
-  { to: '/emergencias', label: 'Monitor de Emergencias', icon: '🚨' },
-  { to: '/usuarios', label: 'Usuarios & Mascotas', icon: '👥' },
-  { to: '/finanzas', label: 'Finanzas & Liquidaciones', icon: '💳' },
-  { to: '/migo-ai', label: 'Migo AI & Contenido', icon: '🤖' },
-  { to: '/configuracion', label: 'Configuración Global', icon: '⚙️' },
+const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
+  { to: '/', label: 'General & Métricas', icon: 'dashboard', end: true },
+  { to: '/comercios', label: 'Gestión de Comercios', icon: 'store' },
+  { to: '/veterinarios', label: 'Verificación de Veterinarios', icon: 'hospital' },
+  { to: '/emergencias', label: 'Monitor de Emergencias', icon: 'emergency' },
+  { to: '/usuarios', label: 'Usuarios & Mascotas', icon: 'team' },
+  { to: '/finanzas', label: 'Finanzas & Liquidaciones', icon: 'finance' },
+  { to: '/migo-ai', label: 'Migo AI & Contenido', icon: 'robot' },
+  { to: '/configuracion', label: 'Configuración Global', icon: 'settings' },
 ];
 
 export function AdminLayout({ children }: { children: ReactNode }) {
@@ -41,7 +42,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
                 }`
               }
             >
-              <span className="text-base">{n.icon}</span>
+              <Icon name={n.icon} className="h-5 w-5 shrink-0" />
               <span>{n.label}</span>
             </NavLink>
           ))}
@@ -58,9 +59,9 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           <button
             onClick={logout}
             title="Cerrar sesión"
-            className="rounded-lg px-2 py-1.5 text-lg text-white/60 transition hover:bg-white/10 hover:text-white"
+            className="rounded-lg p-2 text-white/60 transition hover:bg-white/10 hover:text-white"
           >
-            ⎋
+            <Icon name="logout" className="h-5 w-5" />
           </button>
         </div>
       </aside>

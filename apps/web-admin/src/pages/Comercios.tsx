@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { Badge, Card, ErrorNote, PageHeader, SectionTitle, Spinner } from '../components/ui';
+import { Icon } from '../components/Icon';
 
 interface Clinic {
   id: string;
@@ -128,27 +129,27 @@ export default function Comercios() {
                       <button
                         disabled={mutation.isPending}
                         onClick={() => mutation.mutate({ id: selected.id, action: selected.status === 'SUSPENDED' ? 'reactivate' : 'approve' })}
-                        className="w-full rounded-xl bg-green-500 py-2.5 font-semibold text-white transition hover:bg-green-600 disabled:opacity-60"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-500 py-2.5 font-semibold text-white transition hover:bg-green-600 disabled:opacity-60"
                       >
-                        ● {selected.status === 'SUSPENDED' ? 'Reactivar Comercio' : 'Aprobar Comercio'}
+                        <Icon name="check" className="h-5 w-5" />{selected.status === 'SUSPENDED' ? 'Reactivar Comercio' : 'Aprobar Comercio'}
                       </button>
                     )}
                     {selected.status === 'ACTIVE' && (
                       <button
                         disabled={mutation.isPending}
                         onClick={() => mutation.mutate({ id: selected.id, action: 'suspend' })}
-                        className="w-full rounded-xl bg-amber-500 py-2.5 font-semibold text-white transition hover:bg-amber-600 disabled:opacity-60"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 py-2.5 font-semibold text-white transition hover:bg-amber-600 disabled:opacity-60"
                       >
-                        ⚠ Suspender Servicio
+                        <Icon name="warning" className="h-5 w-5" />Suspender Servicio
                       </button>
                     )}
                     {selected.status !== 'SUSPENDED' && (
                       <button
                         disabled={mutation.isPending}
                         onClick={() => mutation.mutate({ id: selected.id, action: 'reject' })}
-                        className="w-full rounded-xl bg-red-500 py-2.5 font-semibold text-white transition hover:bg-red-600 disabled:opacity-60"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-500 py-2.5 font-semibold text-white transition hover:bg-red-600 disabled:opacity-60"
                       >
-                        ● Rechazar (Con Motivo)
+                        <Icon name="close" className="h-5 w-5" />Rechazar (Con Motivo)
                       </button>
                     )}
                   </div>

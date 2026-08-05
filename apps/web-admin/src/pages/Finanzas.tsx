@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { Badge, Card, ErrorNote, PageHeader, SectionTitle, Spinner, StatCard } from '../components/ui';
+import { Icon } from '../components/Icon';
 
 interface Finance {
   cplTotal: number;
@@ -31,10 +32,10 @@ export default function Finanzas() {
       ) : data ? (
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="Facturación CPL Total" value={usd(data.cplTotal)} icon="📊" hint="Leads de emergencia" />
-            <StatCard label="Comisiones Retenidas" value={usd(data.comisionesRetenidas)} icon="💳" hint="Por consultas de rutina" />
-            <StatCard label="Liquidaciones Pendientes" value={usd(data.liquidacionesPendientes)} icon="⏳" hint="Para procesamiento" />
-            <StatCard label="Clínicas en Mora" value={`${data.clinicasEnMora}`} icon="⚠️" hint="Requieren atención" />
+            <StatCard label="Facturación CPL Total" value={usd(data.cplTotal)} icon={<Icon name="chart" className="h-4 w-4" />} hint="Leads de emergencia" />
+            <StatCard label="Comisiones Retenidas" value={usd(data.comisionesRetenidas)} icon={<Icon name="finance" className="h-4 w-4" />} hint="Por consultas de rutina" />
+            <StatCard label="Liquidaciones Pendientes" value={usd(data.liquidacionesPendientes)} icon={<Icon name="clock" className="h-4 w-4" />} hint="Para procesamiento" />
+            <StatCard label="Clínicas en Mora" value={`${data.clinicasEnMora}`} icon={<Icon name="warning" className="h-4 w-4" />} hint="Requieren atención" />
           </div>
 
           <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -84,9 +85,9 @@ export default function Finanzas() {
                       <button
                         onClick={() => approve.mutate(p.id)}
                         disabled={approve.isPending}
-                        className="mt-3 w-full rounded-xl bg-brand-500 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
+                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-brand-500 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
                       >
-                        ✓ Aprobar Liquidación
+                        <Icon name="check" className="h-4 w-4" />Aprobar Liquidación
                       </button>
                     </div>
                   ))}

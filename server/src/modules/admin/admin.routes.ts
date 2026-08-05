@@ -336,6 +336,23 @@ router.get(
 );
 
 router.post(
+  '/ai/rules',
+  validate({
+    body: z.object({
+      name: z.string().min(1),
+      keywords: z.array(z.string().min(1)).default([]),
+      responseTemplate: z.string().min(1),
+      severity: z.enum(['CRITICA', 'MODERADA', 'BAJA']).default('MODERADA'),
+      active: z.boolean().default(true),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const rule = await prisma.aiTriageRule.create({ data: req.body });
+    res.status(201).json(rule);
+  }),
+);
+
+router.post(
   '/ai/rules/:id/toggle',
   validate({ params: z.object({ id: z.string().uuid() }) }),
   asyncHandler(async (req, res) => {
@@ -343,6 +360,15 @@ router.post(
     if (!rule) throw ApiError.notFound('Regla no encontrada');
     const updated = await prisma.aiTriageRule.update({ where: { id: rule.id }, data: { active: !rule.active } });
     res.json({ id: updated.id, active: updated.active });
+  }),
+);
+
+router.delete(
+  '/ai/rules/:id',
+  validate({ params: z.object({ id: z.string().uuid() }) }),
+  asyncHandler(async (req, res) => {
+    await prisma.aiTriageRule.delete({ where: { id: req.params.id } });
+    res.status(204).end();
   }),
 );
 
@@ -355,6 +381,31 @@ router.get(
       orderBy: { createdAt: 'asc' },
     });
     res.json({ data });
+  }),
+);
+
+router.post(
+  '/ai/knowledge',
+  validate({
+    body: z.object({
+      title: z.string().min(1),
+      category: z.string().min(1),
+      severity: z.string().min(1),
+      description: z.string().min(1),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const entry = await prisma.aiKnowledgeEntry.create({ data: req.body });
+    res.status(201).json(entry);
+  }),
+);
+
+router.delete(
+  '/ai/knowledge/:id',
+  validate({ params: z.object({ id: z.string().uuid() }) }),
+  asyncHandler(async (req, res) => {
+    await prisma.aiKnowledgeEntry.delete({ where: { id: req.params.id } });
+    res.status(204).end();
   }),
 );
 

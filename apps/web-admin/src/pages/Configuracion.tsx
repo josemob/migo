@@ -2,6 +2,11 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { Badge, Card, ErrorNote, PageHeader, SectionTitle, Spinner } from '../components/ui';
+import { Icon, type IconName } from '../components/Icon';
+
+function TitleIcon({ name, children }: { name: IconName; children: string }) {
+  return <span className="flex items-center gap-2"><Icon name={name} className="h-5 w-5 text-migo-purple" />{children}</span>;
+}
 
 interface Config { cplFeeUsd: number; commissionRate: number; bcvRate: number; paymentGateway: string }
 interface Admin { id: string; fullName: string; email: string; status: string; lastAccess: string }
@@ -36,7 +41,7 @@ export default function Configuracion() {
         <>
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <Card>
-              <SectionTitle>💵 Ajustes de Monetización</SectionTitle>
+              <SectionTitle><TitleIcon name="finance">Ajustes de Monetización</TitleIcon></SectionTitle>
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">Valor del Lead de Emergencia (CPL)</label>
               <div className="mt-1 flex items-center gap-2">
                 <span className="text-slate-500">$</span>
@@ -54,7 +59,7 @@ export default function Configuracion() {
             </Card>
 
             <Card>
-              <SectionTitle>🏦 Integración Financiera & Pasarela</SectionTitle>
+              <SectionTitle><TitleIcon name="bank">Integración Financiera & Pasarela</TitleIcon></SectionTitle>
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">Tasa oficial BCV actual</label>
               <div className="mt-1 rounded-xl border border-green-200 bg-green-50 px-4 py-3 font-bold text-green-700">Bs. {data.config.bcvRate.toFixed(2)} / USD</div>
 
@@ -64,7 +69,7 @@ export default function Configuracion() {
           </div>
 
           <Card className="mt-6">
-            <SectionTitle>👥 Gestión de Administradores MIGO</SectionTitle>
+            <SectionTitle><TitleIcon name="team">Gestión de Administradores MIGO</TitleIcon></SectionTitle>
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-400">

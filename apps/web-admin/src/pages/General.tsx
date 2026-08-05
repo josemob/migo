@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { Card, ErrorNote, PageHeader, SectionTitle, Spinner, StatCard } from '../components/ui';
+import { Icon, type IconName } from '../components/Icon';
 
 interface Overview {
   comerciosActivos: number;
@@ -35,10 +36,10 @@ export default function General() {
       ) : data ? (
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="Comercios Activos" value={`${data.comerciosActivos} Clínicas`} icon="🏪" />
-            <StatCard label="Emergencias Hoy" value={`${data.emergenciasHoy} Alertas`} icon="🚨" />
-            <StatCard label="GMV Mensual" value={usd(data.gmvMensual)} icon="📊" hint="Volumen transado" />
-            <StatCard label="Revenue Migo" value={usd(data.revenueMigo)} icon="💳" hint="Comisiones + leads" />
+            <StatCard label="Comercios Activos" value={`${data.comerciosActivos} Clínicas`} icon={<Icon name="store" className="h-4 w-4" />} />
+            <StatCard label="Emergencias Hoy" value={`${data.emergenciasHoy} Alertas`} icon={<Icon name="emergency" className="h-4 w-4" />} />
+            <StatCard label="GMV Mensual" value={usd(data.gmvMensual)} icon={<Icon name="chart" className="h-4 w-4" />} hint="Volumen transado" />
+            <StatCard label="Revenue Migo" value={usd(data.revenueMigo)} icon={<Icon name="finance" className="h-4 w-4" />} hint="Comisiones + leads" />
           </div>
 
           <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -54,9 +55,9 @@ export default function General() {
             <Card>
               <SectionTitle>Salud de la Red</SectionTitle>
               <div className="grid grid-cols-1 gap-3">
-                <MiniStat icon="🩺" label="Veterinarios (red)" value={`${data.vetsGuardia}`} hint="Registrados en la plataforma" />
-                <MiniStat icon="🟡" label="Solicitudes pendientes" value={`${data.solicitudes}`} hint="Comercios por verificar" />
-                <MiniStat icon="🔴" label="Comercios suspendidos" value={`${data.suspendidos}`} hint="Por mora o rechazo" />
+                <MiniStat icon="hospital" tone="text-migo-purple" label="Veterinarios (red)" value={`${data.vetsGuardia}`} hint="Registrados en la plataforma" />
+                <MiniStat icon="clock" tone="text-amber-500" label="Solicitudes pendientes" value={`${data.solicitudes}`} hint="Comercios por verificar" />
+                <MiniStat icon="warning" tone="text-red-500" label="Comercios suspendidos" value={`${data.suspendidos}`} hint="Por mora o rechazo" />
               </div>
             </Card>
           </div>
@@ -84,10 +85,10 @@ function TrendChart({ trend }: { trend: Overview['trend'] }) {
   );
 }
 
-function MiniStat({ icon, label, value, hint }: { icon: string; label: string; value: string; hint: string }) {
+function MiniStat({ icon, tone, label, value, hint }: { icon: IconName; tone: string; label: string; value: string; hint: string }) {
   return (
     <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-4 py-3">
-      <span className="text-xl">{icon}</span>
+      <Icon name={icon} className={`h-5 w-5 ${tone}`} />
       <div className="flex-1">
         <div className="text-sm font-semibold text-slate-700">{label}</div>
         <div className="text-xs text-slate-400">{hint}</div>

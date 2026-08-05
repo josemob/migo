@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { Badge, Card, ErrorNote, PageHeader, SectionTitle, Spinner } from '../components/ui';
+import { Icon } from '../components/Icon';
 
 interface Vet {
   id: string;
@@ -74,16 +75,16 @@ export default function Veterinarios() {
                   <button
                     disabled={mutation.isPending}
                     onClick={() => mutation.mutate({ id: selected.id, action: 'approve' })}
-                    className="rounded-xl bg-green-500 py-3 font-semibold text-white hover:bg-green-600 disabled:opacity-60"
+                    className="flex items-center justify-center gap-2 rounded-xl bg-green-500 py-3 font-semibold text-white hover:bg-green-600 disabled:opacity-60"
                   >
-                    ✓ Otorgar Insignia Médico Verificado
+                    <Icon name="check" className="h-5 w-5" />Otorgar Insignia Médico Verificado
                   </button>
                   <button
                     disabled={mutation.isPending}
                     onClick={() => mutation.mutate({ id: selected.id, action: 'reject' })}
-                    className="rounded-xl bg-red-500 py-3 font-semibold text-white hover:bg-red-600 disabled:opacity-60"
+                    className="flex items-center justify-center gap-2 rounded-xl bg-red-500 py-3 font-semibold text-white hover:bg-red-600 disabled:opacity-60"
                   >
-                    ✗ Rechazar Verificación
+                    <Icon name="close" className="h-5 w-5" />Rechazar Verificación
                   </button>
                 </div>
                 {data.pending.length > 1 && (
@@ -123,7 +124,7 @@ function DocBox({ label }: { label: string }) {
   return (
     <div>
       <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</div>
-      <div className="flex h-28 items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-3xl text-slate-300">🪪</div>
+      <div className="flex h-28 items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-slate-300"><Icon name="image" className="h-9 w-9" /></div>
     </div>
   );
 }
