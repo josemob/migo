@@ -280,6 +280,40 @@ model PushToken {
   @@index([userId])
 }
 
+// ── Super Admin: Migo AI & Contenido ──
+// Reglas de triaje del asistente (palabras clave -> template de respuesta)
+model AiTriageRule {
+  id               String   @id @default(uuid())
+  name             String
+  keywords         String[]
+  responseTemplate String
+  severity         String   @default("MODERADA") // CRITICA | MODERADA | BAJA
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// Base de conocimiento médico (toxinas, síntomas, alergias)
+model AiKnowledgeEntry {
+  id          String   @id @default(uuid())
+  title       String
+  category    String // Toxinas | Síntomas | Alergias
+  severity    String // Crítica | Moderada | Leve
+  description String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ── Super Admin: Configuración Global (singleton) ──
+model PlatformConfig {
+  id             String   @id @default("singleton")
+  cplFeeUsd      Decimal  @default(5) @db.Decimal(10, 2)
+  commissionRate Decimal  @default(0.08) @db.Decimal(4, 3)
+  bcvRate        Decimal  @default(36.5) @db.Decimal(12, 2)
+  paymentGateway String   @default("Stripe + Pago Móvil Local (C2P)")
+  updatedAt      DateTime @updatedAt
+}
+
 // ─────────────────────────────────────────────────────────────────────
 //  PETS & MEDICAL RECORD (Expediente Médico Digital)
 // ─────────────────────────────────────────────────────────────────────
