@@ -13,6 +13,7 @@ import * as Notifications from 'expo-notifications';
 import { OUTFIT_FONTS, enableOutfit } from './src/lib/fonts';
 import { registerForPush } from './src/lib/push';
 import { AuthProvider, useAuth } from './src/lib/auth';
+import { StreamProvider } from './src/lib/stream';
 import { api } from './src/lib/api';
 import { DialogHost } from './src/lib/dialog';
 import { Loading } from './src/components/ui';
@@ -30,6 +31,7 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import PatientDetailScreen from './src/screens/PatientDetailScreen';
 import NewConsultScreen from './src/screens/NewConsultScreen';
 import ReportScreen from './src/screens/ReportScreen';
+import ChatThreadScreen from './src/screens/ChatThreadScreen';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
 const Tab = createBottomTabNavigator();
@@ -77,14 +79,17 @@ function MainApp() {
   }, []);
 
   return (
-    <NavigationContainer ref={navigationRef}>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Tabs" component={Tabs} />
-        <Stack.Screen name="PatientDetail" component={PatientDetailScreen} />
-        <Stack.Screen name="NewConsult" component={NewConsultScreen} options={{ presentation: 'modal' }} />
-        <Stack.Screen name="Report" component={ReportScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <StreamProvider>
+      <NavigationContainer ref={navigationRef}>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Tabs" component={Tabs} />
+          <Stack.Screen name="PatientDetail" component={PatientDetailScreen} />
+          <Stack.Screen name="NewConsult" component={NewConsultScreen} options={{ presentation: 'modal' }} />
+          <Stack.Screen name="Report" component={ReportScreen} />
+          <Stack.Screen name="ChatThread" component={ChatThreadScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </StreamProvider>
   );
 }
 

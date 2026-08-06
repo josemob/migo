@@ -13,7 +13,7 @@ import { api } from './api';
 import { useAuth } from './auth';
 import { colors } from '../theme';
 
-interface Cred { apiKey: string; token: string; userId: string }
+interface Cred { apiKey: string; token: string; userId: string; clinicUserId?: string }
 
 interface StreamCtx {
   chatClient: StreamChat | null;
@@ -41,8 +41,9 @@ export function StreamProvider({ children }: { children: ReactNode }) {
 
     (async () => {
       try {
-        const cred = await api<Cred>('/me/stream-token');
-        const streamUser = { id: cred.userId, name: user.fullName ?? undefined };
+        // El staff se conecta a Stream como la IDENTIDAD DE LA CLÍNICA (clinic_<clinicId>)
+        const cred = await api<Cred>('/clinic/stream-token');
+        const streamUser = { id: cred.userId, name: user.staffProfile?.clinic?.name ?? 'Clínica' };
         cc = StreamChat.getInstance(cred.apiKey);
         if (!cc.userID) await cc.connectUser(streamUser, cred.token);
         vc = StreamVideoClient.getOrCreateInstance({ apiKey: cred.apiKey, user: streamUser, token: cred.token });
