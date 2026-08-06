@@ -16,10 +16,23 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { TabIcon } from '../components/TabIcon';
+import { categoryMeta } from '../lib/serviceCategories';
 import { cardShadow, colors, control, radius, type } from '../theme';
 
 const { width: W } = Dimensions.get('window');
 const CARD_W = W * 0.8;
+
+// Etiqueta amigable de cuándo es la cita ("hoy 3:00 p. m.", "mañana…", "en 2 días")
+function whenLabel(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((startOfDay(d) - startOfDay(now)) / (24 * 3600_000));
+  const time = d.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
+  if (days <= 0) return `hoy ${time}`;
+  if (days === 1) return `mañana ${time}`;
+  return `en ${days} días`;
+}
 
 interface Pet { id: string; name: string }
 interface EmergencyMine { id: string; status: string }
@@ -69,6 +82,19 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   });
   const toRate = pendingReview.data?.appointment ?? null;
 
+  const nextAppt = useQuery({
+    queryKey: ['next-appointment'],
+    queryFn: () =>
+      api<{
+        appointment:
+          | { id: string; scheduledAt: string; clinic: { name: string }; service?: { name: string; category?: string } | null; pet: { name: string } }
+          | null;
+      }>('/me/appointments/next'),
+  });
+  const upcoming = nextAppt.data?.appointment ?? null;
+  // Solo se muestra como recordatorio si la cita es dentro de los próximos 3 días
+  const soon = upcoming && new Date(upcoming.scheduledAt).getTime() - Date.now() <= 3 * 24 * 3600_000 ? upcoming : null;
+
   const firstName = user?.fullName?.split(' ')[0] ?? '';
   const petName = pets.data?.data[0]?.name ?? 'tu mascota';
   const active = emergencies.data?.data.find((e) => ACTIVE.includes(e.status));
@@ -112,16 +138,34 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           </Pressable>
         )}
 
-        {/* Recordatorio */}
-        <View style={styles.reminder}>
-          <View style={styles.reminderIcon}>
-            <TabIcon name="scissors" color={colors.brand} size={22} />
+        {/* Recordatorio: si hay una cita en ≤3 días, se sustituye por el recordatorio de la cita
+            (con el icono del servicio). Si no, muestra la sugerencia genérica de cuidado. */}
+        {soon ? (
+          <View style={styles.reminder}>
+            <View style={styles.reminderIcon}>
+              <TabIcon name={categoryMeta(soon.service?.category)?.icon ?? 'calendar'} color={colors.brand} size={22} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.reminderText}>
+                Cita {soon.service?.name ? `de ${soon.service.name} ` : ''}para {soon.pet.name} {whenLabel(soon.scheduledAt)}
+              </Text>
+              <Text style={styles.reminderSub}>{soon.clinic.name}</Text>
+            </View>
+            <Pressable style={styles.reminderBtn} onPress={() => navigation.navigate('Citas')}>
+              <Text style={styles.reminderBtnText}>Ver cita</Text>
+            </Pressable>
           </View>
-          <Text style={styles.reminderText}>A {petName} le toca un corte de pelo la próxima semana</Text>
-          <Pressable style={styles.reminderBtn} onPress={() => navigation.navigate('Directorio', { category: 'GROOMING' })}>
-            <Text style={styles.reminderBtnText}>Agendar cita</Text>
-          </Pressable>
-        </View>
+        ) : (
+          <View style={styles.reminder}>
+            <View style={styles.reminderIcon}>
+              <TabIcon name="scissors" color={colors.brand} size={22} />
+            </View>
+            <Text style={styles.reminderText}>A {petName} le toca un corte de pelo la próxima semana</Text>
+            <Pressable style={styles.reminderBtn} onPress={() => navigation.navigate('Directorio', { category: 'GROOMING' })}>
+              <Text style={styles.reminderBtnText}>Agendar cita</Text>
+            </Pressable>
+          </View>
+        )}
 
         {/* Carrusel de servicios */}
         <ScrollView
@@ -230,6 +274,7 @@ const styles = StyleSheet.create({
   reminder: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 20, marginBottom: 18, padding: 12, backgroundColor: colors.white, borderRadius: radius.lg, borderWidth: 2, borderColor: colors.accent, boxShadow: cardShadow },
   reminderIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#F1ECF5', alignItems: 'center', justifyContent: 'center' },
   reminderText: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.text },
+  reminderSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
   reminderBtn: { backgroundColor: colors.accent, paddingHorizontal: control.pill.paddingH, paddingVertical: control.pill.paddingV, borderRadius: control.pill.radius, alignItems: 'center', justifyContent: 'center' },
   reminderBtnText: { ...type.bodySmall, color: colors.text },
 

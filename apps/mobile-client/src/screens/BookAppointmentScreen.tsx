@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
   petChipText: { fontWeight: '700', color: colors.text },
   petChipTextOn: { color: colors.brand },
 
-  day: { width: 66, borderRadius: radius.md, backgroundColor: colors.white, alignItems: 'center', paddingVertical: 12, borderWidth: 1.5, borderColor: colors.border },
+  day: { width: 66, borderRadius: radius.md, backgroundColor: colors.white, alignItems: 'center', paddingHorizontal: 12, paddingVertical: 12, borderWidth: 1.5, borderColor: colors.border },
   dayOn: { backgroundColor: colors.brand, borderColor: colors.brand },
   dayDow: { fontSize: 13, color: colors.muted, fontWeight: '700' },
   dayNum: { fontSize: 20, fontWeight: '900', color: colors.text, marginVertical: 1 },
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
   today: { fontSize: 11, color: colors.muted, marginTop: 4, fontWeight: '600' },
 
   slots: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  slot: { width: '47%', flexGrow: 1, alignItems: 'center', gap: 4, paddingVertical: 16, borderRadius: radius.md, backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.border },
+  slot: { width: '47%', flexGrow: 1, alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 16, borderRadius: radius.md, backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.border },
   slotOn: { borderColor: colors.brand, backgroundColor: colors.brandLight },
   slotOff: { backgroundColor: '#F1F1F4', borderColor: '#F1F1F4' },
   slotText: { fontSize: 16, fontWeight: '800', color: colors.text },

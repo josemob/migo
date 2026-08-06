@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
   back: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
   backArrow: { fontSize: 22, color: colors.text },
   headerTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
-  skip: { backgroundColor: colors.accent, paddingHorizontal: 18, paddingVertical: 10, borderRadius: radius.full },
+  skip: { backgroundColor: colors.accent, paddingHorizontal: 12, paddingVertical: 10, borderRadius: radius.full },
   skipText: { fontWeight: '800', color: colors.text },
 
   title: { fontSize: 26, fontWeight: '800', color: colors.brand, marginTop: 8 },

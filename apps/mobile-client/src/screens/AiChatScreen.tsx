@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
   backArrow: { fontSize: 30, color: colors.brand, marginTop: -4, fontWeight: '700' },
   topTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '800', color: colors.text },
 
-  dayChip: { alignSelf: 'center', backgroundColor: '#E9E7EE', borderRadius: radius.full, paddingHorizontal: 14, paddingVertical: 5, marginBottom: 4 },
+  dayChip: { alignSelf: 'center', backgroundColor: '#E9E7EE', borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 5, marginBottom: 4 },
   dayChipText: { fontSize: 12, fontWeight: '800', color: colors.muted, letterSpacing: 0.5 },
 
   bubble: { maxWidth: '85%', borderRadius: 20, paddingHorizontal: 15, paddingVertical: 11 },
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
   suggestionDangerText: { color: colors.red },
 
   quick: { paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
-  qBtn: { borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.full, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: colors.white },
+  qBtn: { borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: colors.white },
   qText: { fontWeight: '700', color: colors.text, fontSize: 13 },
   qDanger: { borderColor: colors.red },
   qDangerText: { fontWeight: '800', color: colors.red, fontSize: 13 },

@@ -48,6 +48,9 @@ interface Clinic {
   longitude?: string | number | null;
   distanceKm?: number | null;
   isOpen24_7: boolean;
+  openNow?: boolean | null; // true=abierto, false=cerrado, null=sin horario cargado
+  closesAt?: string | null; // "20:00" si está abierto
+  opensAt?: string | null; // "08:00" próxima apertura si está cerrado
   acceptsEmergencies: boolean;
   ratingAvg: string;
   ratingCount: number;
@@ -197,6 +200,21 @@ export default function DirectoryScreen({ navigation, route }: any) {
                       <Text style={styles.ratingCount}>({c.ratingCount} opiniones)</Text>
                     </View>
 
+                    {c.openNow != null && (
+                      <View style={[styles.statusPill, c.openNow ? styles.statusOpen : styles.statusClosed]}>
+                        <View style={[styles.statusDot, { backgroundColor: c.openNow ? colors.green : colors.red }]} />
+                        <Text style={[styles.statusText, { color: c.openNow ? colors.green : colors.red }]} numberOfLines={1}>
+                          {c.openNow
+                            ? c.closesAt
+                              ? `Abierto · cierra ${c.closesAt}`
+                              : 'Abierto 24 h'
+                            : c.opensAt
+                            ? `Cerrado · abre ${c.opensAt}`
+                            : 'Cerrado'}
+                        </Text>
+                      </View>
+                    )}
+
                     <Text style={styles.meta} numberOfLines={1}>
                       📍 {c.address ?? c.city ?? 'Caracas'}
                       {c.distanceKm != null ? `  ·  A ${c.distanceKm} km` : ''}
@@ -252,7 +270,7 @@ const styles = StyleSheet.create({
 
   // Chips con estructura de pill (24/4 · radio 27 · body small) SIN borde morado
   chips: { paddingVertical: 2, gap: 8 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: control.pill.paddingV, borderRadius: control.pill.radius, backgroundColor: colors.white, boxShadow: cardShadow },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: control.pill.paddingH, paddingVertical: control.pill.paddingV, borderRadius: control.pill.radius, backgroundColor: colors.white, boxShadow: cardShadow },
   chipActive: { backgroundColor: colors.brand },
   chipText: { ...type.bodySmall, color: colors.brand },
   chipTextActive: { color: colors.white },
@@ -264,8 +282,15 @@ const styles = StyleSheet.create({
   name: { fontSize: 16, fontWeight: '800', color: colors.text, flexShrink: 1 },
 
   // Ver Horarios: pill blanco (24/4 · radio 27 · body small) con borde 1px morado
-  verBtn: { borderWidth: 1, borderColor: colors.brand, borderRadius: control.pill.radius, paddingHorizontal: 10, paddingVertical: control.pill.paddingV, backgroundColor: colors.white },
+  verBtn: { borderWidth: 1, borderColor: colors.brand, borderRadius: control.pill.radius, paddingHorizontal: control.pill.paddingH, paddingVertical: control.pill.paddingV, backgroundColor: colors.white },
   verBtnText: { ...type.bodySmall, color: colors.brand },
+
+  // Badge Abierto/Cerrado (informativo — el agendamiento sigue disponible aunque esté cerrado)
+  statusPill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 6, paddingHorizontal: control.pill.paddingH, paddingVertical: 3, borderRadius: radius.full },
+  statusOpen: { backgroundColor: '#E7F6EC' },
+  statusClosed: { backgroundColor: '#FDECEC' },
+  statusDot: { width: 7, height: 7, borderRadius: 4 },
+  statusText: { ...type.bodySmall, fontWeight: '600' },
 
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   star: { color: colors.accent, fontSize: 14 },

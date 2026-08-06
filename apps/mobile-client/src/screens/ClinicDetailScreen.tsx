@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
   svcIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.brandLight, alignItems: 'center', justifyContent: 'center' },
   svcName: { fontSize: 16, fontWeight: '800', color: colors.text },
   svcMeta: { fontSize: 13, color: colors.muted, marginTop: 2 },
-  agendar: { borderWidth: 1.5, borderColor: colors.brand, borderRadius: radius.full, paddingHorizontal: 18, paddingVertical: 6 },
+  agendar: { borderWidth: 1.5, borderColor: colors.brand, borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 6 },
   agendarText: { color: colors.brand, fontWeight: '800', fontSize: 14 },
 
   review: { backgroundColor: colors.white, borderRadius: radius.lg, padding: 14, boxShadow: cardShadow },

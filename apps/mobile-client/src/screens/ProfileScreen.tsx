@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
   editBadge: { position: 'absolute', top: -6, right: -6, width: 28, height: 28, borderRadius: 14, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.white },
   name: { fontSize: 22, fontWeight: '800', color: colors.text },
   email: { fontSize: 14, color: colors.muted, marginTop: 2 },
-  editData: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: '#F1ECF5', borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 5, marginTop: 8 },
+  editData: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: '#F1ECF5', borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 5, marginTop: 8 },
   editDataText: { color: colors.brand, fontWeight: '700', fontSize: 13 },
 
   sectionBig: { fontSize: 20, fontWeight: '800', color: colors.text, marginTop: 24, marginBottom: 12 },

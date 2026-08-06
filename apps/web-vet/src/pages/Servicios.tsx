@@ -6,6 +6,11 @@ import { Card, PageHeader, Spinner, ErrorNote } from '../components/ui';
 import { Modal, Field } from '../components/Modal';
 import { Icon } from '../components/Icon';
 
+interface StaffLite {
+  id: string;
+  name: string;
+  position: string;
+}
 interface Service {
   id: string;
   name: string;
@@ -13,11 +18,31 @@ interface Service {
   description?: string;
   priceUsd: string;
   durationMin: number;
+  staff?: StaffLite[];
 }
 interface ServicesResp {
   data: Service[];
   medicalServicesEnabled: boolean;
 }
+
+interface StaffMember {
+  id: string;
+  position: string;
+  roleLabel?: string | null;
+  isActive: boolean;
+  user: { fullName: string };
+}
+interface StaffResp {
+  data: StaffMember[];
+}
+
+const POSITION_LABEL: Record<string, string> = {
+  VET: 'Veterinario',
+  GROOMER: 'Estética',
+  SUPPORT: 'Apoyo',
+  RECEPTIONIST: 'Recepción',
+  BRANCH_ADMIN: 'Admin',
+};
 
 const TABS = [
   { key: 'CONSULTATION', label: 'Consultas' },
@@ -34,6 +59,7 @@ interface FormState {
   description: string;
   priceUsd: string;
   durationMin: string;
+  staffIds: string[];
 }
 const emptyForm = (category: string): FormState => ({
   name: '',
@@ -41,6 +67,7 @@ const emptyForm = (category: string): FormState => ({
   description: '',
   priceUsd: '',
   durationMin: '30',
+  staffIds: [],
 });
 
 export default function Servicios() {
@@ -54,6 +81,12 @@ export default function Servicios() {
     queryFn: () => api<ServicesResp>('/services'),
   });
 
+  const staffQuery = useQuery({
+    queryKey: ['staff'],
+    queryFn: () => api<StaffResp>('/staff'),
+  });
+  const staffList = (staffQuery.data?.data ?? []).filter((s) => s.isActive);
+
   const save = useMutation({
     mutationFn: (f: FormState) => {
       const body = {
@@ -62,6 +95,7 @@ export default function Servicios() {
         description: f.description || undefined,
         priceUsd: Number(f.priceUsd),
         durationMin: Number(f.durationMin),
+        staffIds: f.staffIds,
       };
       return f.id
         ? api(`/services/${f.id}`, { method: 'PATCH', body })
@@ -89,7 +123,13 @@ export default function Servicios() {
       description: s.description ?? '',
       priceUsd: String(s.priceUsd),
       durationMin: String(s.durationMin),
+      staffIds: (s.staff ?? []).map((x) => x.id),
     });
+
+  const toggleStaff = (id: string) =>
+    setForm((f) =>
+      f ? { ...f, staffIds: f.staffIds.includes(id) ? f.staffIds.filter((x) => x !== id) : [...f.staffIds, id] } : f,
+    );
 
   return (
     <div>
@@ -163,6 +203,24 @@ export default function Servicios() {
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-brand-600">Duración: {s.durationMin} min</span>
                 <span className="font-heading text-lg font-extrabold text-migo-green">{usd(s.priceUsd)}</span>
+              </div>
+              <div className="mt-3 border-t border-slate-100 pt-3">
+                <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Atiende</p>
+                {s.staff && s.staff.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {s.staff.map((m) => (
+                      <span
+                        key={m.id}
+                        className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700"
+                        title={POSITION_LABEL[m.position] ?? m.position}
+                      >
+                        {m.name}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400">Sin staff asignado — cualquiera puede atenderlo.</p>
+                )}
               </div>
             </Card>
           ))}
@@ -240,6 +298,40 @@ export default function Servicios() {
                 />
               </Field>
             </div>
+
+            <Field label="Staff que puede atender este servicio">
+              {staffList.length === 0 ? (
+                <p className="text-sm text-slate-400">No hay personal activo en la sucursal.</p>
+              ) : (
+                <div className="max-h-44 space-y-1 overflow-y-auto rounded-xl border border-slate-200 p-2">
+                  {staffList.map((m) => {
+                    const checked = form.staffIds.includes(m.id);
+                    return (
+                      <label
+                        key={m.id}
+                        className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm ${
+                          checked ? 'bg-brand-50' : 'hover:bg-slate-50'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleStaff(m.id)}
+                          className="h-4 w-4 accent-brand-600"
+                        />
+                        <span className="font-medium text-slate-800">{m.user.fullName}</span>
+                        <span className="ml-auto text-xs text-slate-400">
+                          {POSITION_LABEL[m.position] ?? m.position}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+              <p className="mt-1 text-xs text-slate-400">
+                Si no seleccionas a nadie, el servicio queda disponible para todo el equipo.
+              </p>
+            </Field>
           </div>
         )}
       </Modal>

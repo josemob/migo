@@ -116,6 +116,6 @@ const styles = StyleSheet.create({
   offer: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginBottom: 8, padding: 14, backgroundColor: '#FEFBEA', borderRadius: 16, borderWidth: 1.5, borderColor: colors.accent, boxShadow: cardShadow },
   offerLabel: { fontSize: 12, color: colors.muted, fontWeight: '700' },
   offerName: { fontSize: 16, fontWeight: '800', color: colors.text, marginTop: 2 },
-  offerBtn: { backgroundColor: colors.brand, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 9 },
+  offerBtn: { backgroundColor: colors.brand, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 9 },
   offerBtnTxt: { color: colors.white, fontWeight: '800', fontSize: 14 },
 });

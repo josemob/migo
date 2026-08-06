@@ -180,6 +180,27 @@ router.get(
   }),
 );
 
+// GET /me/appointments/next -> próxima cita futura (recordatorio del Home)
+router.get(
+  '/appointments/next',
+  asyncHandler(async (req, res) => {
+    const appointment = await prisma.appointment.findFirst({
+      where: {
+        bookedById: req.user!.id,
+        status: { in: ['PENDING', 'CONFIRMED', 'IN_PROGRESS'] },
+        scheduledAt: { gte: new Date() },
+      },
+      orderBy: { scheduledAt: 'asc' },
+      include: {
+        clinic: { select: { id: true, name: true, logoUrl: true } },
+        service: { select: { name: true, category: true } },
+        pet: { select: { name: true } },
+      },
+    });
+    res.json({ appointment });
+  }),
+);
+
 // POST /me/push-token -> registra el Expo push token del device
 router.post(
   '/push-token',

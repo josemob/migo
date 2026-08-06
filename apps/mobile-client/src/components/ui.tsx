@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
   btnTextMd: { ...type.h4 },
   pill: {
     borderRadius: control.pill.radius,
-    paddingHorizontal: control.pill.paddingH,
+    paddingHorizontal: 12,
     paddingVertical: control.pill.paddingV,
     alignItems: 'center',
     justifyContent: 'center',

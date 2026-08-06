@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
   clinicCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.white, borderRadius: radius.lg, padding: 14, boxShadow: cardShadow },
   clinicHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   clinicName: { fontSize: 16, fontWeight: '800', color: colors.text, flexShrink: 1 },
-  badge: { backgroundColor: colors.brandLight, borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 2 },
+  badge: { backgroundColor: colors.brandLight, borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 2 },
   badgeText: { color: colors.brand, fontWeight: '800', fontSize: 11 },
   clinicMeta: { fontSize: 13, color: colors.muted, marginTop: 3 },
   callBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.brand, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 11 },

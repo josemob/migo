@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
   editBadge: { position: 'absolute', top: -6, right: -6, width: 28, height: 28, borderRadius: 14, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.white },
   name: { fontSize: 24, fontWeight: '800', color: colors.text },
   sub: { fontSize: 15, color: colors.muted, marginTop: 2 },
-  badge: { alignSelf: 'flex-start', borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 4, marginTop: 8 },
+  badge: { alignSelf: 'flex-start', borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 4, marginTop: 8 },
 
   stats: { flexDirection: 'row', gap: 12, marginTop: 16 },
   stat: { flex: 1, backgroundColor: colors.white, borderRadius: radius.md, padding: 14, boxShadow: cardShadow },

@@ -45,10 +45,10 @@ export const type = {
 
 // Proporciones estándar de controles (Figma)
 // Botón medium: alto 32 · radio 8 · texto h4
-// Pill / botón pill: padding 24/4 · radio 27 (cápsula) · texto body small (alto efectivo ~26)
+// Pill / botón pill: padding 12/4 · radio 27 (cápsula) · texto body small
 export const control = {
   medium: { height: 32, radius: radius.sm },
-  pill: { radius: 27, paddingH: 24, paddingV: 4 },
+  pill: { radius: 27, paddingH: 12, paddingV: 4 },
 };
 
 // Sombra de tarjetas (design system): X2 Y2 · blur 21 · spread 0 · #7F398A 10%
