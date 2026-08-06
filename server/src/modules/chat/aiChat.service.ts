@@ -1,9 +1,14 @@
 import { env } from '../../config/env';
+import { prisma } from '../../config/prisma';
 
 export interface ChatTurn {
   role: 'user' | 'assistant';
   text: string;
 }
+
+// Reglas y conocimiento configurados por el Super Admin (Migo AI & Contenido)
+interface TriageRule { name: string; keywords: string[]; responseTemplate: string; severity: string }
+interface KnowledgeEntry { title: string; category: string; severity: string; description: string }
 
 interface AiChatInput {
   messages: ChatTurn[];
@@ -29,11 +34,26 @@ export interface ChatSuggestion {
 export async function migoAiReply(
   input: AiChatInput,
 ): Promise<{ text: string; source: 'gemini' | 'fallback'; suggestions: ChatSuggestion[] }> {
+  // Carga las reglas de triaje activas + la base de conocimiento del Super Admin.
+  // Si la BD no responde, el chat sigue funcionando con la lógica base.
+  let rules: TriageRule[] = [];
+  let knowledge: KnowledgeEntry[] = [];
+  try {
+    const [r, k] = await Promise.all([
+      prisma.aiTriageRule.findMany({ where: { active: true }, select: { name: true, keywords: true, responseTemplate: true, severity: true } }),
+      prisma.aiKnowledgeEntry.findMany({ select: { title: true, category: true, severity: true, description: true }, take: 50 }),
+    ]);
+    rules = r;
+    knowledge = k;
+  } catch (err) {
+    console.error('No se pudieron cargar reglas/conocimiento de Migo AI:', (err as Error).message);
+  }
+
   let text: string;
   let source: 'gemini' | 'fallback';
   if (env.GEMINI_API_KEY) {
     try {
-      text = await geminiChat(input);
+      text = await geminiChat(input, rules, knowledge);
       source = 'gemini';
     } catch (err) {
       console.error('Gemini chat falló, usando fallback:', (err as Error).message);
@@ -46,7 +66,7 @@ export async function migoAiReply(
   }
 
   const lastUser = [...input.messages].reverse().find((m) => m.role === 'user')?.text ?? '';
-  return { text, source, suggestions: computeSuggestions(lastUser, text) };
+  return { text, source, suggestions: computeSuggestions(lastUser, text, rules) };
 }
 
 // Deriva acciones sugeridas del último mensaje del dueño + la respuesta de la IA.
@@ -54,26 +74,54 @@ const EMERGENCY_KW = ['no respira', 'respirac', 'convuls', 'sangr', 'hemorrag', 
 const GROOMING_KW = ['peludo', 'pelo', 'corte', 'baño', 'bano', 'estétic', 'estetic', 'uña', 'cepill', 'grooming', 'enredad', 'despein', 'sucio', 'peluquer'];
 const CONSULT_KW = ['vómit', 'vomit', 'diarrea', 'fiebre', 'decaíd', 'no come', 'dolor', 'cojea', 'rasca', 'alergia', 'piel', 'consulta', 'vacun', 'desparasit', 'revis'];
 
-function computeSuggestions(userText: string, replyText: string): ChatSuggestion[] {
+const EMERGENCY = { action: 'emergency', label: '🚨 Activar alerta de emergencia' } as const;
+const GROOMING = { action: 'grooming', label: '✂️ Ver peluquerías cercanas' } as const;
+const CONSULT = { action: 'consult', label: '📅 Agendar una consulta' } as const;
+
+function computeSuggestions(userText: string, replyText: string, rules: TriageRule[] = []): ChatSuggestion[] {
   const u = userText.toLowerCase();
   const all = `${userText} ${replyText}`.toLowerCase();
   const out: ChatSuggestion[] = [];
-  // Emergencia: SOLO según lo que describe el dueño (no por la cautela de la IA en su respuesta)
-  if (EMERGENCY_KW.some((k) => u.includes(k))) out.push({ action: 'emergency', label: '🚨 Activar alerta de emergencia' });
-  if (GROOMING_KW.some((k) => all.includes(k))) out.push({ action: 'grooming', label: '✂️ Ver peluquerías cercanas' });
-  if (out.length === 0 && CONSULT_KW.some((k) => all.includes(k))) out.push({ action: 'consult', label: '📅 Agendar una consulta' });
-  return out.slice(0, 2);
+
+  // 1) Reglas configuradas por el Super Admin (según lo que describe el dueño): severidad -> acción
+  for (const r of rules) {
+    if (r.keywords.some((k) => u.includes(k.toLowerCase()))) {
+      out.push(r.severity === 'CRITICA' ? EMERGENCY : CONSULT);
+    }
+  }
+
+  // 2) Lógica base (respaldo). Emergencia SOLO según lo que describe el dueño.
+  if (EMERGENCY_KW.some((k) => u.includes(k))) out.push(EMERGENCY);
+  if (GROOMING_KW.some((k) => all.includes(k))) out.push(GROOMING);
+  if (CONSULT_KW.some((k) => all.includes(k))) out.push(CONSULT);
+
+  // Dedupe por acción, conservando el orden (las reglas del admin tienen prioridad)
+  const seen = new Set<string>();
+  return out.filter((o) => (seen.has(o.action) ? false : seen.add(o.action))).slice(0, 2);
 }
 
 // ─── Gemini ───────────────────────────────────────────────
-async function geminiChat(input: AiChatInput): Promise<string> {
+async function geminiChat(input: AiChatInput, rules: TriageRule[] = [], knowledge: KnowledgeEntry[] = []): Promise<string> {
   const p = input.pet;
   const petDesc = p?.name
     ? ` Ayudas con la mascota ${p.name}${p.species ? ` (${SPECIES_ES[p.species] ?? 'mascota'}${p.breed ? `, ${p.breed}` : ''})` : ''}.`
     : '';
+
+  // Contenido curado desde el Super Admin (Migo AI & Contenido)
+  const kbSection = knowledge.length
+    ? `\n\nBASE DE CONOCIMIENTO CLÍNICA (curada por Migo, úsala como referencia prioritaria):\n${knowledge
+        .map((k) => `- ${k.title} [${k.category} · ${k.severity}]: ${k.description}`)
+        .join('\n')}`
+    : '';
+  const rulesSection = rules.length
+    ? `\n\nREGLAS DE TRIAJE ACTIVAS (si el dueño menciona estas palabras, aplica la orientación indicada con ese nivel de urgencia):\n${rules
+        .map((r) => `- Palabras [${r.keywords.join(', ')}] → nivel ${r.severity}. Orientación: ${r.responseTemplate}`)
+        .join('\n')}`
+    : '';
+
   const system = `Eres "Migo IA", la asistente veterinaria de la app Migo (Venezuela).${petDesc} Te diriges a ${input.ownerName || 'el dueño'} por su nombre cuando sea natural.
 Responde SIEMPRE en español, cálida, empática y clara, en 2 a 4 frases. Ofrece orientación general y primeros auxilios prácticos, pero NUNCA des un diagnóstico definitivo ni recetes medicamentos específicos con dosis. Recomienda evaluación profesional cuando corresponda.
-Si detectas señales de urgencia (dificultad para respirar, convulsiones, sangrado abundante, intoxicación, trauma grave, inconsciencia), dilo con claridad y sugiere activar la "Alerta de emergencia" en Migo o acudir de inmediato a una clínica. Usa emojis con moderación.`;
+Si detectas señales de urgencia (dificultad para respirar, convulsiones, sangrado abundante, intoxicación, trauma grave, inconsciencia), dilo con claridad y sugiere activar la "Alerta de emergencia" en Migo o acudir de inmediato a una clínica. Usa emojis con moderación.${kbSection}${rulesSection}`;
 
   const contents = input.messages
     .slice(-12)
