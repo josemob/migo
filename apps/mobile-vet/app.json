@@ -1,0 +1,71 @@
+{
+  "expo": {
+    "name": "Migo Vet",
+    "slug": "mobile-vet",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "migovet",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.migo.vet",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Migo usa la cámara para tus videollamadas con la clínica y para adjuntar fotos de tu mascota.",
+        "NSMicrophoneUsageDescription": "Migo usa el micrófono para tus llamadas de voz y video con la clínica.",
+        "NSPhotoLibraryUsageDescription": "Migo accede a tu galería para adjuntar imágenes en el chat con la clínica."
+      },
+      "bitcode": false
+    },
+    "android": {
+      "package": "com.migo.vet",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.WAKE_LOCK",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "@stream-io/video-react-native-sdk",
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "Migo usa la cámara para tus videollamadas con la clínica.",
+          "microphonePermission": "Migo usa el micrófono para tus llamadas con la clínica."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Migo accede a tu galería para adjuntar imágenes en el chat.",
+          "cameraPermission": "Migo usa la cámara para tomar fotos de tu mascota y adjuntarlas."
+        }
+      ],
+      "expo-audio",
+      "expo-video",
+      "expo-sharing",
+      "@maplibre/maplibre-react-native",
+      "expo-font"
+    ],
+    "owner": "mob_jm"
+  }
+}

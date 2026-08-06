@@ -22,6 +22,17 @@ interface StaffResp {
 interface ShiftsResp {
   data: { id: string; shift: string; staff: { user: { fullName: string } } }[];
 }
+interface SearchResult {
+  userId: string;
+  fullName: string;
+  email: string;
+  nationalId?: string | null;
+  position: string;
+  specialty?: string | null;
+  collegiateNumber?: string | null;
+  alreadyStaff: boolean;
+  alreadyInvited: boolean;
+}
 
 const POSITIONS = [
   { key: 'VET', label: 'Veterinario (CMV)' },
@@ -29,6 +40,9 @@ const POSITIONS = [
   { key: 'RECEPTIONIST', label: 'Recepcionista' },
   { key: 'SUPPORT', label: 'Personal de Apoyo' },
 ];
+const POSITION_LABEL: Record<string, string> = {
+  VET: 'Veterinario/a', GROOMER: 'Peluquero / Estética', RECEPTIONIST: 'Recepción', SUPPORT: 'Personal de apoyo', BRANCH_ADMIN: 'Admin de sucursal',
+};
 const positionBadge: Record<string, { tone: string; label: string }> = {
   VET: { tone: 'green', label: 'CMV Verificado' },
   GROOMER: { tone: 'amber', label: 'Personal de Apoyo' },
@@ -40,19 +54,11 @@ const shiftLabel: Record<string, string> = {
   MORNING: 'Guardia Mañana', AFTERNOON: 'Guardia Tarde', NIGHT: 'Guardia Noche', FULL_DAY: 'Día completo', OFF: 'Libre Hoy',
 };
 
-interface InviteForm {
-  fullName: string; email: string; phone: string; nationalId: string;
-  position: string; roleLabel: string; specialty: string; collegiateNumber: string; tempPassword: string;
-}
-const emptyInvite = (): InviteForm => ({
-  fullName: '', email: '', phone: '', nationalId: '', position: 'VET',
-  roleLabel: '', specialty: '', collegiateNumber: '', tempPassword: '',
-});
-
 export default function Equipo() {
   const qc = useQueryClient();
-  const [invite, setInvite] = useState<InviteForm | null>(null);
-  const [inviteError, setInviteError] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const [invited, setInvited] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<Staff | null>(null);
   const [cmvId, setCmvId] = useState('');
   const [cmvResult, setCmvResult] = useState('');
@@ -60,24 +66,20 @@ export default function Equipo() {
   const staff = useQuery({ queryKey: ['staff'], queryFn: () => api<StaffResp>('/staff') });
   const shifts = useQuery({ queryKey: ['shifts'], queryFn: () => api<ShiftsResp>('/staff/shifts/today') });
 
-  const createStaff = useMutation({
-    mutationFn: (f: InviteForm) =>
-      api('/staff', {
-        method: 'POST',
-        body: {
-          fullName: f.fullName, email: f.email, phone: f.phone || undefined,
-          nationalId: f.nationalId || undefined, position: f.position,
-          roleLabel: f.roleLabel || undefined, specialty: f.specialty || undefined,
-          collegiateNumber: f.collegiateNumber || undefined, tempPassword: f.tempPassword,
-        },
-      }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['staff'] }); setInvite(null); },
-    onError: (e) => setInviteError(e instanceof Error ? e.message : 'Error al invitar'),
+  const term = q.trim();
+  const search = useQuery({
+    queryKey: ['staff-search', term],
+    queryFn: () => api<{ data: SearchResult[] }>(`/staff/search?q=${encodeURIComponent(term)}`),
+    enabled: searchOpen && term.length >= 2,
+  });
+
+  const inviteMut = useMutation({
+    mutationFn: (userId: string) => api('/staff/invite', { method: 'POST', body: { userId } }),
+    onSuccess: (_r, userId) => { setInvited((s) => new Set(s).add(userId)); },
   });
 
   const updateStaff = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) =>
-      api(`/staff/${id}`, { method: 'PATCH', body }),
+    mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) => api(`/staff/${id}`, { method: 'PATCH', body }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['staff'] }); setEditing(null); },
   });
 
@@ -86,13 +88,15 @@ export default function Equipo() {
     onSuccess: (r) => setCmvResult(r.found ? '✅ Profesional encontrado en el registro CMV.' : (r.message ?? 'No encontrado en el registro.')),
   });
 
+  const closeSearch = () => { setSearchOpen(false); setQ(''); };
+
   return (
     <div>
       <PageHeader
         title="Gestión de Equipo & Staff"
         subtitle="Administra los veterinarios, especialistas y personal de soporte técnico de la clínica."
         actions={
-          <button className="btn-primary" onClick={() => { setInviteError(''); setInvite(emptyInvite()); }}>
+          <button className="btn-primary" onClick={() => setSearchOpen(true)}>
             <Icon name="plus" className="h-4 w-4" /> Invitar Personal
           </button>
         }
@@ -103,9 +107,7 @@ export default function Equipo() {
           <div className="mb-4 flex items-center gap-3">
             <SectionTitle>Personal Activo en Sucursal</SectionTitle>
             {staff.data && (
-              <span className="badge bg-violet-100 text-violet-700">
-                Capacidad: {staff.data.capacity.used}/{staff.data.capacity.total} Asesores
-              </span>
+              <span className="badge bg-violet-100 text-violet-700">Capacidad: {staff.data.capacity.used}/{staff.data.capacity.total} Asesores</span>
             )}
           </div>
 
@@ -117,9 +119,7 @@ export default function Equipo() {
               const b = positionBadge[m.position] ?? { tone: 'slate', label: m.position };
               return (
                 <div key={m.id} className="flex items-center gap-4 rounded-xl border border-slate-100 p-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-100 text-lg font-bold text-migo-purple">
-                    {m.user.fullName[0]}
-                  </div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-100 text-lg font-bold text-migo-purple">{m.user.fullName[0]}</div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-slate-900">{m.user.fullName}</span>
@@ -127,9 +127,7 @@ export default function Equipo() {
                       {!m.isActive && <Badge tone="slate">Inactivo</Badge>}
                     </div>
                     <div className="text-sm text-slate-500">
-                      {m.specialty
-                        ? `Especialidad: ${m.specialty}${m.collegiateNumber ? ` · Colegiado: #${m.collegiateNumber}` : ''}`
-                        : (m.roleLabel ?? 'Personal de la sucursal')}
+                      {m.specialty ? `Especialidad: ${m.specialty}${m.collegiateNumber ? ` · Colegiado: #${m.collegiateNumber}` : ''}` : (m.roleLabel ?? 'Personal de la sucursal')}
                     </div>
                   </div>
                   <button className="btn-outline" onClick={() => setEditing(m)}>Editar Rol</button>
@@ -141,14 +139,14 @@ export default function Equipo() {
 
         <div className="space-y-6">
           <Card>
-            <SectionTitle>Invitar Médico / Especialista</SectionTitle>
-            <p className="mb-3 text-sm text-slate-500">
-              Busca y asocia profesionales homologados ingresando su cédula o número de registro colegiado nacional.
-            </p>
-            <input className="input mb-3" placeholder="V-18247592" value={cmvId} onChange={(e) => setCmvId(e.target.value)} />
-            <button className="btn-primary w-full" disabled={validateCmv.isPending || !cmvId} onClick={() => validateCmv.mutate(cmvId)}>
-              <Icon name="search" className="h-4 w-4" /> Validar con Registro CMV
+            <SectionTitle>Reclutar personal verificado</SectionTitle>
+            <p className="mb-3 text-sm text-slate-500">Busca por cédula, correo o nombre a profesionales ya verificados por Migo e invítalos a tu equipo.</p>
+            <button className="btn-primary w-full" onClick={() => setSearchOpen(true)}>
+              <Icon name="search" className="h-4 w-4" /> Buscar e invitar
             </button>
+            <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400">Validar registro CMV (opcional)</p>
+            <input className="input mt-2" placeholder="V-18247592" value={cmvId} onChange={(e) => setCmvId(e.target.value)} />
+            <button className="btn-outline mt-2 w-full" disabled={validateCmv.isPending || !cmvId} onClick={() => validateCmv.mutate(cmvId)}>Validar con Registro CMV</button>
             {cmvResult && <p className="mt-2 text-sm text-slate-600">{cmvResult}</p>}
           </Card>
 
@@ -169,45 +167,52 @@ export default function Equipo() {
         </div>
       </div>
 
-      {/* Invitar */}
+      {/* Buscar e invitar */}
       <Modal
-        open={!!invite}
-        onClose={() => setInvite(null)}
-        title="Invitar Personal"
-        footer={
-          <>
-            <button className="btn-outline" onClick={() => setInvite(null)}>Cancelar</button>
-            <button className="btn-primary" disabled={createStaff.isPending} onClick={() => invite && createStaff.mutate(invite)}>
-              {createStaff.isPending ? 'Invitando…' : 'Invitar'}
-            </button>
-          </>
-        }
+        open={searchOpen}
+        onClose={closeSearch}
+        title="Invitar personal a la clínica"
+        footer={<button className="btn-outline" onClick={closeSearch}>Cerrar</button>}
       >
-        {invite && (
-          <div>
-            {inviteError && <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{inviteError}</div>}
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Nombre completo"><input className="input" value={invite.fullName} onChange={(e) => setInvite({ ...invite, fullName: e.target.value })} /></Field>
-              <Field label="Correo"><input className="input" type="email" value={invite.email} onChange={(e) => setInvite({ ...invite, email: e.target.value })} /></Field>
-              <Field label="Teléfono"><input className="input" value={invite.phone} onChange={(e) => setInvite({ ...invite, phone: e.target.value })} /></Field>
-              <Field label="Cédula"><input className="input" value={invite.nationalId} onChange={(e) => setInvite({ ...invite, nationalId: e.target.value })} /></Field>
-            </div>
-            <Field label="Posición">
-              <select className="input" value={invite.position} onChange={(e) => setInvite({ ...invite, position: e.target.value })}>
-                {POSITIONS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
-              </select>
-            </Field>
-            {invite.position === 'VET' ? (
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Especialidad"><input className="input" value={invite.specialty} onChange={(e) => setInvite({ ...invite, specialty: e.target.value })} /></Field>
-                <Field label="N° Colegiado"><input className="input" value={invite.collegiateNumber} onChange={(e) => setInvite({ ...invite, collegiateNumber: e.target.value })} /></Field>
-              </div>
-            ) : (
-              <Field label="Rol / función"><input className="input" placeholder="Ej. Estética & Grooming" value={invite.roleLabel} onChange={(e) => setInvite({ ...invite, roleLabel: e.target.value })} /></Field>
-            )}
-            <Field label="Contraseña temporal (mín. 8)"><input className="input" type="text" value={invite.tempPassword} onChange={(e) => setInvite({ ...invite, tempPassword: e.target.value })} /></Field>
-          </div>
-        )}
+        <p className="mb-3 text-sm text-slate-500">Busca profesionales <b>verificados</b> por cédula, correo o nombre e invítalos. Recibirán una notificación para aceptar o rechazar.</p>
+        <input className="input" placeholder="Cédula, correo o nombre…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+
+        <div className="mt-4 max-h-80 space-y-2 overflow-y-auto">
+          {term.length < 2 ? (
+            <p className="py-6 text-center text-sm text-slate-400">Escribe al menos 2 caracteres para buscar.</p>
+          ) : search.isLoading ? (
+            <Spinner className="mx-auto my-6" />
+          ) : search.error ? (
+            <ErrorNote error={search.error} />
+          ) : (search.data?.data.length ?? 0) === 0 ? (
+            <p className="py-6 text-center text-sm text-slate-400">Sin profesionales verificados que coincidan.</p>
+          ) : (
+            search.data!.data.map((r) => {
+              const done = r.alreadyInvited || invited.has(r.userId);
+              return (
+                <div key={r.userId} className="flex items-center gap-3 rounded-xl border border-slate-100 p-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-100 text-sm font-bold text-migo-purple">{r.fullName[0]}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate font-semibold text-slate-900">{r.fullName}</span>
+                      <Badge tone="purple">{POSITION_LABEL[r.position] ?? r.position}</Badge>
+                    </div>
+                    <div className="truncate text-xs text-slate-500">
+                      Cédula {r.nationalId ?? '—'}{r.specialty ? ` · ${r.specialty}` : ''}{r.collegiateNumber ? ` · Colegiado #${r.collegiateNumber}` : ''}
+                    </div>
+                  </div>
+                  {r.alreadyStaff ? (
+                    <span className="shrink-0 text-xs font-semibold text-slate-400">Ya en una sucursal</span>
+                  ) : done ? (
+                    <span className="shrink-0 text-sm font-semibold text-green-600">✓ Invitado</span>
+                  ) : (
+                    <button className="btn-primary shrink-0" disabled={inviteMut.isPending} onClick={() => inviteMut.mutate(r.userId)}>Invitar</button>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
       </Modal>
 
       {/* Editar rol */}
@@ -218,13 +223,7 @@ export default function Equipo() {
         footer={
           <>
             <button className="btn-outline" onClick={() => setEditing(null)}>Cancelar</button>
-            <button
-              className="btn-primary"
-              disabled={updateStaff.isPending}
-              onClick={() => editing && updateStaff.mutate({ id: editing.id, body: { position: editing.position, roleLabel: editing.roleLabel, isActive: editing.isActive } })}
-            >
-              Guardar
-            </button>
+            <button className="btn-primary" disabled={updateStaff.isPending} onClick={() => editing && updateStaff.mutate({ id: editing.id, body: { position: editing.position, roleLabel: editing.roleLabel, isActive: editing.isActive } })}>Guardar</button>
           </>
         }
       >
@@ -241,12 +240,7 @@ export default function Equipo() {
               Activo en la sucursal
             </label>
             {editing.position === 'VET' && editing.verificationStatus !== 'VERIFIED' && (
-              <button
-                className="btn-green mt-4 w-full"
-                onClick={() => updateStaff.mutate({ id: editing.id, body: { verificationStatus: 'VERIFIED' } })}
-              >
-                ✅ Marcar CMV Verificado
-              </button>
+              <button className="btn-green mt-4 w-full" onClick={() => updateStaff.mutate({ id: editing.id, body: { verificationStatus: 'VERIFIED' } })}>✅ Marcar CMV Verificado</button>
             )}
           </div>
         )}

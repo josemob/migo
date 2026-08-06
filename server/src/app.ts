@@ -17,6 +17,7 @@ import financeRoutes from './modules/finance/finance.routes';
 import meRoutes from './modules/me/me.routes';
 import directoryRoutes from './modules/clinics/directory.routes';
 import adminRoutes from './modules/admin/admin.routes';
+import staffKycRoutes from './modules/staffKyc/staffKyc.routes';
 
 export const app = express();
 
@@ -49,6 +50,8 @@ api.use('/me', meRoutes);
 api.use('/clinics', directoryRoutes);
 // Super Admin (MIGO Sistema Operativo)
 api.use('/admin', adminRoutes);
+// Onboarding/KYC del personal de clínica (app Vet)
+api.use('/staff-kyc', staffKycRoutes);
 app.use('/api/v1', api);
 
 app.use(notFoundHandler);

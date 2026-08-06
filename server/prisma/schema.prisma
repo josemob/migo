@@ -245,6 +245,8 @@ model User {
   subscriptions      Subscription[]
   refreshTokens      RefreshToken[]
   pushTokens         PushToken[]
+  staffKyc           StaffKyc?
+  staffInvitations   StaffInvitation[]
   auditLogsActor     AuditLog[]     @relation("AuditActor")
 
   createdAt DateTime @default(now())
@@ -278,6 +280,71 @@ model PushToken {
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+}
+
+// Onboarding/KYC del personal de clínica (app Vet): selfie + cédula (+ carnet CMV si es vet).
+// El face-match automático deja un score; si es dudoso, pasa a revisión del Super Admin.
+enum KycStatus {
+  PENDING // enviado, esperando face-match
+  UNDER_REVIEW // face-match dudoso/falló -> revisión manual
+  APPROVED // aprobado -> se crea el ClinicStaff
+  REJECTED
+}
+
+// Invitación de una clínica a un profesional verificado para unirse a su equipo.
+// La clínica busca por cédula/correo e invita; el staff acepta (-> se crea ClinicStaff) o rechaza.
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+model StaffInvitation {
+  id          String           @id @default(uuid())
+  clinic      Clinic           @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  clinicId    String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  position    StaffPosition
+  invitedById String? // usuario (admin de clínica) que invitó
+  status      InvitationStatus @default(PENDING)
+  respondedAt DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([userId, status])
+  @@index([clinicId, status])
+}
+
+model StaffKyc {
+  id                String        @id @default(uuid())
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId            String        @unique
+  requestedPosition StaffPosition
+  roleLabel         String?
+  // La clínica lo busca por User.nationalId (cédula) y lo adopta (crea ClinicStaff).
+
+  // documentos capturados con la cámara (data URI o URL de storage)
+  selfieUrl     String?
+  idDocumentUrl String? // cédula
+  cmvCardUrl    String? // carnet del Colegio de Médicos Veterinarios (solo VET)
+  collegiateNumber String?
+  specialty        String?
+
+  // resultado del face-match (face-api.js en el backend)
+  faceMatchScore  Float? // distancia/similaridad
+  faceMatchPassed Boolean?
+
+  status       KycStatus @default(PENDING)
+  reviewNotes  String?
+  reviewedById String?
+  reviewedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
 }
 
 // ── Super Admin: Migo AI & Contenido ──
@@ -524,6 +591,7 @@ model Clinic {
   ratingCount        Int                @default(0)
 
   staff               ClinicStaff[]
+  staffInvitations    StaffInvitation[]
   hours               ClinicHours[]
   services            Service[]
   appointments        Appointment[]

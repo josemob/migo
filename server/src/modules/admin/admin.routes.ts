@@ -462,4 +462,42 @@ router.patch(
   }),
 );
 
+// ── KYC del personal (Verificación de Veterinarios) ──
+
+// GET /admin/staff-kyc -> cola de solicitudes de ingreso del personal
+router.get(
+  '/staff-kyc',
+  asyncHandler(async (_req, res) => {
+    const subs = await prisma.staffKyc.findMany({
+      orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+      include: { user: { select: { fullName: true, email: true, nationalId: true, phone: true } } },
+    });
+    const counts = {
+      review: subs.filter((s) => s.status === 'UNDER_REVIEW').length,
+      approved: subs.filter((s) => s.status === 'APPROVED').length,
+      rejected: subs.filter((s) => s.status === 'REJECTED').length,
+    };
+    res.json({ data: subs, counts });
+  }),
+);
+
+// POST /admin/staff-kyc/:id/review -> aprobar / rechazar identidad del profesional
+router.post(
+  '/staff-kyc/:id/review',
+  validate({
+    params: z.object({ id: z.string().uuid() }),
+    body: z.object({ action: z.enum(['approve', 'reject']), notes: z.string().optional() }),
+  }),
+  asyncHandler(async (req, res) => {
+    const sub = await prisma.staffKyc.findUnique({ where: { id: req.params.id } });
+    if (!sub) throw ApiError.notFound('Solicitud no encontrada');
+    const status = req.body.action === 'approve' ? 'APPROVED' : 'REJECTED';
+    const updated = await prisma.staffKyc.update({
+      where: { id: sub.id },
+      data: { status, reviewNotes: req.body.notes, reviewedById: req.user!.id, reviewedAt: new Date() },
+    });
+    res.json({ id: updated.id, status: updated.status });
+  }),
+);
+
 export default router;
