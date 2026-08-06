@@ -14,6 +14,12 @@ export interface AuthUser {
   } | null;
 }
 
+// El Vet Dashboard es para personal de clínica (tiene ClinicStaff).
+export const isStaff = (u: AuthUser | null): boolean => !!u?.staffProfile;
+// Secciones de administración (Equipo, Servicios, Finanzas, Configuración) solo para admins.
+export const isClinicAdmin = (u: AuthUser | null): boolean =>
+  !!u && (u.staffProfile?.position === 'BRANCH_ADMIN' || u.role === 'CLINIC_ADMIN' || u.role === 'SUPER_ADMIN');
+
 interface AuthCtx {
   user: AuthUser | null;
   loading: boolean;

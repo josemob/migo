@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
-import { useAuth } from '../lib/auth';
+import { useAuth, isClinicAdmin } from '../lib/auth';
 import { useEmergencyStream } from '../lib/useEmergencyStream';
 import { playAlarm } from '../lib/alarm';
 import { Icon, type IconName } from './Icon';
 
 const NAV: {
   section: string;
+  adminOnly?: boolean;
   items: { to: string; label: string; icon: IconName; end?: boolean }[];
 }[] = [
   {
@@ -21,6 +22,7 @@ const NAV: {
   },
   {
     section: 'Administración y Soporte',
+    adminOnly: true,
     items: [
       { to: '/equipo', label: 'Equipo Médico', icon: 'team' },
       { to: '/servicios', label: 'Catálogo de Servicios', icon: 'catalog' },
@@ -32,6 +34,8 @@ const NAV: {
 
 export function Layout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
+  const admin = isClinicAdmin(user);
+  const nav = NAV.filter((g) => !g.adminOnly || admin);
   // Escucha urgencias en tiempo real (SSE) y suena la alarma al llegar una
   useEmergencyStream(playAlarm);
   const clinicName = user?.staffProfile?.clinic?.name ?? 'Sucursal';
@@ -52,7 +56,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-2">
-          {NAV.map((group) => (
+          {nav.map((group) => (
             <div key={group.section} className="mb-6">
               <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-sidebar-muted">
                 {group.section}
