@@ -3,6 +3,7 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
+import { appAlert } from '../lib/dialog';
 import { Loading, Muted } from '../components/ui';
 import { SlotIcon } from '../components/SlotIcon';
 import { cardShadow, colors, radius } from '../theme';
@@ -33,6 +34,7 @@ export default function BookAppointmentScreen({ navigation, route }: any) {
   const [petId, setPetId] = useState<string | null>(null);
   const [dayIdx, setDayIdx] = useState(0);
   const [slotIdx, setSlotIdx] = useState<number | null>(null);
+  const [booking, setBooking] = useState(false);
 
   const petList = pets.data?.data ?? [];
   useEffect(() => {
@@ -57,22 +59,25 @@ export default function BookAppointmentScreen({ navigation, route }: any) {
   const slot = slotIdx != null ? SLOTS[slotIdx] : null;
   const canConfirm = !!pet && !!slot;
 
-  const confirm = () => {
+  // Pago suspendido temporalmente: agendamos directo, sin pasar por ConfirmPay.
+  const confirm = async () => {
     if (!pet || !slot) return;
     const when = new Date(selectedDay);
     when.setHours(slot.h, slot.m, 0, 0);
-    navigation.navigate('ConfirmPay', {
-      clinicId,
-      clinicName,
-      service,
-      petId: pet.id,
-      petName: pet.name,
-      petPhoto: pet.photoUrl ?? null,
-      petSpecies: pet.species,
-      scheduledAt: when.toISOString(),
-      dayLabel: `${DOW[selectedDay.getDay()]} ${selectedDay.getDate()}`,
-      timeLabel: slot.label,
-    });
+    setBooking(true);
+    try {
+      await api('/me/appointments', {
+        method: 'POST',
+        body: { clinicId, petId: pet.id, serviceId: service.id, scheduledAt: when.toISOString(), paid: false },
+      });
+      appAlert('¡Cita agendada! 🐾', `${service.name} en ${clinicName} · ${DOW[selectedDay.getDay()]} ${selectedDay.getDate()}, ${slot.label}.`, [
+        { text: 'Listo', onPress: () => navigation.navigate('Tabs', { screen: 'Home' }) },
+      ]);
+    } catch (e) {
+      appAlert('No se pudo agendar', e instanceof Error ? e.message : 'Intenta de nuevo.');
+    } finally {
+      setBooking(false);
+    }
   };
 
   return (
@@ -162,11 +167,11 @@ export default function BookAppointmentScreen({ navigation, route }: any) {
       <View style={styles.footer}>
         <Pressable
           onPress={confirm}
-          disabled={!canConfirm}
-          style={[styles.cta, !canConfirm && { opacity: 0.4 }]}
+          disabled={!canConfirm || booking}
+          style={[styles.cta, (!canConfirm || booking) && { opacity: 0.4 }]}
         >
           <Text style={styles.ctaText}>
-            {slot ? `Confirmar Reserva · ${DOW[selectedDay.getDay()]} ${selectedDay.getDate()}, ${slot.label}` : 'Selecciona un horario'}
+            {booking ? 'Agendando…' : slot ? `Confirmar Reserva · ${DOW[selectedDay.getDay()]} ${selectedDay.getDate()}, ${slot.label}` : 'Selecciona un horario'}
           </Text>
         </Pressable>
       </View>
