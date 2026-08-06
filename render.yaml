@@ -1,0 +1,34 @@
+# Render Blueprint para el backend de Migo.
+# En Render: New + → Blueprint → conecta este repo. Render lee este archivo.
+# Las variables con `sync: false` las pegas tú en el dashboard (valores de tu server/.env).
+services:
+  - type: web
+    name: migo-api
+    runtime: node
+    plan: free # se duerme tras ~15 min de inactividad (cold start); suficiente para probar
+    rootDir: server
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Secretos: pégalos en el dashboard (Environment) desde tu server/.env
+      - key: DATABASE_URL # Supabase pooler (:6543 con pgbouncer=true)
+        sync: false
+      - key: DIRECT_URL # Supabase directo (:5432) — opcional, para migraciones
+        sync: false
+      - key: CORS_ORIGINS # URLs de los frontends desplegados (Cloudflare Pages), separadas por coma
+        sync: false
+      - key: STREAM_API_KEY
+        sync: false
+      - key: STREAM_API_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      # JWT: Render los genera fuertes automáticamente (una vez)
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
