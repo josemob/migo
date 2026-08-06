@@ -17,6 +17,9 @@ const schema = z.object({
   GEMINI_API_KEY: z.string().optional(),
   GEMINI_MODEL: z.string().default('gemini-flash-latest'),
   GOOGLE_MAPS_API_KEY: z.string().optional(),
+  // Client IDs de Google OAuth (Web + Android cliente + Android vet), separados por coma.
+  // Se aceptan todos como `aud` válido del ID token que envían las apps.
+  GOOGLE_CLIENT_IDS: z.string().optional(),
   AGORA_APP_ID: z.string().optional(),
   AGORA_APP_CERTIFICATE: z.string().optional(),
 
@@ -38,5 +41,9 @@ if (!parsed.success) {
 export const env = {
   ...parsed.data,
   corsOrigins: parsed.data.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean),
+  googleClientIds: (parsed.data.GOOGLE_CLIENT_IDS ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean),
   isProd: parsed.data.NODE_ENV === 'production',
 };

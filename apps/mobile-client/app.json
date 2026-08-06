@@ -64,7 +64,8 @@
       "expo-video",
       "expo-sharing",
       "@maplibre/maplibre-react-native",
-      "expo-font"
+      "expo-font",
+      "expo-web-browser"
     ],
     "extra": {
       "eas": {

@@ -27,6 +27,9 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      # Google OAuth Client IDs (públicos): Web, Android cliente, Android vet
+      - key: GOOGLE_CLIENT_IDS
+        value: 967962081340-023koe87cn4vadbf771oe533hg62r5ug.apps.googleusercontent.com,967962081340-tj95o2pbt1ilqrnn87va0pd5qra9pgka.apps.googleusercontent.com,967962081340-hooajjob19cpg446e60enmqn0hr0b9ta.apps.googleusercontent.com
       # JWT: Render los genera fuertes automáticamente (una vez)
       - key: JWT_ACCESS_SECRET
         generateValue: true

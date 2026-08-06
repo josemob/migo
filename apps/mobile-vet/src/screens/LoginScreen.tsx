@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../lib/auth';
+import { useGoogleSignIn } from '../lib/google';
 import { Button } from '../components/ui';
 import { colors, radius, type } from '../theme';
 
@@ -11,6 +12,7 @@ export default function LoginScreen({ navigation }: any) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const { signIn: googleSignIn, googleBusy, googleReady } = useGoogleSignIn(setError);
 
   const submit = async () => {
     setError('');
@@ -56,6 +58,23 @@ export default function LoginScreen({ navigation }: any) {
           <Button title={busy ? 'Ingresando…' : 'Iniciar sesión'} onPress={submit} loading={busy} />
         </View>
 
+        <View style={styles.divider}>
+          <View style={styles.line} />
+          <Text style={styles.dividerText}>o continúa con</Text>
+          <View style={styles.line} />
+        </View>
+
+        <Button
+          title="Continuar con Google"
+          variant="outline"
+          loading={googleBusy}
+          disabled={!googleReady || googleBusy}
+          onPress={() => {
+            setError('');
+            googleSignIn();
+          }}
+        />
+
         <Pressable style={styles.registerLink} onPress={() => navigation.navigate('Register')} hitSlop={8}>
           <Text style={styles.registerTxt}>¿Nuevo en Migo? <Text style={styles.registerStrong}>Regístrate como personal</Text></Text>
         </Pressable>
@@ -75,6 +94,9 @@ const styles = StyleSheet.create({
   input: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: colors.text },
   errorBox: { backgroundColor: '#FDECEC', borderRadius: radius.md, padding: 12, borderWidth: 1, borderColor: '#F8CBCB' },
   errorText: { ...type.bodySmall, color: colors.red },
+  divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 18 },
+  line: { flex: 1, height: 1, backgroundColor: colors.border },
+  dividerText: { color: colors.muted, fontSize: 13 },
   registerLink: { alignItems: 'center', marginTop: 24 },
   registerTxt: { color: colors.muted, fontSize: 14 },
   registerStrong: { color: colors.brand, fontWeight: '800' },

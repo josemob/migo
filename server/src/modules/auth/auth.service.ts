@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import type { UserRole } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { ApiError } from '../../utils/ApiError';
@@ -64,6 +65,69 @@ export const authService = {
         role: input.role ?? 'PET_OWNER',
       },
     });
+
+    const tokens = await issueTokens(user, userAgent);
+    return { user: publicUser(user), ...tokens };
+  },
+
+  /**
+   * Inicia sesión (o registra) con un ID token de Google.
+   * Verifica el token contra el endpoint público de Google y valida que el
+   * `aud` sea uno de nuestros Client IDs (Web / Android cliente / Android vet).
+   */
+  async googleAuth(idToken: string, userAgent?: string) {
+    if (!idToken) throw ApiError.badRequest('Falta el token de Google');
+
+    let payload: {
+      aud?: string;
+      email?: string;
+      email_verified?: string | boolean;
+      name?: string;
+      picture?: string;
+      sub?: string;
+    };
+    try {
+      const resp = await fetch(
+        `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`,
+      );
+      if (!resp.ok) throw new Error('tokeninfo ' + resp.status);
+      payload = (await resp.json()) as typeof payload;
+    } catch {
+      throw ApiError.unauthorized('No se pudo verificar el token de Google');
+    }
+
+    const allowed = env.googleClientIds;
+    if (allowed.length && (!payload.aud || !allowed.includes(payload.aud))) {
+      throw ApiError.unauthorized('El token de Google no pertenece a esta app');
+    }
+    if (payload.email_verified !== true && payload.email_verified !== 'true') {
+      throw ApiError.unauthorized('El correo de Google no está verificado');
+    }
+    const email = payload.email?.toLowerCase();
+    if (!email) throw ApiError.unauthorized('Google no devolvió un correo');
+
+    let user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      // Sin contraseña utilizable: se autentica siempre por Google.
+      const randomPw = crypto.randomUUID() + crypto.randomUUID();
+      user = await prisma.user.create({
+        data: {
+          email,
+          passwordHash: await hashPassword(randomPw),
+          fullName: payload.name || email.split('@')[0] || email,
+          avatarUrl: payload.picture ?? null,
+          role: 'PET_OWNER',
+        },
+      });
+    } else {
+      if (user.status !== 'ACTIVE') throw ApiError.forbidden('La cuenta está suspendida');
+      if (!user.avatarUrl && payload.picture) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { avatarUrl: payload.picture },
+        });
+      }
+    }
 
     const tokens = await issueTokens(user, userAgent);
     return { user: publicUser(user), ...tokens };

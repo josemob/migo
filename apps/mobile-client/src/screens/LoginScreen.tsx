@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../lib/auth';
+import { useGoogleSignIn } from '../lib/google';
 import { appAlert } from '../lib/dialog';
 import { Button, Input, Screen } from '../components/ui';
 import { Logo } from '../components/Logo';
@@ -16,6 +17,7 @@ export default function LoginScreen() {
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const { signIn: googleSignIn, googleBusy, googleReady } = useGoogleSignIn(setError);
 
   const submit = async () => {
     setError('');
@@ -75,7 +77,12 @@ export default function LoginScreen() {
         <Button
           title="Continuar con Google"
           variant="outline"
-          onPress={() => appAlert('Google', 'Inicio con Google: pendiente de configurar OAuth.')}
+          loading={googleBusy}
+          disabled={!googleReady || googleBusy}
+          onPress={() => {
+            setError('');
+            googleSignIn();
+          }}
         />
 
         <Text style={styles.switch} onPress={() => setMode(mode === 'login' ? 'register' : 'login')}>

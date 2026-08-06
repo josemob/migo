@@ -24,6 +24,8 @@ const loginSchema = z.object({
 
 const refreshSchema = z.object({ refreshToken: z.string().min(1) });
 
+const googleSchema = z.object({ idToken: z.string().min(1) });
+
 router.post(
   '/register',
   validate({ body: registerSchema }),
@@ -38,6 +40,15 @@ router.post(
   validate({ body: loginSchema }),
   asyncHandler(async (req, res) => {
     const result = await authService.login(req.body.email, req.body.password, req.headers['user-agent']);
+    res.json(result);
+  }),
+);
+
+router.post(
+  '/google',
+  validate({ body: googleSchema }),
+  asyncHandler(async (req, res) => {
+    const result = await authService.googleAuth(req.body.idToken, req.headers['user-agent']);
     res.json(result);
   }),
 );

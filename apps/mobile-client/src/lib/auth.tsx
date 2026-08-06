@@ -14,6 +14,7 @@ interface AuthCtx {
   user: AuthUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -57,6 +58,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(await api<AuthUser>('/auth/me'));
   };
 
+  const loginWithGoogle = async (idToken: string) => {
+    const res = await api<{ accessToken: string; refreshToken: string }>('/auth/google', {
+      method: 'POST',
+      body: { idToken },
+      auth: false,
+    });
+    await tokens.set(res.accessToken, res.refreshToken);
+    setUser(await api<AuthUser>('/auth/me'));
+  };
+
   const register = async (input: RegisterInput) => {
     const res = await api<{ accessToken: string; refreshToken: string }>('/auth/register', {
       method: 'POST',
@@ -77,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{ user, loading, login, register, logout, refreshUser }}>
+    <Ctx.Provider value={{ user, loading, login, loginWithGoogle, register, logout, refreshUser }}>
       {children}
     </Ctx.Provider>
   );
