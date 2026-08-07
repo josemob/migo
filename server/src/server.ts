@@ -1,13 +1,26 @@
 import { app } from './app';
 import { env } from './config/env';
 import { prisma } from './config/prisma';
+import { expireStaleEmergencies } from './modules/emergencies/emergency.service';
 
 const server = app.listen(env.PORT, () => {
   console.log(`🐾 Migo API escuchando en http://localhost:${env.PORT} (${env.NODE_ENV})`);
 });
 
+// Barrido periódico: cierra las urgencias que nadie aceptó pasados 20 min.
+// Corre cada minuto aunque no haya nadie consultando (autoridad del auto-cierre).
+const emergencySweep = setInterval(() => {
+  expireStaleEmergencies()
+    .then((n) => {
+      if (n > 0) console.log(`[emergencies] ${n} urgencia(s) sin atención cerradas por tiempo`);
+    })
+    .catch((e) => console.error('[emergencies] barrido falló', e instanceof Error ? e.message : e));
+}, 60_000);
+emergencySweep.unref?.(); // no impide que el proceso termine
+
 const shutdown = async (signal: string) => {
   console.log(`\n${signal} recibido, cerrando...`);
+  clearInterval(emergencySweep);
   server.close(async () => {
     await prisma.$disconnect();
     process.exit(0);

@@ -6,6 +6,40 @@ import { runTriage } from './triage.service';
 
 const BROADCAST_RADIUS_KM = 15;
 const MAX_CLINICS = 10;
+// Una urgencia que nadie aceptó se cierra sola pasados estos minutos.
+const UNATTENDED_TIMEOUT_MIN = 20;
+
+/**
+ * Cierra automáticamente las urgencias que nadie atendió: si siguen en
+ * TRIAGING/BROADCASTING (ninguna clínica aceptó) pasados UNATTENDED_TIMEOUT_MIN,
+ * se marcan EXPIRED, se expiran sus alertas pendientes y se refrescan los
+ * paneles de las clínicas alertadas (SSE). Devuelve cuántas se cerraron.
+ */
+export async function expireStaleEmergencies(): Promise<number> {
+  const cutoff = new Date(Date.now() - UNATTENDED_TIMEOUT_MIN * 60 * 1000);
+  const stale = await prisma.emergency.findMany({
+    where: { status: { in: ['TRIAGING', 'BROADCASTING'] }, createdAt: { lt: cutoff } },
+    select: { id: true, alerts: { select: { clinicId: true } } },
+  });
+  if (!stale.length) return 0;
+
+  const ids = stale.map((e) => e.id);
+  await prisma.$transaction([
+    prisma.emergency.updateMany({ where: { id: { in: ids } }, data: { status: 'EXPIRED' } }),
+    prisma.emergencyAlert.updateMany({
+      where: { emergencyId: { in: ids }, status: { in: ['SENT', 'SEEN'] } },
+      data: { status: 'EXPIRED' },
+    }),
+  ]);
+
+  // Avisa a cada clínica alertada para que la quite del panel (SSE)
+  for (const e of stale) {
+    for (const clinicId of new Set(e.alerts.map((a) => a.clinicId))) {
+      bus.emit(EMERGENCY_UPDATE, { clinicId, emergencyId: e.id });
+    }
+  }
+  return ids.length;
+}
 
 interface CreateInput {
   petId: string;
@@ -111,6 +145,7 @@ export const emergencyService = {
   },
 
   async listForOwner(ownerId: string) {
+    await expireStaleEmergencies().catch(() => {}); // cierra las vencidas antes de listar
     return prisma.emergency.findMany({
       where: { ownerId },
       include: {

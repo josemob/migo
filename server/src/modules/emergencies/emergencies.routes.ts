@@ -9,7 +9,7 @@ import { ApiError } from '../../utils/ApiError';
 import { env } from '../../config/env';
 import { verifyAccessToken } from '../../utils/jwt';
 import { bus, EMERGENCY_NEW, EMERGENCY_UPDATE, type EmergencyEvent } from '../../lib/events';
-import { emergencyService } from './emergency.service';
+import { emergencyService, expireStaleEmergencies } from './emergency.service';
 
 const router = Router();
 
@@ -136,6 +136,7 @@ router.get(
   '/active',
   withClinicContext,
   asyncHandler(async (req, res) => {
+    await expireStaleEmergencies().catch(() => {}); // descarta las vencidas (>20 min sin aceptar)
     const alerts = await prisma.emergencyAlert.findMany({
       where: {
         clinicId: req.clinicId!,
