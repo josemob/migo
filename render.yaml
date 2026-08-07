@@ -7,10 +7,11 @@ services:
     runtime: node
     plan: free # se duerme tras ~15 min de inactividad (cold start); suficiente para probar
     rootDir: server
-    # npm ci = instalación determinista desde package-lock.json (misma versión de
-    # TypeScript que en local; evita que npm reresuelva a una TS incompatible).
-    buildCommand: npm ci && npm run build
-    startCommand: npm run start
+    # Se ejecuta con tsx (igual que en dev) en lugar de compilar con tsc: evita
+    # incompatibilidades del toolchain de TypeScript en el entorno de build de Render.
+    # --include=dev asegura que tsx/prisma (devDependencies) queden instalados.
+    buildCommand: npm ci --include=dev && npx prisma generate
+    startCommand: npx tsx src/server.ts
     healthCheckPath: /health
     autoDeploy: true
     envVars:
