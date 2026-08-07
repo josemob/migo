@@ -7,13 +7,18 @@ services:
     runtime: node
     plan: free # se duerme tras ~15 min de inactividad (cold start); suficiente para probar
     rootDir: server
-    buildCommand: npm install && npm run build
+    # npm ci = instalación determinista desde package-lock.json (misma versión de
+    # TypeScript que en local; evita que npm reresuelva a una TS incompatible).
+    buildCommand: npm ci && npm run build
     startCommand: npm run start
     healthCheckPath: /health
     autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
+      # Fijar Node LTS (evita que Render use una versión demasiado nueva/bleeding-edge)
+      - key: NODE_VERSION
+        value: "22"
       # Secretos: pégalos en el dashboard (Environment) desde tu server/.env
       - key: DATABASE_URL # Supabase pooler (:6543 con pgbouncer=true)
         sync: false
