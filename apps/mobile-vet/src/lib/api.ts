@@ -76,9 +76,10 @@ export async function api<T = unknown>(path: string, opts: Options = {}): Promis
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (auth && accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
-  // Timeout: si el backend no responde, falla en vez de colgarse para siempre
+  // Timeout: si el backend no responde, falla en vez de colgarse para siempre.
+  // 60s para tolerar el "cold start" del plan free de Render (~30-60s al despertar).
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 10000);
+  const timer = setTimeout(() => controller.abort(), 60000);
   let res: Response;
   try {
     res = await fetch(`${BASE_URL}${path}`, {
@@ -90,7 +91,7 @@ export async function api<T = unknown>(path: string, opts: Options = {}): Promis
   } catch (err) {
     clearTimeout(timer);
     const aborted = err instanceof Error && err.name === 'AbortError';
-    throw new ApiError(0, aborted ? 'El servidor no responde. Revisa tu conexión.' : 'Error de red');
+    throw new ApiError(0, aborted ? 'El servidor está tardando (puede estar despertando). Reintenta en unos segundos.' : 'Error de red');
   }
   clearTimeout(timer);
 
