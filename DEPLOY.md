@@ -6,7 +6,7 @@
 |---|---|
 | **Backend API** (Render) | https://migo-api-n85p.onrender.com  ·  base API `/api/v1` |
 | **Vet Dashboard** (Vercel) | https://migo-vet.vercel.app |
-| **Super Admin** (Vercel) | https://migo-admin.vercel.app |
+| **Super Admin** (Vercel) | https://migo-admin-tau.vercel.app |
 
 Notas del deploy real:
 - El backend en Render corre con **tsx** (`npx tsx src/server.ts`), no con `tsc`
