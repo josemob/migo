@@ -1,5 +1,24 @@
 # 🚀 Migo — Guía de despliegue
 
+## ✅ Estado actual (desplegado 2026-08-07)
+
+| Pieza | URL en producción |
+|---|---|
+| **Backend API** (Render) | https://migo-api-n85p.onrender.com  ·  base API `/api/v1` |
+| **Vet Dashboard** (Vercel) | https://migo-vet.vercel.app |
+| **Super Admin** (Vercel) | https://migo-admin.vercel.app |
+
+Notas del deploy real:
+- El backend en Render corre con **tsx** (`npx tsx src/server.ts`), no con `tsc`
+  (el build de Render rechazaba la config CommonJS/`node10`). Build:
+  `npm ci --include=dev && npx prisma generate`; `NODE_VERSION=22`.
+- Frontends en **Vercel** (no Cloudflare): Root Directory `apps/web-vet` y
+  `apps/web-admin`, framework Vite, env `VITE_API_URL` = backend + `/api/v1`.
+- `CORS_ORIGINS` (Render) = las dos URLs de Vercel.
+- Apps móviles (APK) → `EXPO_PUBLIC_API_URL=https://migo-api-n85p.onrender.com/api/v1`.
+
+---
+
 Arquitectura del deploy (todo en tiers **gratuitos**):
 
 | Pieza | Dónde | Costo |
