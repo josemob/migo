@@ -90,29 +90,35 @@ export default function LoginScreen() {
           </Text>
         )}
 
-        <View style={styles.divider}>
-          <View style={styles.line} />
-          <Text style={styles.dividerText}>o continúa con</Text>
-          <View style={styles.line} />
-        </View>
+        {/* Con el teclado abierto se ocultan Google / divider / "crear cuenta"
+            para dejar solo el formulario, centrado sobre el teclado. */}
+        {!kbd && (
+          <>
+            <View style={styles.divider}>
+              <View style={styles.line} />
+              <Text style={styles.dividerText}>o continúa con</Text>
+              <View style={styles.line} />
+            </View>
 
-        <Button
-          title="Continuar con Google"
-          variant="outline"
-          loading={googleBusy}
-          disabled={!googleReady || googleBusy}
-          onPress={() => {
-            setError('');
-            googleSignIn();
-          }}
-        />
+            <Button
+              title="Continuar con Google"
+              variant="outline"
+              loading={googleBusy}
+              disabled={!googleReady || googleBusy}
+              onPress={() => {
+                setError('');
+                googleSignIn();
+              }}
+            />
 
-        <Text style={styles.switch} onPress={() => setMode(mode === 'login' ? 'register' : 'login')}>
-          {mode === 'login' ? '¿Eres nuevo en Migo? ' : '¿Ya tienes cuenta? '}
-          <Text style={{ color: colors.brand, fontWeight: '700' }}>
-            {mode === 'login' ? 'Crear una cuenta' : 'Inicia sesión'}
-          </Text>
-        </Text>
+            <Text style={styles.switch} onPress={() => setMode(mode === 'login' ? 'register' : 'login')}>
+              {mode === 'login' ? '¿Eres nuevo en Migo? ' : '¿Ya tienes cuenta? '}
+              <Text style={{ color: colors.brand, fontWeight: '700' }}>
+                {mode === 'login' ? 'Crear una cuenta' : 'Inicia sesión'}
+              </Text>
+            </Text>
+          </>
+        )}
       </View>
         </ScrollView>
       </KeyboardAvoidingView>
