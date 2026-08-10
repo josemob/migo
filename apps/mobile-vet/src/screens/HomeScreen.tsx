@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
+import { appAlert } from '../lib/dialog';
 import { useAuth } from '../lib/auth';
 import { TabIcon } from '../components/TabIcon';
 import { Loading } from '../components/ui';
@@ -39,7 +40,20 @@ const STATUS: Record<string, { label: string; bg: string; fg: string }> = {
 
 export default function HomeScreen({ navigation }: { navigation: any }) {
   const { user } = useAuth();
+  const qc = useQueryClient();
   const [available, setAvailable] = useState(true);
+
+  // Marcar una cita como concluida -> habilita la calificación del servicio en la app del dueño
+  const complete = useMutation({
+    mutationFn: (id: string) => api(`/appointments/${id}/status`, { method: 'POST', body: { status: 'COMPLETED' } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['vet-appts-today'] }),
+    onError: (e) => appAlert('No se pudo concluir', e instanceof Error ? e.message : 'Intenta de nuevo'),
+  });
+  const confirmComplete = (a: Appt) =>
+    appAlert('Concluir cita', `¿Marcar como concluida la cita de ${a.pet.name}? El dueño podrá calificar el servicio.`, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Concluir', onPress: () => complete.mutate(a.id) },
+    ]);
   const firstName = user?.fullName?.replace(/^Dr\.?a?\.?\s*/i, '').split(' ')[0] ?? '';
 
   const startToday = new Date(); startToday.setHours(0, 0, 0, 0);
@@ -118,6 +132,11 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                   <Text style={styles.apptOwner}>Dueño: {a.pet.owner?.fullName ?? '—'}</Text>
                   <View style={styles.petPill}><Text style={styles.petPillTxt}>Paciente: {a.pet.name}</Text></View>
                 </View>
+                {['PENDING', 'CONFIRMED', 'IN_PROGRESS'].includes(a.status) && (
+                  <Pressable style={styles.concludeBtn} onPress={() => confirmComplete(a)} disabled={complete.isPending}>
+                    <Text style={styles.concludeTxt}>✓ Marcar concluida</Text>
+                  </Pressable>
+                )}
               </Pressable>
             );
           })
@@ -176,6 +195,8 @@ const styles = StyleSheet.create({
   petPillTxt: { color: colors.brand, fontWeight: '700', fontSize: 12 },
   badge: { borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 4 },
   badgeTxt: { ...type.bodySmall, fontWeight: '700' },
+  concludeBtn: { marginTop: 12, borderWidth: 1.5, borderColor: colors.green, borderRadius: radius.md, paddingVertical: 10, alignItems: 'center' },
+  concludeTxt: { color: colors.green, fontWeight: '800', fontSize: 14 },
 
   empty: { alignItems: 'center', gap: 8, paddingVertical: 30 },
   emptyIcon: { fontSize: 36 },

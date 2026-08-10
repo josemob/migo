@@ -649,6 +649,10 @@ model ClinicStaff {
 
   isActive Boolean @default(true)
 
+  // reputación del profesional (agregado de las reseñas de sus citas)
+  ratingAvg   Decimal @default(0) @db.Decimal(3, 2)
+  ratingCount Int     @default(0)
+
   vaccinations  Vaccination[]
   prescriptions Prescription[]
   records       MedicalRecord[]
@@ -656,6 +660,7 @@ model ClinicStaff {
   teleconsults  Teleconsult[]  @relation("TeleconsultVet")
   shifts        StaffShift[]
   serviceStaff  ServiceStaff[]
+  reviews       Review[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -901,11 +906,15 @@ model Review {
   authorId      String
   appointment   Appointment? @relation(fields: [appointmentId], references: [id])
   appointmentId String?      @unique
+  // vet que atendió la cita: la reseña cuenta para la clínica Y para el profesional
+  staff         ClinicStaff? @relation(fields: [staffId], references: [id])
+  staffId       String?
   rating        Int // 1..5
   comment       String?
   createdAt     DateTime     @default(now())
 
   @@index([clinicId])
+  @@index([staffId])
 }
 
 // ─────────────────────────────────────────────────────────────────────

@@ -358,6 +358,7 @@ router.get(
         clinic: { select: { id: true, name: true, logoUrl: true } },
         service: { select: { name: true } },
         pet: { select: { name: true } },
+        vet: { select: { user: { select: { fullName: true } } } },
       },
     });
     res.json({ appointment });
@@ -378,7 +379,11 @@ router.post(
   asyncHandler(async (req, res) => {
     const appt = await prisma.appointment.findFirst({
       where: { id: req.params.id, bookedById: req.user!.id },
-      include: { review: true, clinic: { select: { id: true, ratingAvg: true, ratingCount: true } } },
+      include: {
+        review: true,
+        clinic: { select: { id: true, ratingAvg: true, ratingCount: true } },
+        vet: { select: { id: true, ratingAvg: true, ratingCount: true } },
+      },
     });
     if (!appt) throw ApiError.notFound('Cita no encontrada');
     if (appt.review) throw ApiError.conflict('Esta cita ya fue calificada.');
@@ -392,6 +397,7 @@ router.post(
           appointmentId: appt.id,
           clinicId: appt.clinicId,
           authorId: req.user!.id,
+          staffId: appt.vetId ?? undefined, // la reseña cuenta también para el vet que atendió
           rating,
           comment: fullComment || undefined,
         },
@@ -402,6 +408,15 @@ router.post(
       const ratingCount = oldCount + 1;
       const ratingAvg = Number(((oldAvg * oldCount + rating) / ratingCount).toFixed(2));
       await tx.clinic.update({ where: { id: appt.clinicId }, data: { ratingAvg, ratingCount } });
+
+      // ...y el promedio del profesional (veterinario) que atendió, si lo hubo
+      if (appt.vet) {
+        const vCount = appt.vet.ratingCount + 1;
+        const vAvg = Number(
+          ((Number(appt.vet.ratingAvg) * appt.vet.ratingCount + rating) / vCount).toFixed(2),
+        );
+        await tx.clinicStaff.update({ where: { id: appt.vet.id }, data: { ratingAvg: vAvg, ratingCount: vCount } });
+      }
       return { review, ratingAvg, ratingCount };
     });
 

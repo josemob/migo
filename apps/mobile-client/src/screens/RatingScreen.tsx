@@ -16,6 +16,7 @@ export default function RatingScreen({ navigation, route }: any) {
     clinicName?: string;
     serviceName?: string;
     petName?: string;
+    vetName?: string;
     timeLabel?: string;
   };
 
@@ -76,7 +77,19 @@ export default function RatingScreen({ navigation, route }: any) {
             <TabIcon name="scissors" color={colors.brand} size={16} />
             <Text style={styles.cardMeta}>{p.serviceName ?? 'Servicio'}{p.timeLabel ? ` · ${p.timeLabel}` : ''}</Text>
           </View>
+          {p.vetName ? (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.cardRow}>
+                <TabIcon name="person" color={colors.brand} size={16} />
+                <Text style={styles.cardMeta}>Te atendió {p.vetName}</Text>
+              </View>
+            </>
+          ) : null}
         </View>
+        <Text style={styles.ratesBoth}>
+          Tu calificación es para la clínica{p.vetName ? ' y para el profesional que te atendió' : ''}.
+        </Text>
 
         {/* Estrellas */}
         <Text style={styles.q}>¿Cómo fue tu experiencia?</Text>
@@ -140,6 +153,7 @@ const styles = StyleSheet.create({
   cardClinic: { fontSize: 16, fontWeight: '800', color: colors.text, flex: 1 },
   cardMeta: { fontSize: 14, color: colors.muted, flex: 1 },
   divider: { height: 1, backgroundColor: colors.border, marginVertical: 10 },
+  ratesBoth: { fontSize: 13, color: colors.muted, textAlign: 'center', marginTop: 10 },
 
   q: { fontSize: 15, fontWeight: '800', color: colors.brand, textAlign: 'center', marginTop: 24 },
   stars: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: 10 },

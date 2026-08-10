@@ -114,10 +114,11 @@ router.patch(
   }),
 );
 
-// Transiciones válidas del ciclo de vida de una cita
+// Transiciones válidas del ciclo de vida de una cita.
+// El vet puede "marcar concluida" desde cualquier estado activo (PENDING/CONFIRMED/IN_PROGRESS).
 const TRANSITIONS: Record<string, string[]> = {
-  PENDING: ['CONFIRMED', 'CANCELLED'],
-  CONFIRMED: ['IN_PROGRESS', 'CANCELLED', 'NO_SHOW'],
+  PENDING: ['CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW'],
+  CONFIRMED: ['IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW'],
   IN_PROGRESS: ['COMPLETED', 'CANCELLED'],
   COMPLETED: [],
   CANCELLED: [],
@@ -148,7 +149,15 @@ router.post(
     const updated = await prisma.$transaction(async (tx) => {
       const result = await tx.appointment.update({
         where: { id: appt.id },
-        data: { status: req.body.status, cancelReason: req.body.cancelReason },
+        data: {
+          status: req.body.status,
+          cancelReason: req.body.cancelReason,
+          // Al concluir se registra qué profesional atendió (si no había uno asignado),
+          // para que la reseña del cliente cuente también para ese veterinario.
+          ...(req.body.status === 'COMPLETED' && !appt.vetId && req.staffId
+            ? { vetId: req.staffId }
+            : {}),
+        },
         include: detailInclude,
       });
 

@@ -76,7 +76,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const pendingReview = useQuery({
     queryKey: ['pending-review'],
     queryFn: () =>
-      api<{ appointment: { id: string; scheduledAt: string; clinic: { name: string }; service?: { name: string }; pet: { name: string } } | null }>(
+      api<{ appointment: { id: string; scheduledAt: string; clinic: { name: string }; service?: { name: string }; pet: { name: string }; vet?: { user: { fullName: string } } | null } | null }>(
         '/me/appointments/pending-review',
       ),
   });
@@ -125,6 +125,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 clinicName: toRate.clinic.name,
                 serviceName: toRate.service?.name,
                 petName: toRate.pet.name,
+                vetName: toRate.vet?.user.fullName,
                 timeLabel: new Date(toRate.scheduledAt).toLocaleDateString('es-VE', { day: 'numeric', month: 'short' }),
               })
             }
