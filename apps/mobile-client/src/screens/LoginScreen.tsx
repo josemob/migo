@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../lib/auth';
 import { useGoogleSignIn } from '../lib/google';
@@ -20,6 +20,18 @@ export default function LoginScreen() {
   const [busy, setBusy] = useState(false);
   const { signIn: googleSignIn, googleBusy, googleReady } = useGoogleSignIn(setError);
 
+  // Con el teclado abierto se compacta el logo/tagline para que el formulario y
+  // los botones quepan centrados en el espacio restante (app arriba, teclado abajo).
+  const [kbd, setKbd] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKbd(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKbd(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
   const submit = async () => {
     setError('');
     if (mode === 'register' && password !== confirm) return setError('Las contraseñas no coinciden');
@@ -36,24 +48,26 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
         >
-      <View style={styles.logoWrap}>
-        {mode === 'register' && <Text style={styles.join}>Únete a</Text>}
-        <Logo width={150} />
-        <Text style={styles.tagline}>
-          {mode === 'login'
-            ? 'Cuidamos a quien más quieres, 24/7'
-            : 'Crea tu cuenta gratis y empieza a cuidar de tu mejor amigo con la ayuda de nuestra IA.'}
-        </Text>
+      <View style={[styles.logoWrap, kbd && styles.logoWrapKbd]}>
+        {mode === 'register' && !kbd && <Text style={styles.join}>Únete a</Text>}
+        <Logo width={kbd ? 96 : 150} />
+        {!kbd && (
+          <Text style={styles.tagline}>
+            {mode === 'login'
+              ? 'Cuidamos a quien más quieres, 24/7'
+              : 'Crea tu cuenta gratis y empieza a cuidar de tu mejor amigo con la ayuda de nuestra IA.'}
+          </Text>
+        )}
       </View>
 
-      <View style={{ marginTop: 24 }}>
+      <View style={{ marginTop: kbd ? 10 : 24 }}>
         {mode === 'register' && (
           <>
             <Input label="Nombre completo" value={fullName} onChangeText={setFullName} placeholder="Ej: José Mota" />
@@ -113,6 +127,7 @@ const styles = StyleSheet.create({
   // contenido se hace scrolleable para no tapar los botones de abajo.
   scroll: { flexGrow: 1, padding: 24, justifyContent: 'center' },
   logoWrap: { alignItems: 'center', marginTop: 40 },
+  logoWrapKbd: { marginTop: 0 }, // teclado abierto: sin margen superior extra
   join: { fontSize: 22, fontWeight: '800', color: colors.brand, marginBottom: 4 },
   tagline: { fontSize: 14, color: colors.muted, marginTop: 10, textAlign: 'center', paddingHorizontal: 20 },
   error: { color: colors.red, marginBottom: 12, fontSize: 14 },
