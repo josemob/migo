@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
+import * as ImagePicker from 'expo-image-picker';
 import { useQuery } from '@tanstack/react-query';
 import type { Channel as StreamChannel } from 'stream-chat';
 import { Channel, MessageList, MessageComposer } from 'stream-chat-expo';
@@ -18,10 +20,13 @@ export default function ChatThreadScreen({ navigation, route }: any) {
   const { channelType, channelId, clientName } = route.params as { channelType: string; channelId: string; clientName?: string };
   const { user } = useAuth();
   const { chatClient, ready } = useStream();
+  const insets = useSafeAreaInsets();
   const [channel, setChannel] = useState<StreamChannel | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [picker, setPicker] = useState(false);
   const [sending, setSending] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const services = useQuery({ queryKey: ['clinic-services'], queryFn: () => api<{ data: Service[] }>('/services'), enabled: picker });
 
@@ -59,6 +64,54 @@ export default function ChatThreadScreen({ navigation, route }: any) {
     }
   };
 
+  const uploadAndSend = async (asset: ImagePicker.ImagePickerAsset) => {
+    if (!channel) return;
+    const isVideo = asset.type === 'video';
+    const name = asset.fileName ?? asset.uri.split('/').pop() ?? `archivo-${isVideo ? 'video.mp4' : 'foto.jpg'}`;
+    const type = asset.mimeType ?? (isVideo ? 'video/mp4' : 'image/jpeg');
+    setUploading(true);
+    try {
+      const resp = isVideo
+        ? await channel.sendFile(asset.uri, name, type)
+        : await channel.sendImage(asset.uri, name, type);
+      const url = (resp as { file: string }).file;
+      await channel.sendMessage({
+        attachments: [
+          isVideo
+            ? { type: 'video', asset_url: url, title: name, mime_type: type }
+            : { type: 'image', image_url: url, asset_url: url },
+        ],
+      });
+    } catch (e) {
+      appAlert('No se pudo enviar', e instanceof Error ? e.message : 'Intenta de nuevo.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const pick = async (kind: 'image' | 'camera' | 'video') => {
+    setAttachOpen(false);
+    try {
+      let result: ImagePicker.ImagePickerResult;
+      if (kind === 'camera') {
+        const perm = await ImagePicker.requestCameraPermissionsAsync();
+        if (!perm.granted) return appAlert('Permiso necesario', 'Habilita el acceso a la cámara para tomar fotos.');
+        result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.7 });
+      } else {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) return appAlert('Permiso necesario', 'Habilita el acceso a tus fotos para adjuntar archivos.');
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: kind === 'video' ? ['videos'] : ['images'],
+          quality: 0.7,
+        });
+      }
+      if (result.canceled || !result.assets?.length) return;
+      await uploadAndSend(result.assets[0]);
+    } catch (e) {
+      appAlert('No se pudo adjuntar', e instanceof Error ? e.message : 'Intenta de nuevo.');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.topbar}>
@@ -74,10 +127,40 @@ export default function ChatThreadScreen({ navigation, route }: any) {
       ) : !channel ? (
         <Loading />
       ) : (
-        <Channel channel={channel} bottomInset={0} keyboardVerticalOffset={0} additionalKeyboardAvoidingViewProps={{ style: { flex: 1 } }} hasFilePicker={false} hasImagePicker hasCameraPicker hasCommands={false} audioRecordingEnabled={false}>
+        <Channel
+          channel={channel}
+          bottomInset={insets.bottom}
+          keyboardVerticalOffset={0}
+          additionalKeyboardAvoidingViewProps={{ style: { flex: 1 } }}
+          handleAttachButtonPress={() => {
+            Keyboard.dismiss();
+            setAttachOpen((o) => !o);
+          }}
+          hasFilePicker={false}
+          hasImagePicker
+          hasCameraPicker={false}
+          hasCommands={false}
+          audioRecordingEnabled={false}
+        >
           <MessageList />
+          {attachOpen && (
+            <View style={styles.attachRow}>
+              <AttachOption icon="image" onPress={() => pick('image')} />
+              <AttachOption icon="camera" onPress={() => pick('camera')} />
+              <AttachOption icon="video" onPress={() => pick('video')} />
+            </View>
+          )}
           <MessageComposer />
         </Channel>
+      )}
+
+      {uploading && (
+        <View style={styles.uploading} pointerEvents="none">
+          <View style={styles.uploadingCard}>
+            <ActivityIndicator color={colors.brand} />
+            <Text style={styles.uploadingTxt}>Enviando…</Text>
+          </View>
+        </View>
       )}
 
       {/* Selector de servicio */}
@@ -111,8 +194,29 @@ export default function ChatThreadScreen({ navigation, route }: any) {
   );
 }
 
+const ATTACH_ICONS: Record<string, string> = {
+  image: 'M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z',
+  camera: 'M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z',
+  video: 'M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z',
+};
+
+function AttachOption({ icon, onPress }: { icon: keyof typeof ATTACH_ICONS; onPress: () => void }) {
+  return (
+    <Pressable style={styles.attachOpt} onPress={onPress} hitSlop={8}>
+      <Svg width={26} height={26} viewBox="0 0 24 24" fill={colors.brand}>
+        <Path d={ATTACH_ICONS[icon]} />
+      </Svg>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas, paddingBottom: 12 },
+  attachRow: { flexDirection: 'row', gap: 22, paddingTop: 12, paddingBottom: 14, paddingHorizontal: 20 },
+  attachOpt: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  uploading: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  uploadingCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.white, paddingHorizontal: 20, paddingVertical: 14, borderRadius: 16, boxShadow: cardShadow },
+  uploadingTxt: { fontSize: 15, fontWeight: '700', color: colors.text },
   topbar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
   topTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '800', color: colors.text },
   svcBtn: { backgroundColor: colors.brand, borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 8 },
