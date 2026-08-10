@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../lib/auth';
 import { useGoogleSignIn } from '../lib/google';
 import { appAlert } from '../lib/dialog';
-import { Button, Input, Screen } from '../components/ui';
+import { Button, Input } from '../components/ui';
 import { Logo } from '../components/Logo';
 import { colors } from '../theme';
 
@@ -34,7 +35,14 @@ export default function LoginScreen() {
   };
 
   return (
-    <Screen>
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+        >
       <View style={styles.logoWrap}>
         {mode === 'register' && <Text style={styles.join}>Únete a</Text>}
         <Logo width={150} />
@@ -92,11 +100,18 @@ export default function LoginScreen() {
           </Text>
         </Text>
       </View>
-    </Screen>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.canvas },
+  flex: { flex: 1 },
+  // flexGrow: 1 permite centrar/expandir; al abrir el teclado (adjustResize) el
+  // contenido se hace scrolleable para no tapar los botones de abajo.
+  scroll: { flexGrow: 1, padding: 24, justifyContent: 'center' },
   logoWrap: { alignItems: 'center', marginTop: 40 },
   join: { fontSize: 22, fontWeight: '800', color: colors.brand, marginBottom: 4 },
   tagline: { fontSize: 14, color: colors.muted, marginTop: 10, textAlign: 'center', paddingHorizontal: 20 },
