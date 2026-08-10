@@ -58,11 +58,13 @@ export default function LoginScreen() {
       <View style={[styles.logoWrap, kbd && styles.logoWrapKbd]}>
         {mode === 'register' && !kbd && <Text style={styles.join}>Únete a</Text>}
         <Logo width={150} />
-        <Text style={styles.tagline}>
-          {mode === 'login'
-            ? 'Cuidamos a quien más quieres, 24/7'
-            : 'Crea tu cuenta gratis y empieza a cuidar de tu mejor amigo con la ayuda de nuestra IA.'}
-        </Text>
+        {!kbd && (
+          <Text style={styles.tagline}>
+            {mode === 'login'
+              ? 'Cuidamos a quien más quieres, 24/7'
+              : 'Crea tu cuenta gratis y empieza a cuidar de tu mejor amigo con la ayuda de nuestra IA.'}
+          </Text>
+        )}
       </View>
 
       <View style={{ marginTop: kbd ? 0 : 24 }}>
