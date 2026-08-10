@@ -50,24 +50,22 @@ export default function LoginScreen() {
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[styles.scroll, kbd && styles.scrollKbd]}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
         >
       <View style={[styles.logoWrap, kbd && styles.logoWrapKbd]}>
         {mode === 'register' && !kbd && <Text style={styles.join}>Únete a</Text>}
-        <Logo width={kbd ? 96 : 150} />
-        {!kbd && (
-          <Text style={styles.tagline}>
-            {mode === 'login'
-              ? 'Cuidamos a quien más quieres, 24/7'
-              : 'Crea tu cuenta gratis y empieza a cuidar de tu mejor amigo con la ayuda de nuestra IA.'}
-          </Text>
-        )}
+        <Logo width={150} />
+        <Text style={styles.tagline}>
+          {mode === 'login'
+            ? 'Cuidamos a quien más quieres, 24/7'
+            : 'Crea tu cuenta gratis y empieza a cuidar de tu mejor amigo con la ayuda de nuestra IA.'}
+        </Text>
       </View>
 
-      <View style={{ marginTop: kbd ? 10 : 24 }}>
+      <View style={{ marginTop: kbd ? 0 : 24 }}>
         {mode === 'register' && (
           <>
             <Input label="Nombre completo" value={fullName} onChangeText={setFullName} placeholder="Ej: José Mota" />
@@ -132,8 +130,11 @@ const styles = StyleSheet.create({
   // flexGrow: 1 permite centrar/expandir; al abrir el teclado (adjustResize) el
   // contenido se hace scrolleable para no tapar los botones de abajo.
   scroll: { flexGrow: 1, padding: 24, justifyContent: 'center' },
+  // Teclado abierto: separa 34px el grupo de inputs del teclado
+  scrollKbd: { paddingBottom: 34 },
   logoWrap: { alignItems: 'center', marginTop: 40 },
-  logoWrapKbd: { marginTop: 0 }, // teclado abierto: sin margen superior extra
+  // Teclado abierto: el logo ocupa el espacio superior y queda centrado vertical
+  logoWrapKbd: { flex: 1, marginTop: 0, justifyContent: 'center' },
   join: { fontSize: 22, fontWeight: '800', color: colors.brand, marginBottom: 4 },
   tagline: { fontSize: 14, color: colors.muted, marginTop: 10, textAlign: 'center', paddingHorizontal: 20 },
   error: { color: colors.red, marginBottom: 12, fontSize: 14 },
