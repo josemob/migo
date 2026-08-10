@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Image, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Map as MapLibreMap, Camera, Marker as MapMarker } from '@maplibre/maplibre-react-native';
 
 // OpenFreeMap: tiles vectoriales gratis, SIN API key ni facturación (vía MapLibre).
@@ -42,6 +42,7 @@ type TabKey = 'info' | 'services' | 'reviews';
 
 export default function ClinicDetailScreen({ navigation, route }: any) {
   const { id, distanceKm } = route.params as { id: string; name?: string; distanceKm?: number | null };
+  const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<TabKey>('info');
 
   const { data: clinic, isLoading } = useQuery({
@@ -95,7 +96,7 @@ export default function ClinicDetailScreen({ navigation, route }: any) {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: Math.max(insets.bottom, 40) }} showsVerticalScrollIndicator={false}>
         {/* Mapa real (con marcador de la clínica). Sin API key válida → pin placeholder. */}
         <View style={styles.map}>
           {showMap ? (

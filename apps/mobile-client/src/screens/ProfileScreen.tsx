@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { DevSettings, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery } from '@tanstack/react-query';
 import { api, tokens } from '../lib/api';
@@ -24,6 +24,7 @@ interface Pet {
 
 export default function ProfileScreen({ navigation }: { navigation: any }) {
   const { user, logout, refreshUser } = useAuth();
+  const insets = useSafeAreaInsets();
   const [faceId, setFaceId] = useState(true);
   const [push, setPush] = useState(true);
   const [avatarOverride, setAvatarOverride] = useState<string | null>(null);
@@ -74,7 +75,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
         <View style={{ width: 44 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: Math.max(insets.bottom, 40) }} showsVerticalScrollIndicator={false}>
         {/* Perfil */}
         <View style={styles.hero}>
           <Pressable style={styles.avatarWrap} onPress={changeAvatar}>

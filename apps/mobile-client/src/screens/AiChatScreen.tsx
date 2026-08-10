@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -15,6 +15,7 @@ interface Pet { id: string; name: string }
 
 export default function AiChatScreen({ navigation }: { navigation: any }) {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const firstName = user?.fullName?.split(' ')[0] ?? '';
   const pets = useQuery({ queryKey: ['pets'], queryFn: () => api<{ data: Pet[] }>('/me/pets') });
   const pet = pets.data?.data[0];
@@ -117,7 +118,7 @@ export default function AiChatScreen({ navigation }: { navigation: any }) {
         </ScrollView>
 
         {/* Barra de entrada */}
-        <View style={styles.inputBar}>
+        <View style={[styles.inputBar, { paddingTop: 10, paddingBottom: Math.max(insets.bottom, 10) }]}>
           <TextInput
             style={styles.input}
             placeholder="Escribe un mensaje para Migo IA…"

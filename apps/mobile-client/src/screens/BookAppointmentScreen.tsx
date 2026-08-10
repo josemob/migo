@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { appAlert } from '../lib/dialog';
@@ -29,6 +29,7 @@ export default function BookAppointmentScreen({ navigation, route }: any) {
     clinicId: string; clinicName: string; service: Service;
   };
   const price = Number(service.priceUsd);
+  const insets = useSafeAreaInsets();
 
   const pets = useQuery({ queryKey: ['pets'], queryFn: () => api<{ data: Pet[] }>('/me/pets') });
   const [petId, setPetId] = useState<string | null>(null);
@@ -164,7 +165,7 @@ export default function BookAppointmentScreen({ navigation, route }: any) {
       </ScrollView>
 
       {/* CTA */}
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
         <Pressable
           onPress={confirm}
           disabled={!canConfirm || booking}

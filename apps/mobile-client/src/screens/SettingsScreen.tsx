@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -23,6 +23,11 @@ type Row = {
 
 export default function SettingsScreen({ navigation }: { navigation: any }) {
   const { logout } = useAuth();
+  const insets = useSafeAreaInsets();
+  // Padding inferior condicionado al notch/barra de gestos: al menos 34px, y si el
+  // dispositivo tiene un inset inferior mayor (barra visible) se usa ese alto real
+  // para que la construcción no quede solapada por la barra del sistema.
+  const bottomPad = Math.max(insets.bottom, 34);
   const [bio, setBio] = useState(true);
   const pets = useQuery({ queryKey: ['pets'], queryFn: () => api<{ data: Pet[] }>('/me/pets') });
   const petNames = pets.data?.data.map((p) => p.name).join(', ') || 'Sin mascotas aún';
@@ -95,7 +100,7 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
         {sections.map((section) => (
           <View key={section.title} style={{ marginBottom: 22 }}>
             <Text style={styles.sectionTitle}>{section.title}</Text>

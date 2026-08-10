@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { appAlert } from '../lib/dialog';
@@ -19,6 +19,7 @@ const ROLES = [
 
 export default function KycScreen({ onSubmitted }: { onSubmitted: () => void }) {
   const { user, logout } = useAuth();
+  const insets = useSafeAreaInsets();
   const [position, setPosition] = useState<string>('');
   const [selfie, setSelfie] = useState<string | null>(null);
   const [idDoc, setIdDoc] = useState<string | null>(null);
@@ -64,7 +65,7 @@ export default function KycScreen({ onSubmitted }: { onSubmitted: () => void }) 
         <Text style={styles.title}>Verificación de identidad</Text>
         <Pressable onPress={logout} hitSlop={10}><Text style={styles.logout}>Salir</Text></Pressable>
       </View>
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: Math.max(insets.bottom, 40) }} showsVerticalScrollIndicator={false}>
         <Text style={styles.sub}>Para unirte a una clínica en Migo, verificamos tu identidad. Tus datos van cifrados y solo los revisa el equipo Migo.</Text>
 
         {/* Rol */}

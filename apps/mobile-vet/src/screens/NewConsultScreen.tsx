@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../lib/api';
 import { appAlert } from '../lib/dialog';
 import { Button } from '../components/ui';
@@ -12,6 +12,7 @@ interface Rx { drug: string; dose: string; frequency: string }
 export default function NewConsultScreen({ navigation, route }: any) {
   const { petId, name, allergies = [], weightKg: prevWeight } = route.params as { petId: string; name: string; allergies?: string[]; weightKg?: string | number };
 
+  const insets = useSafeAreaInsets();
   const [reason, setReason] = useState('');
   const [weight, setWeight] = useState(prevWeight ? String(prevWeight) : '');
   const [temp, setTemp] = useState('');
@@ -60,7 +61,7 @@ export default function NewConsultScreen({ navigation, route }: any) {
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: Math.max(insets.bottom, 40) }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {/* Paciente */}
           <View style={styles.patient}>
             <Text style={styles.patientName}>🐶 {name}</Text>

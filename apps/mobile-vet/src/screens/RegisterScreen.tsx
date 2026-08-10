@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../lib/auth';
 import { BackButton } from '../components/BackButton';
 import { Button } from '../components/ui';
@@ -8,6 +8,7 @@ import { colors, radius, type } from '../theme';
 
 export default function RegisterScreen({ navigation }: any) {
   const { register } = useAuth();
+  const insets = useSafeAreaInsets();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [nationalId, setNationalId] = useState('');
@@ -42,7 +43,7 @@ export default function RegisterScreen({ navigation }: any) {
         <View style={{ width: 44 }} />
       </View>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={{ padding: 24, gap: 12 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: Math.max(insets.bottom, 24), gap: 12 }} keyboardShouldPersistTaps="handled">
           <Text style={styles.sub}>Crea tu cuenta profesional. Luego verificaremos tu identidad.</Text>
           {error ? <View style={styles.err}><Text style={styles.errTxt}>{error}</Text></View> : null}
 

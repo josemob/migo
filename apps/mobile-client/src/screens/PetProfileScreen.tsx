@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { appAlert } from '../lib/dialog';
@@ -44,6 +44,7 @@ const ageText = (iso?: string) => {
 export default function PetProfileScreen({ route, navigation }: { route: any; navigation: any }) {
   const { id } = route.params;
   const qc = useQueryClient();
+  const insets = useSafeAreaInsets();
   const { data, isLoading } = useQuery({ queryKey: ['pet', id], queryFn: () => api<Ficha>(`/me/pets/${id}`) });
 
   const del = useMutation({
@@ -102,7 +103,7 @@ export default function PetProfileScreen({ route, navigation }: { route: any; na
         <View style={{ width: 44 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: Math.max(insets.bottom, 40) }} showsVerticalScrollIndicator={false}>
         {/* Card principal */}
         <View style={styles.hero}>
           <Pressable style={styles.avatarWrap} onPress={changePhoto}>

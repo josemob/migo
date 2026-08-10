@@ -9,18 +9,23 @@ import {
   View,
   type TextInputProps,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { cardShadow, colors, control, radius, spacing, type } from '../theme';
 
 export function Screen({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) {
+  const insets = useSafeAreaInsets();
+  const bottomPad = Math.max(insets.bottom, spacing.lg);
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       {scroll ? (
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={[styles.scroll, { paddingBottom: bottomPad }]}
+          keyboardShouldPersistTaps="handled"
+        >
           {children}
         </ScrollView>
       ) : (
-        <View style={styles.scroll}>{children}</View>
+        <View style={[styles.scroll, { paddingBottom: bottomPad }]}>{children}</View>
       )}
     </SafeAreaView>
   );

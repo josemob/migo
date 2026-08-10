@@ -1,5 +1,5 @@
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { BackButton } from '../components/BackButton';
@@ -31,6 +31,7 @@ const fmt = (iso: string) => new Date(iso).toLocaleDateString('es-VE', { day: '2
 
 export default function PatientDetailScreen({ navigation, route }: any) {
   const { petId } = route.params;
+  const insets = useSafeAreaInsets();
   const { data, isLoading } = useQuery({ queryKey: ['patient', petId], queryFn: () => api<Ficha>(`/patients/${petId}`) });
 
   if (isLoading || !data) {
@@ -118,7 +119,7 @@ export default function PatientDetailScreen({ navigation, route }: any) {
       </ScrollView>
 
       {/* CTA fija */}
-      <View style={styles.cta}>
+      <View style={[styles.cta, { paddingBottom: Math.max(insets.bottom, 20) }]}>
         <Button title="+ Iniciar Nueva Consulta" onPress={() => navigation.navigate('NewConsult', { petId: data.id, name: data.name, allergies: data.allergies.map((a) => a.substance), weightKg: data.weightKg })} />
       </View>
     </SafeAreaView>

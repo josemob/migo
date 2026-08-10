@@ -1,5 +1,5 @@
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -28,6 +28,7 @@ const POSITION_LABEL: Record<string, string> = {
 
 export default function KycPendingScreen({ kyc, onRetry, onRefresh }: { kyc: Kyc; onRetry: () => void; onRefresh: () => void }) {
   const { user, logout, refreshUser } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const invites = useQuery({
     queryKey: ['my-invitations'],
@@ -107,7 +108,7 @@ export default function KycPendingScreen({ kyc, onRetry, onRefresh }: { kyc: Kyc
         )}
       </ScrollView>
 
-      <View style={styles.actions}>
+      <View style={[styles.actions, { paddingBottom: Math.max(insets.bottom, 24) }]}>
         {kyc.status === 'REJECTED' && <Button title="Reintentar verificación" onPress={onRetry} />}
         {kyc.status !== 'REJECTED' && <Button title="Actualizar" variant="outline" onPress={() => { onRefresh(); invites.refetch(); }} />}
         <Button title="Cerrar sesión" variant="outline" onPress={logout} />

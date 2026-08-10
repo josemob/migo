@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import { api } from '../lib/api';
 import { appAlert } from '../lib/dialog';
@@ -22,6 +22,7 @@ export default function ConfirmPayScreen({ navigation, route }: any) {
   };
   const base = Number(p.service.priceUsd);
   const total = base + MIGO_FEE;
+  const insets = useSafeAreaInsets();
 
   const [method, setMethod] = useState<'PM' | 'DEBIT'>('PM');
   const [reference, setReference] = useState('');
@@ -151,7 +152,7 @@ export default function ConfirmPayScreen({ navigation, route }: any) {
         </View>
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
         <Pressable style={[styles.cta, busy && { opacity: 0.5 }]} disabled={busy} onPress={process}>
           <Text style={styles.ctaText}>{busy ? 'Procesando…' : 'Procesar y confirmar pago'}</Text>
         </Pressable>

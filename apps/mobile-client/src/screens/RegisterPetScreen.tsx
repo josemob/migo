@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { appAlert } from '../lib/dialog';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
@@ -27,6 +27,7 @@ const SIZES = ['Pequeño', 'Mediano', 'Grande'];
 
 export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Props) {
   const qc = useQueryClient();
+  const insets = useSafeAreaInsets();
   const done = () => (onComplete ? onComplete() : navigation?.goBack());
   const skip = () => (onSkip ? onSkip() : navigation?.goBack());
 
@@ -160,7 +161,7 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
       </ScrollView>
 
       {/* Footer */}
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
         <Pressable style={[styles.saveBtn, busy && { opacity: 0.6 }]} onPress={save} disabled={busy}>
           <Text style={styles.saveText}>{busy ? 'Guardando…' : '¡Listo, guardar mascota!'}</Text>
         </Pressable>
