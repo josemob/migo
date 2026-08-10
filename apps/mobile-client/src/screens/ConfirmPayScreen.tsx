@@ -152,7 +152,7 @@ export default function ConfirmPayScreen({ navigation, route }: any) {
         </View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}>
         <Pressable style={[styles.cta, busy && { opacity: 0.5 }]} disabled={busy} onPress={process}>
           <Text style={styles.ctaText}>{busy ? 'Procesando…' : 'Procesar y confirmar pago'}</Text>
         </Pressable>

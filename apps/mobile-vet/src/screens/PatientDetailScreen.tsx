@@ -119,7 +119,7 @@ export default function PatientDetailScreen({ navigation, route }: any) {
       </ScrollView>
 
       {/* CTA fija */}
-      <View style={[styles.cta, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+      <View style={[styles.cta, { paddingBottom: insets.bottom + 20 }]}>
         <Button title="+ Iniciar Nueva Consulta" onPress={() => navigation.navigate('NewConsult', { petId: data.id, name: data.name, allergies: data.allergies.map((a) => a.substance), weightKg: data.weightKg })} />
       </View>
     </SafeAreaView>

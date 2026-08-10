@@ -92,7 +92,7 @@ export default function ReportScreen({ navigation, route }: any) {
             </View>
           </ScrollView>
 
-          <View style={[styles.actions, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+          <View style={[styles.actions, { paddingBottom: insets.bottom + 20 }]}>
             <View style={{ flex: 1 }}>
               <Button title="Reenviar al dueño" variant="outline" onPress={() => appAlert('Informe disponible', 'El informe ya quedó guardado en el expediente digital del dueño; lo verá en su app. (El reenvío por chat/push llega en la próxima entrega.)')} />
             </View>

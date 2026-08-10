@@ -27,7 +27,7 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
   // Padding inferior condicionado al notch/barra de gestos: al menos 34px, y si el
   // dispositivo tiene un inset inferior mayor (barra visible) se usa ese alto real
   // para que la construcción no quede solapada por la barra del sistema.
-  const bottomPad = Math.max(insets.bottom, 34);
+  const bottomPad = insets.bottom + 34;
   const [bio, setBio] = useState(true);
   const pets = useQuery({ queryKey: ['pets'], queryFn: () => api<{ data: Pet[] }>('/me/pets') });
   const petNames = pets.data?.data.map((p) => p.name).join(', ') || 'Sin mascotas aún';

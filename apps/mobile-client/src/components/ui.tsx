@@ -14,7 +14,7 @@ import { cardShadow, colors, control, radius, spacing, type } from '../theme';
 
 export function Screen({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) {
   const insets = useSafeAreaInsets();
-  const bottomPad = Math.max(insets.bottom, spacing.lg);
+  const bottomPad = insets.bottom + spacing.lg;
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       {scroll ? (

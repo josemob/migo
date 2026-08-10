@@ -103,7 +103,7 @@ export default function PetProfileScreen({ route, navigation }: { route: any; na
         <View style={{ width: 44 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: Math.max(insets.bottom, 40) }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
         {/* Card principal */}
         <View style={styles.hero}>
           <Pressable style={styles.avatarWrap} onPress={changePhoto}>
@@ -160,7 +160,6 @@ export default function PetProfileScreen({ route, navigation }: { route: any; na
           <Action icon="file" label="Ver expediente médico" onPress={() => navigation.navigate('PetDetail', { id, name: data.name })} />
           <Action icon="calendar" label="Calendario de cuidados" onPress={soon} border />
           <Action icon="syringe" label="Historial de vacunas" onPress={soon} border />
-          <Action icon="file" label="Exportar expediente médico" onPress={soon} border />
         </View>
 
         <Pressable style={styles.delBtn} onPress={confirmDelete} disabled={del.isPending}>

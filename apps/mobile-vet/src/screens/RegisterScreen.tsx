@@ -43,7 +43,7 @@ export default function RegisterScreen({ navigation }: any) {
         <View style={{ width: 44 }} />
       </View>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: Math.max(insets.bottom, 24), gap: 12 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: insets.bottom + 24, gap: 12 }} keyboardShouldPersistTaps="handled">
           <Text style={styles.sub}>Crea tu cuenta profesional. Luego verificaremos tu identidad.</Text>
           {error ? <View style={styles.err}><Text style={styles.errTxt}>{error}</Text></View> : null}
 

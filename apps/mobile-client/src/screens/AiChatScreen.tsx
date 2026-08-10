@@ -118,7 +118,7 @@ export default function AiChatScreen({ navigation }: { navigation: any }) {
         </ScrollView>
 
         {/* Barra de entrada */}
-        <View style={[styles.inputBar, { paddingTop: 10, paddingBottom: Math.max(insets.bottom, 10) }]}>
+        <View style={[styles.inputBar, { paddingTop: 10, paddingBottom: insets.bottom + 10 }]}>
           <TextInput
             style={styles.input}
             placeholder="Escribe un mensaje para Migo IA…"

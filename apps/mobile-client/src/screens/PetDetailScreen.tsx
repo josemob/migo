@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { StyleSheet, Text, View } from 'react-native';
 import { api } from '../lib/api';
-import { Badge, Card, Loading, Muted, Screen } from '../components/ui';
+import { appAlert } from '../lib/dialog';
+import { Badge, Button, Card, Loading, Muted, Screen } from '../components/ui';
 import { colors } from '../theme';
 
 interface Ficha {
@@ -114,6 +115,12 @@ export default function PetDetailScreen({ route }: { route: any }) {
           ))
         )}
       </Card>
+
+      <Button
+        title="Exportar expediente médico"
+        variant="outline"
+        onPress={() => appAlert('Migo', 'Exportación del expediente disponible próximamente.')}
+      />
     </Screen>
   );
 }

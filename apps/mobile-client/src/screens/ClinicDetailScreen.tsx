@@ -96,7 +96,7 @@ export default function ClinicDetailScreen({ navigation, route }: any) {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: Math.max(insets.bottom, 40) }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
         {/* Mapa real (con marcador de la clínica). Sin API key válida → pin placeholder. */}
         <View style={styles.map}>
           {showMap ? (

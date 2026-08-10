@@ -161,7 +161,7 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
       </ScrollView>
 
       {/* Footer */}
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}>
         <Pressable style={[styles.saveBtn, busy && { opacity: 0.6 }]} onPress={save} disabled={busy}>
           <Text style={styles.saveText}>{busy ? 'Guardando…' : '¡Listo, guardar mascota!'}</Text>
         </Pressable>

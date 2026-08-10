@@ -165,7 +165,7 @@ export default function BookAppointmentScreen({ navigation, route }: any) {
       </ScrollView>
 
       {/* CTA */}
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}>
         <Pressable
           onPress={confirm}
           disabled={!canConfirm || booking}

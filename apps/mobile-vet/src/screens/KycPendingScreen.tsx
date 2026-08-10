@@ -108,7 +108,7 @@ export default function KycPendingScreen({ kyc, onRetry, onRefresh }: { kyc: Kyc
         )}
       </ScrollView>
 
-      <View style={[styles.actions, { paddingBottom: Math.max(insets.bottom, 24) }]}>
+      <View style={[styles.actions, { paddingBottom: insets.bottom + 24 }]}>
         {kyc.status === 'REJECTED' && <Button title="Reintentar verificación" onPress={onRetry} />}
         {kyc.status !== 'REJECTED' && <Button title="Actualizar" variant="outline" onPress={() => { onRefresh(); invites.refetch(); }} />}
         <Button title="Cerrar sesión" variant="outline" onPress={logout} />

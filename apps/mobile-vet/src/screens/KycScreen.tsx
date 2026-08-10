@@ -65,7 +65,7 @@ export default function KycScreen({ onSubmitted }: { onSubmitted: () => void }) 
         <Text style={styles.title}>Verificación de identidad</Text>
         <Pressable onPress={logout} hitSlop={10}><Text style={styles.logout}>Salir</Text></Pressable>
       </View>
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: Math.max(insets.bottom, 40) }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
         <Text style={styles.sub}>Para unirte a una clínica en Migo, verificamos tu identidad. Tus datos van cifrados y solo los revisa el equipo Migo.</Text>
 
         {/* Rol */}
