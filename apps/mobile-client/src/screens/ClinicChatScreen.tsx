@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import type { Channel as StreamChannel } from 'stream-chat';
 import { Channel, MessageList, MessageComposer } from 'stream-chat-expo';
 import { api } from '../lib/api';
@@ -16,7 +16,6 @@ interface ServiceOffer {
 export default function ClinicChatScreen({ navigation, route }: any) {
   const { clinicId, clinicName } = route.params as { clinicId: string; clinicName?: string };
   const { chatClient, ready } = useStream();
-  const insets = useSafeAreaInsets();
   const [channel, setChannel] = useState<StreamChannel | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [offer, setOffer] = useState<ServiceOffer | null>(null);
@@ -58,7 +57,7 @@ export default function ClinicChatScreen({ navigation, route }: any) {
   }, [ready, chatClient, clinicId]);
 
   return (
-    <SafeAreaView style={[styles.safe, { paddingBottom: insets.bottom + 40 }]} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.topbar}>
         <BackButton onPress={() => navigation.goBack()} />
         <Text style={styles.topTitle} numberOfLines={1}>{clinicName ?? 'Clínica'}</Text>
@@ -91,7 +90,9 @@ export default function ClinicChatScreen({ navigation, route }: any) {
       ) : (
         <Channel
           channel={channel}
-          bottomInset={insets.bottom}
+          bottomInset={0}
+          keyboardVerticalOffset={0}
+          additionalKeyboardAvoidingViewProps={{ style: { flex: 1 } }}
           hasFilePicker={false}
           hasImagePicker
           hasCameraPicker
@@ -107,7 +108,7 @@ export default function ClinicChatScreen({ navigation, route }: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.canvas },
+  safe: { flex: 1, backgroundColor: colors.canvas, paddingBottom: 12 },
   topbar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
   back: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', boxShadow: cardShadow },
   backArrow: { fontSize: 30, color: colors.brand, marginTop: -4, fontWeight: '700' },

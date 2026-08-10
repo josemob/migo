@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import type { Channel as StreamChannel } from 'stream-chat';
 import { Channel, MessageList, MessageComposer } from 'stream-chat-expo';
@@ -18,7 +18,6 @@ export default function ChatThreadScreen({ navigation, route }: any) {
   const { channelType, channelId, clientName } = route.params as { channelType: string; channelId: string; clientName?: string };
   const { user } = useAuth();
   const { chatClient, ready } = useStream();
-  const insets = useSafeAreaInsets();
   const [channel, setChannel] = useState<StreamChannel | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [picker, setPicker] = useState(false);
@@ -61,7 +60,7 @@ export default function ChatThreadScreen({ navigation, route }: any) {
   };
 
   return (
-    <SafeAreaView style={[styles.safe, { paddingBottom: insets.bottom + 40 }]} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.topbar}>
         <BackButton onPress={() => navigation.goBack()} />
         <Text style={styles.topTitle} numberOfLines={1}>{clientName ?? 'Cliente'}</Text>
@@ -75,7 +74,7 @@ export default function ChatThreadScreen({ navigation, route }: any) {
       ) : !channel ? (
         <Loading />
       ) : (
-        <Channel channel={channel} bottomInset={insets.bottom} hasFilePicker={false} hasImagePicker hasCameraPicker hasCommands={false} audioRecordingEnabled={false}>
+        <Channel channel={channel} bottomInset={0} keyboardVerticalOffset={0} additionalKeyboardAvoidingViewProps={{ style: { flex: 1 } }} hasFilePicker={false} hasImagePicker hasCameraPicker hasCommands={false} audioRecordingEnabled={false}>
           <MessageList />
           <MessageComposer />
         </Channel>
@@ -113,7 +112,7 @@ export default function ChatThreadScreen({ navigation, route }: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.canvas },
+  safe: { flex: 1, backgroundColor: colors.canvas, paddingBottom: 12 },
   topbar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
   topTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '800', color: colors.text },
   svcBtn: { backgroundColor: colors.brand, borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 8 },
