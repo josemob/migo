@@ -192,7 +192,7 @@ const ATTACH_ICONS: Record<string, string> = {
 function AttachOption({ icon, onPress }: { icon: keyof typeof ATTACH_ICONS; onPress: () => void }) {
   return (
     <Pressable style={styles.attachOpt} onPress={onPress} hitSlop={8}>
-      <Svg width={26} height={26} viewBox="0 0 24 24" fill={colors.brand}>
+      <Svg width={18} height={18} viewBox="0 0 24 24" fill="#334155">
         <Path d={ATTACH_ICONS[icon]} />
       </Svg>
     </Pressable>
@@ -211,9 +211,10 @@ const styles = StyleSheet.create({
   offerName: { fontSize: 16, fontWeight: '800', color: colors.text, marginTop: 2 },
   offerBtn: { backgroundColor: colors.brand, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 9 },
   offerBtnTxt: { color: colors.white, fontWeight: '800', fontSize: 14 },
-  // Fila de opciones de adjuntar (iconos flat, fondo transparente): sobre el input, a 14px
-  attachRow: { flexDirection: 'row', gap: 22, paddingTop: 12, paddingBottom: 14, paddingHorizontal: 20 },
-  attachOpt: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  // Fila de opciones de adjuntar: sobre el input, a 14px; fondo del chat para continuidad
+  attachRow: { flexDirection: 'row', gap: 16, paddingTop: 12, paddingBottom: 14, paddingHorizontal: 20, backgroundColor: colors.canvas },
+  // Iconos gris oscuro en círculos 34x34 con borde gris
+  attachOpt: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center' },
   uploading: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   uploadingCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.white, paddingHorizontal: 20, paddingVertical: 14, borderRadius: 16, boxShadow: cardShadow },
   uploadingTxt: { fontSize: 15, fontWeight: '700', color: colors.text },
