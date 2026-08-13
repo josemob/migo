@@ -47,7 +47,7 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
       {/* Botón central Alerta (pestaña de urgencias cercanas) */}
       <View style={styles.centerSlot}>
         <Pressable style={styles.alertBtn} onPress={() => navigation.navigate(alerta!.name)}>
-          <MigoTabIcon name="paw" color={colors.brand} size={30} />
+          <MigoTabIcon name="paw" color={colors.white} size={30} />
         </Pressable>
         <Text style={styles.alertLabel}>Alerta</Text>
       </View>
@@ -73,13 +73,13 @@ const styles = StyleSheet.create({
     width: 62,
     height: 62,
     borderRadius: 31,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.red,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: -34,
     borderWidth: 5,
     borderColor: colors.white,
-    shadowColor: colors.accent,
+    shadowColor: colors.red,
     shadowOpacity: 0.5,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },

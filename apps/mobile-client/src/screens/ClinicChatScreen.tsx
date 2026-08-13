@@ -200,7 +200,7 @@ function AttachOption({ icon, onPress }: { icon: keyof typeof ATTACH_ICONS; onPr
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.canvas, paddingBottom: 12 },
+  safe: { flex: 1, backgroundColor: colors.white, paddingBottom: 12 },
   topbar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
   back: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', boxShadow: cardShadow },
   backArrow: { fontSize: 30, color: colors.brand, marginTop: -4, fontWeight: '700' },

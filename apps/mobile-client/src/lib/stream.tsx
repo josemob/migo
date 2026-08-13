@@ -22,6 +22,12 @@ interface StreamCtx {
 const Ctx = createContext<StreamCtx>({ chatClient: null, ready: false });
 export const useStream = () => useContext(Ctx);
 
+// Fuerza fondo blanco en los chats (message list + composer)
+const CHAT_THEME = {
+  colors: { white_snow: '#FFFFFF' },
+  messageList: { container: { backgroundColor: '#FFFFFF' } },
+} as const;
+
 /**
  * Conecta al usuario a GetStream (Chat + Video) usando el token del backend
  * (/me/stream-token, rol customer). Envuelve la app con los providers de Stream
@@ -69,8 +75,8 @@ export function StreamProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <OverlayProvider>
-      <Chat client={chatClient}>
+    <OverlayProvider value={{ style: CHAT_THEME }}>
+      <Chat client={chatClient} style={CHAT_THEME}>
         <StreamVideo client={videoClient}>
           <Ctx.Provider value={{ chatClient, ready: true }}>
             {children}

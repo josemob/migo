@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +14,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
+import { BREEDS, breedImage } from '../lib/breeds';
 import { TabIcon } from '../components/TabIcon';
 import { BackButton } from '../components/BackButton';
 import { colors, radius } from '../theme';
@@ -34,6 +36,9 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
   const [species, setSpecies] = useState<'DOG' | 'CAT'>('DOG');
   const [name, setName] = useState('');
   const [breed, setBreed] = useState('');
+  const [breedOpen, setBreedOpen] = useState(false);
+  const [breedSearch, setBreedSearch] = useState('');
+  const [weight, setWeight] = useState('');
   const [age, setAge] = useState('');
   const [photo, setPhoto] = useState<string | null>(null);
   const [showMedical, setShowMedical] = useState(false);
@@ -42,6 +47,12 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
   const [color, setColor] = useState('');
   const [allergy, setAllergy] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const selectedBreedImg = useMemo(() => breedImage(breed), [breed]);
+  const filteredBreeds = useMemo(
+    () => BREEDS.filter((b) => b.name.toLowerCase().includes(breedSearch.trim().toLowerCase())),
+    [breedSearch],
+  );
 
   const pickPhoto = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -63,6 +74,7 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
           breed: breed || undefined,
           color: color || undefined,
           birthDate,
+          weightKg: weight && Number(weight) > 0 ? Number(weight) : undefined,
           alias: alias || undefined,
           size: size || undefined,
         },
@@ -120,10 +132,13 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
         </Field>
 
         <Field label="Raza">
-          <View style={styles.inputRow}>
-            <TextInput style={styles.inputFlex} placeholder="Selecciona la raza (Ej. Mestizo, Poodle...)" placeholderTextColor={colors.muted} value={breed} onChangeText={setBreed} />
+          <Pressable style={styles.inputRow} onPress={() => setBreedOpen(true)}>
+            {selectedBreedImg && <Image source={selectedBreedImg} style={styles.breedThumb} />}
+            <Text style={[styles.inputFlex, styles.breedValue, !breed && { color: colors.muted }]} numberOfLines={1}>
+              {breed || 'Selecciona la raza (Ej. Mestizo, Poodle...)'}
+            </Text>
             <Text style={styles.chevron}>⌄</Text>
-          </View>
+          </Pressable>
         </Field>
 
         <Field label="Edad">
@@ -150,6 +165,9 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
                 <TypeBtn key={s} label={s} active={size === s} onPress={() => setSize(s)} small />
               ))}
             </View>
+            <Field label="Peso aproximado (kg)">
+              <TextInput style={styles.input} placeholder="Ej. 4" placeholderTextColor={colors.muted} value={weight} onChangeText={setWeight} keyboardType="numeric" />
+            </Field>
             <Field label="Color dominante">
               <TextInput style={styles.input} placeholder="Ej. Marrón con blanco, Negro" placeholderTextColor={colors.muted} value={color} onChangeText={setColor} />
             </Field>
@@ -166,6 +184,42 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
           <Text style={styles.saveText}>{busy ? 'Guardando…' : '¡Listo, guardar mascota!'}</Text>
         </Pressable>
       </View>
+
+      {/* Selector de raza */}
+      <Modal visible={breedOpen} animationType="slide" transparent onRequestClose={() => setBreedOpen(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setBreedOpen(false)}>
+          <Pressable style={[styles.modalSheet, { paddingBottom: insets.bottom + 12 }]} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Selecciona la raza</Text>
+            <TextInput
+              style={styles.search}
+              placeholder="Buscar raza…"
+              placeholderTextColor={colors.muted}
+              value={breedSearch}
+              onChangeText={setBreedSearch}
+              autoCorrect={false}
+            />
+            <ScrollView style={{ maxHeight: 420 }} keyboardShouldPersistTaps="handled">
+              {filteredBreeds.map((b) => (
+                <Pressable
+                  key={b.name}
+                  style={styles.breedRow}
+                  onPress={() => {
+                    setBreed(b.name);
+                    setBreedOpen(false);
+                    setBreedSearch('');
+                  }}
+                >
+                  <Image source={b.image} style={styles.breedRowImg} />
+                  <Text style={styles.breedRowText}>{b.name}</Text>
+                  {breed === b.name && <Text style={styles.breedCheck}>✓</Text>}
+                </Pressable>
+              ))}
+              {filteredBreeds.length === 0 && <Text style={styles.breedEmpty}>Sin resultados</Text>}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -214,7 +268,20 @@ const styles = StyleSheet.create({
   input: { backgroundColor: colors.white, borderRadius: radius.md, paddingHorizontal: 16, paddingVertical: 15, fontSize: 15, color: colors.text, borderWidth: 1, borderColor: colors.border },
   inputRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, paddingRight: 16 },
   inputFlex: { flex: 1, paddingHorizontal: 16, paddingVertical: 15, fontSize: 15, color: colors.text },
+  breedValue: { paddingLeft: 12 },
+  breedThumb: { width: 34, height: 34, borderRadius: 10, marginLeft: 10, backgroundColor: '#EFE3F5' },
   chevron: { fontSize: 20, color: colors.muted },
+
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  modalSheet: { backgroundColor: colors.canvas, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20 },
+  modalHandle: { alignSelf: 'center', width: 44, height: 5, borderRadius: 3, backgroundColor: colors.border, marginBottom: 12 },
+  modalTitle: { fontSize: 18, fontWeight: '900', color: colors.text, marginBottom: 12 },
+  search: { backgroundColor: colors.white, borderRadius: radius.md, paddingHorizontal: 16, paddingVertical: 12, fontSize: 15, color: colors.text, borderWidth: 1, borderColor: colors.border, marginBottom: 8 },
+  breedRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 8 },
+  breedRowImg: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#EFE3F5' },
+  breedRowText: { flex: 1, fontSize: 16, fontWeight: '600', color: colors.text },
+  breedCheck: { fontSize: 18, fontWeight: '900', color: colors.brand },
+  breedEmpty: { textAlign: 'center', color: colors.muted, paddingVertical: 24 },
 
   medicalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F3EAF8', borderRadius: radius.md, padding: 16, marginTop: 22, borderWidth: 1, borderColor: '#E3D0EE', borderStyle: 'dashed' },
   medicalHeadOpen: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },

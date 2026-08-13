@@ -39,6 +39,8 @@ export const radius = { sm: 8, md: 12, lg: 16, xl: 24, pill: 13, full: 999 };
 // h4 (Outfit Medium): 16px / 18px / peso 500 / letter-spacing 0  -> títulos de botón medium
 // body small (Outfit Regular): 14px / peso 400  -> pills, chips y textos secundarios
 export const type = {
+  h2: { fontSize: 26, lineHeight: 30, fontWeight: '700' as const, letterSpacing: 0 },
+  h3: { fontSize: 20, lineHeight: 24, fontWeight: '700' as const, letterSpacing: 0 },
   h4: { fontSize: 16, lineHeight: 18, fontWeight: '500' as const, letterSpacing: 0 },
   bodySmall: { fontSize: 14, lineHeight: 18, fontWeight: '400' as const },
 };
