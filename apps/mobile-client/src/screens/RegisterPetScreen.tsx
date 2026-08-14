@@ -38,6 +38,7 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
   const [breed, setBreed] = useState('');
   const [breedOpen, setBreedOpen] = useState(false);
   const [breedSearch, setBreedSearch] = useState('');
+  const [manualBreed, setManualBreed] = useState(false);
   const [weight, setWeight] = useState('');
   const [age, setAge] = useState('');
   const [photo, setPhoto] = useState<string | null>(null);
@@ -134,11 +135,21 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
         <Field label="Raza">
           <Pressable style={styles.inputRow} onPress={() => setBreedOpen(true)}>
             {selectedBreedImg && <Image source={selectedBreedImg} style={styles.breedThumb} />}
-            <Text style={[styles.inputFlex, styles.breedValue, !breed && { color: colors.muted }]} numberOfLines={1}>
-              {breed || 'Selecciona la raza (Ej. Mestizo, Poodle...)'}
+            <Text style={[styles.inputFlex, styles.breedValue, !manualBreed && !breed && { color: colors.muted }]} numberOfLines={1}>
+              {manualBreed ? 'Otra raza (escribir abajo)' : breed || 'Selecciona la raza (Ej. Mestizo, Poodle...)'}
             </Text>
             <Text style={styles.chevron}>⌄</Text>
           </Pressable>
+          {manualBreed && (
+            <TextInput
+              style={[styles.input, { marginTop: 8 }]}
+              placeholder="Escribe la raza de tu mascota"
+              placeholderTextColor={colors.muted}
+              value={breed}
+              onChangeText={setBreed}
+              autoFocus
+            />
+          )}
         </Field>
 
         <Field label="Edad">
@@ -206,16 +217,33 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
                   style={styles.breedRow}
                   onPress={() => {
                     setBreed(b.name);
+                    setManualBreed(false);
                     setBreedOpen(false);
                     setBreedSearch('');
                   }}
                 >
                   <Image source={b.image} style={styles.breedRowImg} />
                   <Text style={styles.breedRowText}>{b.name}</Text>
-                  {breed === b.name && <Text style={styles.breedCheck}>✓</Text>}
+                  {!manualBreed && breed === b.name && <Text style={styles.breedCheck}>✓</Text>}
                 </Pressable>
               ))}
-              {filteredBreeds.length === 0 && <Text style={styles.breedEmpty}>Sin resultados</Text>}
+              {/* Opción para razas no listadas: activa el input manual */}
+              <Pressable
+                style={styles.breedRow}
+                onPress={() => {
+                  setManualBreed(true);
+                  setBreed('');
+                  setBreedOpen(false);
+                  setBreedSearch('');
+                }}
+              >
+                <View style={[styles.breedRowImg, styles.otherIcon]}>
+                  <Text style={styles.otherIconTxt}>✎</Text>
+                </View>
+                <Text style={styles.breedRowText}>Otros (escribir manualmente)</Text>
+                {manualBreed && <Text style={styles.breedCheck}>✓</Text>}
+              </Pressable>
+              {filteredBreeds.length === 0 && <Text style={styles.breedEmpty}>Sin resultados en la lista — usa "Otros"</Text>}
             </ScrollView>
           </Pressable>
         </Pressable>
@@ -279,6 +307,8 @@ const styles = StyleSheet.create({
   search: { backgroundColor: colors.white, borderRadius: radius.md, paddingHorizontal: 16, paddingVertical: 12, fontSize: 15, color: colors.text, borderWidth: 1, borderColor: colors.border, marginBottom: 8 },
   breedRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 8 },
   breedRowImg: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#EFE3F5' },
+  otherIcon: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3EAF8' },
+  otherIconTxt: { fontSize: 22, color: colors.brand },
   breedRowText: { flex: 1, fontSize: 16, fontWeight: '600', color: colors.text },
   breedCheck: { fontSize: 18, fontWeight: '900', color: colors.brand },
   breedEmpty: { textAlign: 'center', color: colors.muted, paddingVertical: 24 },

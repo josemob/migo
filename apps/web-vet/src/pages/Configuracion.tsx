@@ -31,6 +31,8 @@ interface Clinic {
   longitude?: string;
   isOpen24_7: boolean;
   acceptsEmergencies: boolean;
+  manuallyUnavailable?: boolean;
+  unavailableUntil?: string | null;
   organization?: Organization;
   hours: Hour[];
 }
@@ -80,6 +82,8 @@ export default function Configuracion() {
   // Operación
   const [open247, setOpen247] = useState(false);
   const [acceptsEmergencies, setAcceptsEmergencies] = useState(true);
+  // Disponibilidad (cierre manual temporal, efecto inmediato)
+  const [available, setAvailable] = useState(true);
   // Horarios
   const [hours, setHours] = useState<Hour[]>([]);
 
@@ -103,6 +107,7 @@ export default function Configuracion() {
     setLng(data.longitude != null ? String(data.longitude) : '');
     setOpen247(data.isOpen24_7);
     setAcceptsEmergencies(data.acceptsEmergencies);
+    setAvailable(!(data.manuallyUnavailable ?? false));
     setHours(
       ORDER.map(
         (d) =>
@@ -158,6 +163,13 @@ export default function Configuracion() {
     onError: (e) => setFormError(e instanceof Error ? e.message : 'No se pudo guardar.'),
   });
 
+  // Disponibilidad: efecto inmediato (no requiere "Guardar"); se restaura sola al día siguiente.
+  const availabilityMut = useMutation({
+    mutationFn: (next: boolean) => api('/clinic/availability', { method: 'PATCH', body: { available: next } }),
+    onMutate: (next) => setAvailable(next),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['clinic'] }),
+  });
+
   const setHour = (i: number, patch: Partial<Hour>) =>
     setHours((hs) => hs.map((h, idx) => (idx === i ? { ...h, ...patch } : h)));
 
@@ -186,6 +198,37 @@ export default function Configuracion() {
 
       {data && (
         <>
+          {/* Disponibilidad: cierre manual temporal (efecto inmediato, se restaura al día siguiente) */}
+          <Card className="mb-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <SectionTitle>Disponibilidad de la sucursal</SectionTitle>
+                <p className="mt-1 text-sm text-slate-500">
+                  {available
+                    ? 'La sucursal se muestra según su horario. Márcala como no disponible si por algún motivo no pueden atender hoy.'
+                    : 'Marcada como NO DISPONIBLE — aparece "Cerrado" en el directorio. Se reactivará sola mañana.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={availabilityMut.isPending}
+                onClick={() => availabilityMut.mutate(!available)}
+                className={`flex items-center gap-3 rounded-xl px-4 py-3 disabled:opacity-50 ${
+                  available ? 'bg-green-50' : 'bg-red-50'
+                }`}
+              >
+                <span className={`text-sm font-semibold ${available ? 'text-green-700' : 'text-red-700'}`}>
+                  {available ? 'Disponible' : 'No disponible'}
+                </span>
+                <span className={`relative h-6 w-11 rounded-full transition ${available ? 'bg-migo-green' : 'bg-slate-300'}`}>
+                  <span
+                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${available ? 'left-[22px]' : 'left-0.5'}`}
+                  />
+                </span>
+              </button>
+            </div>
+          </Card>
+
           {/* Datos legales del comercio (RIF requerido) */}
           <Card className="mb-6">
             <div className="mb-4 flex items-center justify-between">

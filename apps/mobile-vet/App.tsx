@@ -65,13 +65,27 @@ function Tabs() {
 function MainApp() {
   useEffect(() => {
     registerForPush();
+    // Navega a la pantalla de Alerta cuando el vet toca una notificación de emergencia.
+    const goToAlerta = () => {
+      const nav = () => {
+        if (navigationRef.isReady()) (navigationRef as never as { navigate: (n: string) => void }).navigate('Alerta');
+        else setTimeout(nav, 300);
+      };
+      nav();
+    };
     try {
+      // Tap con la app abierta / en segundo plano
       const sub = Notifications.addNotificationResponseReceivedListener((resp) => {
         const data = resp.notification.request.content.data as { type?: string };
-        if (data?.type === 'emergency' && navigationRef.isReady()) {
-          (navigationRef as never as { navigate: (n: string) => void }).navigate('Alerta');
-        }
+        if (data?.type === 'emergency') goToAlerta();
       });
+      // Tap que abrió la app desde estado cerrado (cold start)
+      Notifications.getLastNotificationResponseAsync()
+        .then((resp) => {
+          const data = resp?.notification.request.content.data as { type?: string } | undefined;
+          if (data?.type === 'emergency') goToAlerta();
+        })
+        .catch(() => {});
       return () => sub.remove();
     } catch (e) {
       console.log('[push] listener no disponible:', e instanceof Error ? e.message : e);

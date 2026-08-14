@@ -56,6 +56,35 @@ router.patch(
   }),
 );
 
+// Inicio del PRÓXIMO día en hora de Venezuela (UTC-4), como instante UTC.
+function startOfNextVenezuelaDay(): Date {
+  const OFFSET_MS = 4 * 60 * 60 * 1000; // VE = UTC-4
+  const ve = new Date(Date.now() - OFFSET_MS); // ahora, con campos UTC = hora VE
+  const veMidnightNext = Date.UTC(ve.getUTCFullYear(), ve.getUTCMonth(), ve.getUTCDate() + 1, 0, 0, 0, 0);
+  return new Date(veMidnightNext + OFFSET_MS); // vuelve a UTC real
+}
+
+// PATCH /clinic/availability -> cierre manual temporal (override del horario).
+// available=false: la clínica queda "no disponible" (Cerrado en el directorio) hasta
+// el inicio del próximo día VE, cuando se restaura sola. available=true: reabrir ya.
+router.patch(
+  '/availability',
+  requireRole('CLINIC_ADMIN', 'VET', 'SUPER_ADMIN'),
+  validate({ body: z.object({ available: z.boolean() }) }),
+  asyncHandler(async (req, res) => {
+    const unavailable = req.body.available === false;
+    const clinic = await prisma.clinic.update({
+      where: { id: req.clinicId! },
+      data: {
+        manuallyUnavailable: unavailable,
+        unavailableUntil: unavailable ? startOfNextVenezuelaDay() : null,
+      },
+      select: { id: true, manuallyUnavailable: true, unavailableUntil: true },
+    });
+    res.json(clinic);
+  }),
+);
+
 // PATCH /clinic/organization -> "Datos Legales del Comercio" (razón social + RIF, auditado por Super Admin)
 // RIF venezolano: letra fiscal (J/G/V/E/P) + dígitos, ej. J-40123456-7
 const RIF_RE = /^[VEJPGvejpg]-?\d{7,9}-?\d?$/;

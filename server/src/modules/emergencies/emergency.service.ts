@@ -2,6 +2,7 @@ import { prisma } from '../../config/prisma';
 import { ApiError } from '../../utils/ApiError';
 import { distanceKm, etaMinutes } from '../../lib/geo';
 import { bus, EMERGENCY_NEW, EMERGENCY_UPDATE } from '../../lib/events';
+import { sendPush } from '../push/push.service';
 import { runTriage } from './triage.service';
 
 const BROADCAST_RADIUS_KM = 15;
@@ -132,9 +133,35 @@ export const emergencyService = {
       }),
     ]);
 
-    // Push en tiempo real a las clínicas alertadas (SSE)
+    // Push en tiempo real a las clínicas alertadas (SSE, para el panel web)
     for (const c of nearby) {
       bus.emit(EMERGENCY_NEW, { clinicId: c.clinicId, emergencyId: emergency.id });
+    }
+
+    // Notificación push a los profesionales (app vet): suena y es clicable → pantalla de alerta
+    try {
+      const clinicIds = nearby.map((c) => c.clinicId);
+      if (clinicIds.length) {
+        const staff = await prisma.clinicStaff.findMany({
+          where: { clinicId: { in: clinicIds }, isActive: true },
+          select: { userId: true },
+        });
+        const critical = triage.triageLevel === 'RED';
+        const title = critical ? '🚨 Emergencia crítica cerca' : '🚑 Nueva emergencia cerca';
+        const body = `${pet.name}: ${input.symptoms}`.replace(/\s+/g, ' ').trim().slice(0, 140);
+        const targets = [...new Set(staff.map((s) => s.userId))];
+        await Promise.all(
+          targets.map((userId) =>
+            sendPush(userId, {
+              title,
+              body,
+              data: { type: 'emergency', emergencyId: emergency.id, triageLevel: triage.triageLevel },
+            }),
+          ),
+        );
+      }
+    } catch (e) {
+      console.error('[emergency] push a clínicas falló', e);
     }
 
     return {

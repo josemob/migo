@@ -67,6 +67,11 @@
       "expo-font",
       "expo-web-browser"
     ],
-    "owner": "mob_jm"
+    "owner": "mob_jm",
+    "extra": {
+      "eas": {
+        "projectId": "ee4adaac-1cda-4e48-858c-34d89ce90a61"
+      }
+    }
   }
 }

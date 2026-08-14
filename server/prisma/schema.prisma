@@ -584,6 +584,12 @@ model Clinic {
   radarSuspended Boolean   @default(false)
   suspendedAt    DateTime?
 
+  // ── Cierre manual temporal (override del horario) ──
+  // La clínica se marca "no disponible" por motivos poco comunes; se restaura
+  // sola al iniciar el próximo día (unavailableUntil = inicio del día siguiente VE).
+  manuallyUnavailable Boolean   @default(false)
+  unavailableUntil    DateTime?
+
   // badge público de sucursal (deriva de la verificación del comercio)
   verificationStatus VerificationStatus @default(PENDING)
   verifiedAt         DateTime?

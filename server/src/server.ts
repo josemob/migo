@@ -2,6 +2,7 @@ import { app } from './app';
 import { env } from './config/env';
 import { prisma } from './config/prisma';
 import { expireStaleEmergencies } from './modules/emergencies/emergency.service';
+import { resetExpiredUnavailability } from './modules/clinics/availability.service';
 
 const server = app.listen(env.PORT, () => {
   console.log(`🐾 Migo API escuchando en http://localhost:${env.PORT} (${env.NODE_ENV})`);
@@ -18,9 +19,21 @@ const emergencySweep = setInterval(() => {
 }, 60_000);
 emergencySweep.unref?.(); // no impide que el proceso termine
 
+// Barrido periódico: restaura la disponibilidad de clínicas cuyo cierre manual ya venció
+// (se reabren solas al iniciar el día siguiente en hora de Venezuela).
+const availabilitySweep = setInterval(() => {
+  resetExpiredUnavailability()
+    .then((n) => {
+      if (n > 0) console.log(`[clinics] ${n} clínica(s) reabiertas automáticamente`);
+    })
+    .catch((e) => console.error('[clinics] barrido disponibilidad falló', e instanceof Error ? e.message : e));
+}, 60_000);
+availabilitySweep.unref?.();
+
 const shutdown = async (signal: string) => {
   console.log(`\n${signal} recibido, cerrando...`);
   clearInterval(emergencySweep);
+  clearInterval(availabilitySweep);
   server.close(async () => {
     await prisma.$disconnect();
     process.exit(0);

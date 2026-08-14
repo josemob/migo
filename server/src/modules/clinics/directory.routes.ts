@@ -83,6 +83,7 @@ router.get(
         id: true, name: true, address: true, city: true, phone: true,
         logoUrl: true, coverUrl: true, latitude: true, longitude: true,
         isOpen24_7: true, acceptsEmergencies: true, ratingAvg: true, ratingCount: true, plan: true,
+        manuallyUnavailable: true, unavailableUntil: true,
         organization: { select: { name: true } },
         _count: { select: { services: true } },
         services: { where: { isActive: true }, select: { priceUsd: true, category: true } },
@@ -91,14 +92,19 @@ router.get(
       take: 100,
     });
 
+    const now = Date.now();
     let data = clinics.map((c) => {
-      const { services, hours, ...rest } = c;
+      const { services, hours, manuallyUnavailable, unavailableUntil, ...rest } = c;
       // Precio base "Desde $X": mínimo entre los servicios relevantes al filtro (o todos si no hay filtro)
       const relevant = category ? services.filter((s) => s.category === category) : services;
       const prices = relevant.map((s) => Number(s.priceUsd)).filter((n) => !Number.isNaN(n));
+      const base = computeOpen(c.isOpen24_7, hours);
+      // Cierre manual temporal: fuerza "Cerrado" hasta unavailableUntil (si no ha expirado)
+      const overrideActive = manuallyUnavailable && !!unavailableUntil && unavailableUntil.getTime() > now;
+      const openInfo = overrideActive ? { openNow: false, closesAt: null, opensAt: base.opensAt } : base;
       return {
         ...rest,
-        ...computeOpen(c.isOpen24_7, hours),
+        ...openInfo,
         categories: Array.from(new Set(services.map((s) => s.category))),
         fromPriceUsd: prices.length ? Math.min(...prices) : null,
         distanceKm:
