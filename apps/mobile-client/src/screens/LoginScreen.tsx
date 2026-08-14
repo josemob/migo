@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth';
 import { useGoogleSignIn } from '../lib/google';
 import { appAlert } from '../lib/dialog';
 import { Button, Input } from '../components/ui';
+import { PasswordInput, PhoneInput } from '../components/formFields';
 import { Logo } from '../components/Logo';
 import { colors } from '../theme';
 
@@ -71,13 +72,13 @@ export default function LoginScreen() {
         {mode === 'register' && (
           <>
             <Input label="Nombre completo" value={fullName} onChangeText={setFullName} placeholder="Ej: José Mota" />
-            <Input label="Teléfono" value={phone} onChangeText={setPhone} placeholder="+58 412…" keyboardType="phone-pad" />
+            <PhoneInput label="Teléfono" value={phone} onChangeText={setPhone} />
           </>
         )}
         <Input label="Correo" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" placeholder="ejemplo@correo.com" />
-        <Input label="Contraseña" value={password} onChangeText={setPassword} secureTextEntry placeholder="••••••••" />
+        <PasswordInput label="Contraseña" value={password} onChangeText={setPassword} placeholder="••••••••" />
         {mode === 'register' && (
-          <Input label="Repite tu contraseña" value={confirm} onChangeText={setConfirm} secureTextEntry placeholder="••••••••" />
+          <PasswordInput label="Repite tu contraseña" value={confirm} onChangeText={setConfirm} placeholder="••••••••" />
         )}
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
