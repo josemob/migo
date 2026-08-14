@@ -14,6 +14,15 @@ export function streamConfigured(): boolean {
   return !!(env.STREAM_API_KEY && env.STREAM_API_SECRET);
 }
 
+/**
+ * Stream espera una URL para `image`; un data URI base64 (logo/avatar pesado)
+ * rompe el upsert por el límite de 100KB de payload (error code 22). Solo
+ * dejamos pasar URLs http(s); cualquier otra cosa se omite.
+ */
+function safeStreamImage(image?: string | null): string | undefined {
+  return image && /^https?:\/\//i.test(image) ? image : undefined;
+}
+
 /** Cliente server-side de Stream (firma tokens con el API Secret). Singleton. */
 export function getStreamClient(): StreamChat {
   if (!streamConfigured()) throw new Error('GetStream no está configurado (STREAM_API_KEY / STREAM_API_SECRET).');
@@ -34,9 +43,7 @@ interface StreamUser {
  * backend (solo el endpoint del Vet Dashboard crea teleconsultas), no en el cliente.
  */
 export async function ensureStreamUser(u: StreamUser): Promise<void> {
-  // Stream espera una URL para `image`; un data URI base64 (foto pesada) rompe el
-  // upsert por el límite de 100KB de payload. Solo enviamos URLs http(s).
-  const image = u.image && /^https?:\/\//i.test(u.image) ? u.image : undefined;
+  const image = safeStreamImage(u.image);
   await getStreamClient().upsertUser({
     id: u.id,
     name: u.name ?? undefined,
@@ -73,17 +80,19 @@ export async function ensureChatChannel(params: {
 }): Promise<{ type: string; id: string; cid: string }> {
   const c = getStreamClient();
   const clinicUserId = clinicStreamUserId(params.clinic.id);
+  const ownerImage = safeStreamImage(params.owner.image);
+  const clinicImage = safeStreamImage(params.clinic.logoUrl);
 
   await c.upsertUsers([
-    { id: params.owner.id, name: params.owner.name ?? undefined, image: params.owner.image ?? undefined, role: 'user', migo_role: 'customer' },
-    { id: clinicUserId, name: params.clinic.name, image: params.clinic.logoUrl ?? undefined, role: 'user', migo_role: 'vet' },
+    { id: params.owner.id, name: params.owner.name ?? undefined, image: ownerImage, role: 'user', migo_role: 'customer' },
+    { id: clinicUserId, name: params.clinic.name, image: clinicImage, role: 'user', migo_role: 'vet' },
   ] as never);
 
   const channel = c.channel('messaging', undefined, {
     members: [params.owner.id, clinicUserId],
     created_by_id: clinicUserId,
     name: params.clinic.name,
-    image: params.clinic.logoUrl ?? undefined,
+    image: clinicImage,
     migo_clinic_id: params.clinic.id,
     migo_owner_id: params.owner.id,
   } as never);
