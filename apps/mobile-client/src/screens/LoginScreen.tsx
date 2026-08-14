@@ -71,7 +71,7 @@ export default function LoginScreen() {
       <View style={{ marginTop: kbd ? 0 : 24 }}>
         {mode === 'register' && (
           <>
-            <Input label="Nombre completo" value={fullName} onChangeText={setFullName} placeholder="Ej: José Mota" />
+            <Input label="Nombre completo" value={fullName} onChangeText={setFullName} placeholder="John Wick" />
             <PhoneInput label="Teléfono" value={phone} onChangeText={setPhone} />
           </>
         )}

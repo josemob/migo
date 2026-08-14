@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { colors, radius, spacing } from '../theme';
+import { cardShadow, colors, radius, spacing } from '../theme';
 
 // Iconos ojo / ojo tachado (flat, un color)
 const EYE =
@@ -83,6 +83,7 @@ const OPERATORS: { code: string; name: string }[] = [
   { code: '0412', name: 'Digitel' },
   { code: '0414', name: 'Movistar' },
   { code: '0416', name: 'Movilnet' },
+  { code: '0422', name: 'Digitel' },
   { code: '0424', name: 'Movistar' },
   { code: '0426', name: 'Movilnet' },
 ];
@@ -108,45 +109,43 @@ export function PhoneInput({
     onChangeText?.(newOp + newDigits.replace(/\D/g, '').slice(0, 7));
 
   return (
-    <View style={{ marginBottom: spacing.md }}>
+    <View style={{ marginBottom: spacing.md, zIndex: open ? 20 : 0 }}>
       {label && <Text style={styles.label}>{label}</Text>}
       <View style={styles.phoneRow}>
-        <Pressable style={styles.opBtn} onPress={() => setOpen(true)}>
-          <Text style={styles.opText}>{op}</Text>
-          <Text style={styles.opChevron}>⌄</Text>
-        </Pressable>
+        <View>
+          <Pressable style={[styles.opBtn, open && styles.opBtnOpen]} onPress={() => setOpen((o) => !o)}>
+            <Text style={styles.opText}>{op}</Text>
+            <Text style={styles.opChevron}>⌄</Text>
+          </Pressable>
+          {open && (
+            <View style={styles.opDropdown}>
+              {OPERATORS.map((o) => (
+                <Pressable
+                  key={o.code}
+                  style={[styles.opDropRow, o.code === op && styles.opDropRowActive]}
+                  onPress={() => {
+                    emit(o.code, digits);
+                    setOpen(false);
+                  }}
+                >
+                  <Text style={styles.opDropCode}>{o.code}</Text>
+                  <Text style={styles.opDropName}>{o.name}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </View>
         <TextInput
           style={styles.phoneInput}
           value={digits}
           onChangeText={(t) => emit(op, t)}
+          onFocus={() => setOpen(false)}
           keyboardType="number-pad"
           maxLength={7}
           placeholder="1234567"
           placeholderTextColor={colors.muted}
         />
       </View>
-
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
-          <Pressable style={styles.opSheet} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.opSheetTitle}>Operadora</Text>
-            {OPERATORS.map((o) => (
-              <Pressable
-                key={o.code}
-                style={styles.opRow}
-                onPress={() => {
-                  emit(o.code, digits);
-                  setOpen(false);
-                }}
-              >
-                <Text style={styles.opRowCode}>{o.code}</Text>
-                <Text style={styles.opRowName}>{o.name}</Text>
-                {o.code === op && <Text style={styles.opCheck}>✓</Text>}
-              </Pressable>
-            ))}
-          </Pressable>
-        </Pressable>
-      </Modal>
     </View>
   );
 }
@@ -177,8 +176,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
+  opBtnOpen: { borderColor: colors.brand },
   opText: { fontSize: 16, color: colors.text, fontWeight: '600' },
   opChevron: { fontSize: 16, color: colors.muted },
+  // Dropdown compacto (tipo select) anclado bajo el botón de operadora
+  opDropdown: {
+    position: 'absolute',
+    top: 50,
+    left: 0,
+    minWidth: 160,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: 4,
+    zIndex: 20,
+    elevation: 8,
+    boxShadow: cardShadow,
+  },
+  opDropRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
+  opDropRowActive: { backgroundColor: colors.brandLight },
+  opDropCode: { fontSize: 15, fontWeight: '800', color: colors.text, width: 44 },
+  opDropName: { fontSize: 13, color: colors.muted },
   phoneInput: {
     flex: 1,
     backgroundColor: colors.white,
@@ -191,12 +210,4 @@ const styles = StyleSheet.create({
     color: colors.text,
     letterSpacing: 1,
   },
-
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', padding: 32 },
-  opSheet: { backgroundColor: colors.white, borderRadius: radius.lg, padding: 12 },
-  opSheetTitle: { fontSize: 14, fontWeight: '700', color: colors.muted, paddingHorizontal: 8, paddingVertical: 6 },
-  opRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 8, paddingVertical: 14 },
-  opRowCode: { fontSize: 16, fontWeight: '800', color: colors.text, width: 56 },
-  opRowName: { flex: 1, fontSize: 15, color: colors.muted },
-  opCheck: { fontSize: 18, fontWeight: '900', color: colors.brand },
 });
