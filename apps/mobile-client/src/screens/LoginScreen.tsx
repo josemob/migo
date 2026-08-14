@@ -12,8 +12,8 @@ import { colors } from '../theme';
 export default function LoginScreen() {
   const { login, register } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [email, setEmail] = useState('jose.mota@example.com');
-  const [password, setPassword] = useState('Migo1234');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
@@ -75,7 +75,7 @@ export default function LoginScreen() {
             <PhoneInput label="Teléfono" value={phone} onChangeText={setPhone} />
           </>
         )}
-        <Input label="Correo" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" placeholder="ejemplo@correo.com" />
+        <Input label="Correo" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" placeholder="usuario@holamigo.app" />
         <PasswordInput label="Contraseña" value={password} onChangeText={setPassword} placeholder="••••••••" />
         {mode === 'register' && (
           <PasswordInput label="Repite tu contraseña" value={confirm} onChangeText={setConfirm} placeholder="••••••••" />

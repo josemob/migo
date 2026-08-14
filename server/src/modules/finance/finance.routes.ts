@@ -179,6 +179,19 @@ router.post(
   }),
 );
 
+// GET /finance/payouts -> liquidaciones (pagos de Migo -> la clínica)
+router.get(
+  '/payouts',
+  asyncHandler(async (req, res) => {
+    const payouts = await prisma.payout.findMany({
+      where: { clinicId: req.clinicId! },
+      orderBy: { periodStart: 'desc' },
+      take: 100,
+    });
+    res.json({ data: payouts });
+  }),
+);
+
 // GET / PUT /finance/settlement -> "Datos de Liquidación local"
 router.get(
   '/settlement',
