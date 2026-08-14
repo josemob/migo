@@ -180,7 +180,15 @@ router.get(
   }),
 );
 
-// GET /me/appointments/next -> próxima cita futura (recordatorio del Home)
+// GET /me/appointments/next -> próxima cita (recordatorio del Home).
+// Incluye las citas de HOY aunque su hora ya haya pasado (desde el inicio del día en
+// hora de Venezuela, UTC-4), para que "Próxima cita" no desaparezca a media jornada.
+function startOfTodayVenezuela(): Date {
+  const OFFSET_MS = 4 * 60 * 60 * 1000; // VE = UTC-4
+  const ve = new Date(Date.now() - OFFSET_MS);
+  const veMidnight = Date.UTC(ve.getUTCFullYear(), ve.getUTCMonth(), ve.getUTCDate(), 0, 0, 0, 0);
+  return new Date(veMidnight + OFFSET_MS);
+}
 router.get(
   '/appointments/next',
   asyncHandler(async (req, res) => {
@@ -188,7 +196,7 @@ router.get(
       where: {
         bookedById: req.user!.id,
         status: { in: ['PENDING', 'CONFIRMED', 'IN_PROGRESS'] },
-        scheduledAt: { gte: new Date() },
+        scheduledAt: { gte: startOfTodayVenezuela() },
       },
       orderBy: { scheduledAt: 'asc' },
       include: {
