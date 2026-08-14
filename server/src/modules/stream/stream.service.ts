@@ -34,10 +34,13 @@ interface StreamUser {
  * backend (solo el endpoint del Vet Dashboard crea teleconsultas), no en el cliente.
  */
 export async function ensureStreamUser(u: StreamUser): Promise<void> {
+  // Stream espera una URL para `image`; un data URI base64 (foto pesada) rompe el
+  // upsert por el límite de 100KB de payload. Solo enviamos URLs http(s).
+  const image = u.image && /^https?:\/\//i.test(u.image) ? u.image : undefined;
   await getStreamClient().upsertUser({
     id: u.id,
     name: u.name ?? undefined,
-    image: u.image ?? undefined,
+    image,
     role: 'user',
     // @ts-expect-error campo custom permitido por Stream
     migo_role: u.migoRole,

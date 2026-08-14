@@ -54,8 +54,9 @@ export function StreamProvider({ children }: { children: ReactNode }) {
         vc = StreamVideoClient.getOrCreateInstance({ apiKey: cred.apiKey, user: streamUser, token: cred.token });
         setChatClient(cc);
         setVideoClient(vc);
-      } catch {
+      } catch (e) {
         // Stream no configurado / sin red: la app sigue funcionando sin chat en vivo
+        console.error('[stream] connect failed:', e instanceof Error ? e.message : e);
         connecting.current = false;
       }
     })();
