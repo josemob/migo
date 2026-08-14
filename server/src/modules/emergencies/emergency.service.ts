@@ -53,6 +53,16 @@ interface CreateInput {
 export const emergencyService = {
   /** Botón de pánico: crea la urgencia, la triajea con IA y la difunde a clínicas cercanas. */
   async create(ownerId: string, input: CreateInput) {
+    // Anti-duplicado: si el dueño ya tiene una emergencia en curso, la devuelve
+    // en lugar de crear otra (el cliente navega al seguimiento de la existente).
+    const active = await prisma.emergency.findFirst({
+      where: { ownerId, status: { in: ['TRIAGING', 'BROADCASTING', 'ACCEPTED', 'EN_ROUTE'] } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (active) {
+      return { emergency: active, triage: null, broadcastedTo: 0, existing: true };
+    }
+
     const pet = await prisma.pet.findFirst({
       where: { id: input.petId, ownerId },
       include: {

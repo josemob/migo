@@ -22,6 +22,7 @@ interface Clinic {
 }
 
 const FALLBACK = { lat: 10.4806, lng: -66.8564 };
+const ACTIVE_STATUSES = ['TRIAGING', 'BROADCASTING', 'ACCEPTED', 'EN_ROUTE'];
 const eta = (km?: number | null) => (km != null ? Math.max(1, Math.round((km / 25) * 60)) : null);
 const call = (phone?: string) =>
   phone ? Linking.openURL(`tel:${phone.replace(/\s/g, '')}`) : appAlert('Sin teléfono', 'Esta clínica no tiene teléfono registrado.');
@@ -33,6 +34,13 @@ export default function EmergencyClinicsScreen({ navigation }: { navigation: any
   const [busy, setBusy] = useState(false);
 
   const pets = useQuery({ queryKey: ['pets'], queryFn: () => api<{ data: Pet[] }>('/me/pets') });
+  // Emergencia en curso (evita crear una segunda): si existe, se muestra el seguimiento.
+  const mine = useQuery({
+    queryKey: ['my-emergencies'],
+    queryFn: () => api<{ data: { id: string; status: string }[] }>('/emergencies/mine'),
+    refetchInterval: 8000,
+  });
+  const activeEmergency = mine.data?.data.find((e) => ACTIVE_STATUSES.includes(e.status)) ?? null;
 
   useEffect(() => {
     (async () => {
@@ -92,6 +100,19 @@ export default function EmergencyClinicsScreen({ navigation }: { navigation: any
         <Text style={styles.headerTitle}>Activar Emergencia</Text>
       </View>
 
+      {activeEmergency ? (
+        <View style={styles.inProgress}>
+          <View style={styles.inProgressCard}>
+            <Text style={styles.inProgressEmoji}>🚨</Text>
+            <Text style={styles.inProgressTitle}>Tienes una alerta en curso</Text>
+            <Text style={styles.inProgressSub}>
+              Ya activaste una emergencia. Sigue su estado o cancélala desde el seguimiento; no puedes crear otra
+              mientras esta siga activa.
+            </Text>
+            <Button title="Ver seguimiento" variant="danger" onPress={() => navigation.navigate('Tracking', { id: activeEmergency.id })} />
+          </View>
+        </View>
+      ) : (
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Muted>Selecciona la mascota y describe qué ocurre. Migo AI hará el triaje y alertará a las clínicas cercanas.</Muted>
 
@@ -169,6 +190,7 @@ export default function EmergencyClinicsScreen({ navigation }: { navigation: any
           </View>
         )}
       </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -177,6 +199,13 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
   header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
   headerTitle: { fontSize: 26, fontWeight: '800', color: colors.text },
+
+  // Estado "alerta en curso" (no permite crear otra)
+  inProgress: { flex: 1, justifyContent: 'center', padding: 20 },
+  inProgressCard: { backgroundColor: colors.white, borderRadius: radius.lg, padding: 24, alignItems: 'center', gap: 10, borderWidth: 2, borderColor: colors.red, boxShadow: cardShadow },
+  inProgressEmoji: { fontSize: 44 },
+  inProgressTitle: { fontSize: 20, fontWeight: '800', color: colors.text, textAlign: 'center' },
+  inProgressSub: { fontSize: 14, color: colors.muted, textAlign: 'center', lineHeight: 20, marginBottom: 8 },
 
   section: { fontSize: 16, fontWeight: '700', color: colors.text, marginTop: 22, marginBottom: 10 },
 

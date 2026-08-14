@@ -39,6 +39,7 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
   const [breedOpen, setBreedOpen] = useState(false);
   const [breedSearch, setBreedSearch] = useState('');
   const [manualBreed, setManualBreed] = useState(false);
+  const [footerH, setFooterH] = useState(0);
   const [weight, setWeight] = useState('');
   const [age, setAge] = useState('');
   const [photo, setPhoto] = useState<string | null>(null);
@@ -103,7 +104,7 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: (footerH || 90) + 62 }} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Cuéntanos sobre tu mejor amigo</Text>
         <Text style={styles.subtitle}>Esta información ayuda a la IA de Migo a personalizar su cuidado diario y médico.</Text>
 
@@ -190,7 +191,7 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
       </ScrollView>
 
       {/* Footer */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 34 }]} onLayout={(e) => setFooterH(e.nativeEvent.layout.height)}>
         <Pressable style={[styles.saveBtn, busy && { opacity: 0.6 }]} onPress={save} disabled={busy}>
           <Text style={styles.saveText}>{busy ? 'Guardando…' : '¡Listo, guardar mascota!'}</Text>
         </Pressable>

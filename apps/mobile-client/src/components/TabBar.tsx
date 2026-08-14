@@ -44,12 +44,15 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
     <View style={[styles.wrap, { paddingBottom: insets.bottom || 8 }]}>
       {left.map((r, i) => renderTab(r, i))}
 
-      {/* Botón central Alerta (pestaña de urgencias cercanas) */}
+      {/* Botón central Alerta (pestaña de urgencias cercanas).
+          El botón va absoluto (elevado) y un spacer del tamaño del icono mantiene
+          el label alineado con los demás títulos. */}
       <View style={styles.centerSlot}>
+        <View style={styles.alertIconSpace} />
+        <Text style={styles.alertLabel}>Alerta</Text>
         <Pressable style={styles.alertBtn} onPress={() => navigation.navigate(alerta!.name)}>
           <MigoTabIcon name="paw" color={colors.white} size={30} />
         </Pressable>
-        <Text style={styles.alertLabel}>Alerta</Text>
       </View>
 
       {right.map((r, i) => renderTab(r, i + 3))}
@@ -68,22 +71,20 @@ const styles = StyleSheet.create({
   },
   tab: { flex: 1, alignItems: 'center', gap: 12 },
   label: { fontSize: 11, fontWeight: '600' },
-  centerSlot: { flex: 1, alignItems: 'center' },
+  centerSlot: { flex: 1, alignItems: 'center', gap: 12 },
+  alertIconSpace: { width: 24, height: 24 },
   alertBtn: {
+    position: 'absolute',
+    top: -34,
     width: 62,
     height: 62,
     borderRadius: 31,
     backgroundColor: colors.red,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -34,
     borderWidth: 5,
     borderColor: colors.white,
-    shadowColor: colors.red,
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
+    elevation: 4,
   },
-  alertLabel: { fontSize: 11, fontWeight: '700', color: colors.brand, marginTop: 3 },
+  alertLabel: { fontSize: 11, fontWeight: '700', color: colors.brand },
 });

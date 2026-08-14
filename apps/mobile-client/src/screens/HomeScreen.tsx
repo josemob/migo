@@ -25,7 +25,7 @@ const { width: W } = Dimensions.get('window');
 const CARD_GAP = 12;
 const CARD_W = (W - 40 - CARD_GAP) / 2;
 
-interface Pet { id: string; name: string; breed?: string | null; weightKg?: string | number | null; birthDate?: string | null; size?: string | null }
+interface Pet { id: string; name: string; alias?: string | null; breed?: string | null; weightKg?: string | number | null; birthDate?: string | null; size?: string | null }
 interface EmergencyMine { id: string; status: string }
 const ACTIVE = ['TRIAGING', 'BROADCASTING', 'ACCEPTED', 'EN_ROUTE'];
 
@@ -210,7 +210,14 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
             <View style={styles.petInfo}>
               <View style={styles.petHeadGroup}>
-                <Text style={styles.petName} numberOfLines={1}>{pet.name}</Text>
+                <View style={styles.petNameRow}>
+                  <Text style={styles.petName} numberOfLines={1}>{pet.name}</Text>
+                  {pet.alias ? (
+                    <View style={styles.aliasChip}>
+                      <Text style={styles.aliasChipTxt} numberOfLines={1}>Alias: {pet.alias}</Text>
+                    </View>
+                  ) : null}
+                </View>
                 <View style={styles.petCitaRow}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.petCitaLabel}>Próxima cita:</Text>
@@ -340,7 +347,10 @@ const styles = StyleSheet.create({
   petImgFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1ECF5', borderRadius: 20 },
   petInfo: { flex: 1, alignSelf: 'stretch', justifyContent: 'space-between', paddingVertical: 2, gap: 8 },
   petHeadGroup: { alignSelf: 'stretch', gap: 3 },
-  petName: { ...type.h2, color: '#444444' },
+  petNameRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
+  petName: { ...type.h2, lineHeight: 26, color: '#444444', flexShrink: 1 },
+  aliasChip: { backgroundColor: colors.white, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
+  aliasChipTxt: { color: colors.brand, fontSize: 12, fontWeight: '600' },
   petCitaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   petCitaLabel: { fontSize: 16, fontWeight: '700', color: '#444444' },
   petCitaVal: { fontSize: 14, color: '#000000', marginTop: 1 },
