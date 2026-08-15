@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "388706892553",
+    "project_id": "migo-f5b7c",
+    "storage_bucket": "migo-f5b7c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:388706892553:android:bdf0340a5c41d1968331d8",
+        "android_client_info": {
+          "package_name": "com.migo.vet"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCs0CkETHWAGOSsGIUt6uPupcc262qb2eg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

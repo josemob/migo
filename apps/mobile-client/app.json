@@ -19,6 +19,7 @@
     },
     "android": {
       "package": "com.migo.client",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#7F398A",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -38,13 +39,15 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.POST_NOTIFICATIONS"
       ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "expo-notifications",
       "@stream-io/video-react-native-sdk",
       [
         "@config-plugins/react-native-webrtc",
