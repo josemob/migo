@@ -170,9 +170,10 @@ export const authService = {
   },
 
   async me(userId: string) {
-    // Turno de HOY (hora de Venezuela, UTC-4) para el chip "Turno" del dashboard vet.
-    const startVe = startOfTodayVenezuela();
-    const endVe = new Date(startVe.getTime() + 24 * 60 * 60 * 1000);
+    // Turno de HOY para el chip "Turno" del dashboard vet. StaffShift.date es @db.Date
+    // (se lee como medianoche UTC), así que comparamos por la fecha-calendario de hoy
+    // en Venezuela usando límites de medianoche UTC — no el instante VE (04:00 UTC).
+    const { start: dayStart, end: dayEnd } = venezuelaTodayDateRange();
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -180,7 +181,7 @@ export const authService = {
           include: {
             clinic: { include: { organization: true } },
             shifts: {
-              where: { date: { gte: startVe, lt: endVe }, shift: { not: 'OFF' } },
+              where: { date: { gte: dayStart, lt: dayEnd }, shift: { not: 'OFF' } },
               orderBy: { date: 'desc' },
               take: 1,
             },
@@ -201,10 +202,13 @@ export const authService = {
   },
 };
 
-// Inicio del día en hora de Venezuela (UTC-4), para filtrar el turno de hoy.
-function startOfTodayVenezuela(): Date {
-  const OFFSET_MS = 4 * 60 * 60 * 1000;
-  const ve = new Date(Date.now() - OFFSET_MS);
-  const veMidnight = Date.UTC(ve.getUTCFullYear(), ve.getUTCMonth(), ve.getUTCDate(), 0, 0, 0, 0);
-  return new Date(veMidnight + OFFSET_MS);
+// Rango [inicio, fin) de la fecha-calendario de HOY en Venezuela (UTC-4), expresado
+// en medianoche UTC — para comparar contra columnas @db.Date (que se leen como
+// medianoche UTC). Ej: si hoy en VE es 2026-08-19 -> [2026-08-19T00:00Z, 2026-08-20T00:00Z).
+function venezuelaTodayDateRange(): { start: Date; end: Date } {
+  const OFFSET_MS = 4 * 60 * 60 * 1000; // VE = UTC-4
+  const ve = new Date(Date.now() - OFFSET_MS); // desplaza al "reloj de pared" de VE
+  const start = new Date(Date.UTC(ve.getUTCFullYear(), ve.getUTCMonth(), ve.getUTCDate(), 0, 0, 0, 0));
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  return { start, end };
 }
