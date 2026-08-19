@@ -183,6 +183,13 @@ enum ClinicPlan {
   PRO // ~$29-49/mes — prioridad en radar, comisión reducida, insignia Pro
 }
 
+// Plan de patrocinio (contenido destacado en búsqueda) — define la vigencia.
+enum SponsorshipPlan {
+  WEEKLY // 7 días
+  BIWEEKLY // 15 días
+  MONTHLY // 30 días
+}
+
 // Ciclo de corte de la facturación postpago de leads
 enum BillingCycle {
   MONTHLY
@@ -610,6 +617,7 @@ model Clinic {
   payouts             Payout[]
   invoices            Invoice[]
   settlementAccount   SettlementAccount?
+  sponsorships        ClinicSponsorship[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -618,6 +626,28 @@ model Clinic {
   @@index([verificationStatus])
   @@index([city])
   @@index([latitude, longitude])
+}
+
+// Patrocinio de búsqueda ("contenido patrocinado"): la clínica paga para aparecer
+// PRIMERO en los resultados, pero solo para usuarios dentro de `radiusKm`. Entre
+// varias patrocinadas en rango, gana la más cercana. La vigencia la define `plan`
+// (semanal/quincenal/mensual) y se AUTO-VENCE: "vigente" = isActive && now < expiresAt.
+// Activado manualmente por el Super Admin (cobro se atará a facturación después).
+model ClinicSponsorship {
+  id          String          @id @default(uuid())
+  clinic      Clinic          @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  clinicId    String
+  plan        SponsorshipPlan
+  radiusKm    Int             @default(10) // regla fija 10km (no expuesto en UI por ahora)
+  startsAt    DateTime        @default(now())
+  expiresAt   DateTime
+  isActive    Boolean         @default(true) // permite cancelar antes de vencer
+  createdById String? // Super Admin que lo activó
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([clinicId])
+  @@index([isActive, expiresAt])
 }
 
 // Horario de atención / guardia por día ("Horarios de Atención Semanal")

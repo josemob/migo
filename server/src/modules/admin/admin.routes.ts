@@ -66,6 +66,7 @@ router.get(
 router.get(
   '/clinics',
   asyncHandler(async (_req, res) => {
+    const nowDate = new Date();
     const clinics = await prisma.clinic.findMany({
       orderBy: { createdAt: 'desc' },
       select: {
@@ -76,6 +77,13 @@ router.get(
         plan: true,
         createdAt: true,
         organization: { select: { rif: true, name: true, owner: { select: { fullName: true } } } },
+        // Patrocinio vigente (si lo hay) para la tarjeta de gestión
+        sponsorships: {
+          where: { isActive: true, expiresAt: { gt: nowDate } },
+          orderBy: { expiresAt: 'desc' },
+          take: 1,
+          select: { id: true, plan: true, startsAt: true, expiresAt: true },
+        },
       },
     });
 
@@ -89,6 +97,7 @@ router.get(
       createdAt: c.createdAt,
       verificationStatus: c.verificationStatus,
       status: clinicStatus(c),
+      sponsorship: c.sponsorships[0] ?? null,
     }));
 
     const counts = {
@@ -130,6 +139,50 @@ router.post(
     }
 
     res.json({ id: updated.id, verificationStatus: updated.verificationStatus, radarSuspended: updated.radarSuspended });
+  }),
+);
+
+// Vigencia por plan de patrocinio (días)
+const SPONSORSHIP_DAYS: Record<'WEEKLY' | 'BIWEEKLY' | 'MONTHLY', number> = { WEEKLY: 7, BIWEEKLY: 15, MONTHLY: 30 };
+
+// POST /admin/clinics/:id/sponsorship -> activar contenido patrocinado (manual, con vigencia)
+router.post(
+  '/clinics/:id/sponsorship',
+  validate({
+    params: z.object({ id: z.string().uuid() }),
+    body: z.object({ plan: z.enum(['WEEKLY', 'BIWEEKLY', 'MONTHLY']) }),
+  }),
+  asyncHandler(async (req, res) => {
+    const clinic = await prisma.clinic.findUnique({ where: { id: req.params.id }, select: { id: true } });
+    if (!clinic) throw ApiError.notFound('Clínica no encontrada');
+
+    const plan = req.body.plan as 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + SPONSORSHIP_DAYS[plan] * 24 * 60 * 60 * 1000);
+
+    // Un solo patrocinio vigente a la vez: desactiva los previos y crea el nuevo.
+    await prisma.clinicSponsorship.updateMany({
+      where: { clinicId: clinic.id, isActive: true, expiresAt: { gt: now } },
+      data: { isActive: false },
+    });
+    const sponsorship = await prisma.clinicSponsorship.create({
+      data: { clinicId: clinic.id, plan, startsAt: now, expiresAt, createdById: req.user?.id ?? null },
+      select: { id: true, plan: true, startsAt: true, expiresAt: true },
+    });
+    res.status(201).json(sponsorship);
+  }),
+);
+
+// POST /admin/clinics/:id/sponsorship/cancel -> cancelar patrocinio vigente antes de vencer
+router.post(
+  '/clinics/:id/sponsorship/cancel',
+  validate({ params: z.object({ id: z.string().uuid() }) }),
+  asyncHandler(async (req, res) => {
+    await prisma.clinicSponsorship.updateMany({
+      where: { clinicId: req.params.id, isActive: true },
+      data: { isActive: false },
+    });
+    res.json({ ok: true });
   }),
 );
 

@@ -59,6 +59,9 @@ CREATE TYPE "RevenueType" AS ENUM ('CPL', 'BOOKING_COMMISSION', 'PRO_PLAN', 'SUB
 CREATE TYPE "ClinicPlan" AS ENUM ('FREEMIUM', 'PRO');
 
 -- CreateEnum
+CREATE TYPE "SponsorshipPlan" AS ENUM ('WEEKLY', 'BIWEEKLY', 'MONTHLY');
+
+-- CreateEnum
 CREATE TYPE "BillingCycle" AS ENUM ('MONTHLY', 'BIWEEKLY');
 
 -- CreateEnum
@@ -364,6 +367,22 @@ CREATE TABLE "Clinic" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Clinic_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ClinicSponsorship" (
+    "id" TEXT NOT NULL,
+    "clinicId" TEXT NOT NULL,
+    "plan" "SponsorshipPlan" NOT NULL,
+    "radiusKm" INTEGER NOT NULL DEFAULT 10,
+    "startsAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdById" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "ClinicSponsorship_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -766,6 +785,12 @@ CREATE INDEX "Clinic_city_idx" ON "Clinic"("city");
 CREATE INDEX "Clinic_latitude_longitude_idx" ON "Clinic"("latitude", "longitude");
 
 -- CreateIndex
+CREATE INDEX "ClinicSponsorship_clinicId_idx" ON "ClinicSponsorship"("clinicId");
+
+-- CreateIndex
+CREATE INDEX "ClinicSponsorship_isActive_expiresAt_idx" ON "ClinicSponsorship"("isActive", "expiresAt");
+
+-- CreateIndex
 CREATE INDEX "ClinicHours_clinicId_idx" ON "ClinicHours"("clinicId");
 
 -- CreateIndex
@@ -947,6 +972,9 @@ ALTER TABLE "Organization" ADD CONSTRAINT "Organization_ownerId_fkey" FOREIGN KE
 
 -- AddForeignKey
 ALTER TABLE "Clinic" ADD CONSTRAINT "Clinic_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ClinicSponsorship" ADD CONSTRAINT "ClinicSponsorship_clinicId_fkey" FOREIGN KEY ("clinicId") REFERENCES "Clinic"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ClinicHours" ADD CONSTRAINT "ClinicHours_clinicId_fkey" FOREIGN KEY ("clinicId") REFERENCES "Clinic"("id") ON DELETE CASCADE ON UPDATE CASCADE;

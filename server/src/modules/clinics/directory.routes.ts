@@ -66,6 +66,7 @@ router.get(
       lat?: number; lng?: number; city?: string; q?: string; category?: (typeof SERVICE_CATEGORIES)[number];
     };
 
+    const nowDate = new Date();
     const clinics = await prisma.clinic.findMany({
       where: {
         verificationStatus: 'VERIFIED',
@@ -88,13 +89,19 @@ router.get(
         _count: { select: { services: true } },
         services: { where: { isActive: true }, select: { priceUsd: true, category: true } },
         hours: { select: { dayOfWeek: true, opensAt: true, closesAt: true, isOpen: true } },
+        // Patrocinio vigente (para el "boost" en búsqueda + badge "Patrocinado")
+        sponsorships: {
+          where: { isActive: true, startsAt: { lte: nowDate }, expiresAt: { gt: nowDate } },
+          select: { radiusKm: true },
+          take: 1,
+        },
       },
       take: 100,
     });
 
     const now = Date.now();
     let data = clinics.map((c) => {
-      const { services, hours, manuallyUnavailable, unavailableUntil, ...rest } = c;
+      const { services, hours, manuallyUnavailable, unavailableUntil, sponsorships, ...rest } = c;
       // Precio base "Desde $X": mínimo entre los servicios relevantes al filtro (o todos si no hay filtro)
       const relevant = category ? services.filter((s) => s.category === category) : services;
       const prices = relevant.map((s) => Number(s.priceUsd)).filter((n) => !Number.isNaN(n));
@@ -102,20 +109,28 @@ router.get(
       // Cierre manual temporal: fuerza "Cerrado" hasta unavailableUntil (si no ha expirado)
       const overrideActive = manuallyUnavailable && !!unavailableUntil && unavailableUntil.getTime() > now;
       const openInfo = overrideActive ? { openNow: false, closesAt: null, opensAt: base.opensAt } : base;
+      const distKm =
+        lat != null && lng != null && c.latitude != null && c.longitude != null
+          ? Number(distanceKm({ lat, lng }, { lat: Number(c.latitude), lng: Number(c.longitude) }).toFixed(2))
+          : null;
+      // "Patrocinado" solo cuenta si el usuario está DENTRO del radio del patrocinio (regla <10km).
+      const sponsorship = sponsorships[0];
+      const sponsored = !!sponsorship && distKm != null && distKm <= sponsorship.radiusKm;
       return {
         ...rest,
         ...openInfo,
         categories: Array.from(new Set(services.map((s) => s.category))),
         fromPriceUsd: prices.length ? Math.min(...prices) : null,
-        distanceKm:
-          lat != null && lng != null && c.latitude != null && c.longitude != null
-            ? Number(distanceKm({ lat, lng }, { lat: Number(c.latitude), lng: Number(c.longitude) }).toFixed(2))
-            : null,
+        distanceKm: distKm,
+        sponsored,
       };
     });
 
-    // Orden: Pro primero, luego por cercanía (si hay), luego rating
+    // Orden: (1) patrocinadas EN RANGO primero, la más cercana arriba; luego el resto:
+    // (2) Pro primero, (3) por cercanía, (4) por rating.
     data = data.sort((a, b) => {
+      if (a.sponsored !== b.sponsored) return a.sponsored ? -1 : 1;
+      if (a.sponsored && b.sponsored) return (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity);
       if (a.plan !== b.plan) return a.plan === 'PRO' ? -1 : 1;
       if (a.distanceKm != null && b.distanceKm != null) return a.distanceKm - b.distanceKm;
       return Number(b.ratingAvg) - Number(a.ratingAvg);

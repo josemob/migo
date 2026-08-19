@@ -55,6 +55,7 @@ interface Clinic {
   ratingAvg: string;
   ratingCount: number;
   plan: string;
+  sponsored?: boolean; // patrocinada y el usuario está dentro del radio -> badge "Patrocinado"
   fromPriceUsd?: number | null;
   categories?: string[];
   organization?: { name: string };
@@ -187,6 +188,11 @@ export default function DirectoryScreen({ navigation, route }: any) {
                   )}
 
                   <View style={{ flex: 1 }}>
+                    {c.sponsored && (
+                      <View style={styles.sponsoredChip}>
+                        <Text style={styles.sponsoredChipTxt}>★ Patrocinado</Text>
+                      </View>
+                    )}
                     <View style={styles.cardTop}>
                       <Text style={styles.name} numberOfLines={1}>{c.name}</Text>
                       <Pressable style={styles.verBtn} onPress={() => goClinic(c)}>
@@ -278,6 +284,8 @@ const styles = StyleSheet.create({
   card: { flexDirection: 'row', gap: 12, backgroundColor: colors.white, borderRadius: radius.lg, padding: 12, boxShadow: cardShadow },
   thumb: { width: 84, height: 84, borderRadius: 14, backgroundColor: colors.brandLight },
   thumbPh: { alignItems: 'center', justifyContent: 'center' },
+  sponsoredChip: { alignSelf: 'flex-start', flexDirection: 'row', backgroundColor: '#FDF3D6', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3, marginBottom: 5 },
+  sponsoredChipTxt: { color: '#B7791F', fontSize: 11, fontWeight: '800', letterSpacing: 0.2 },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   name: { fontSize: 16, fontWeight: '800', color: colors.text, flexShrink: 1 },
 
