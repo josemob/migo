@@ -11,6 +11,7 @@ interface Staff {
   roleLabel?: string;
   specialty?: string;
   collegiateNumber?: string;
+  experienceYears?: number | null;
   verificationStatus: string;
   isActive: boolean;
   user: { fullName: string };
@@ -223,7 +224,7 @@ export default function Equipo() {
         footer={
           <>
             <button className="btn-outline" onClick={() => setEditing(null)}>Cancelar</button>
-            <button className="btn-primary" disabled={updateStaff.isPending} onClick={() => editing && updateStaff.mutate({ id: editing.id, body: { position: editing.position, roleLabel: editing.roleLabel, isActive: editing.isActive } })}>Guardar</button>
+            <button className="btn-primary" disabled={updateStaff.isPending} onClick={() => editing && updateStaff.mutate({ id: editing.id, body: { position: editing.position, roleLabel: editing.roleLabel, specialty: editing.specialty || undefined, experienceYears: editing.experienceYears ?? null, isActive: editing.isActive } })}>Guardar</button>
           </>
         }
       >
@@ -235,6 +236,12 @@ export default function Equipo() {
               </select>
             </Field>
             <Field label="Rol / etiqueta"><input className="input" value={editing.roleLabel ?? ''} onChange={(e) => setEditing({ ...editing, roleLabel: e.target.value })} /></Field>
+            {editing.position === 'VET' && (
+              <>
+                <Field label="Especialidad"><input className="input" placeholder="Medicina de pequeñas especies" value={editing.specialty ?? ''} onChange={(e) => setEditing({ ...editing, specialty: e.target.value })} /></Field>
+                <Field label="Años de experiencia"><input className="input" type="number" min={0} max={80} placeholder="12" value={editing.experienceYears ?? ''} onChange={(e) => setEditing({ ...editing, experienceYears: e.target.value === '' ? null : Number(e.target.value) })} /></Field>
+              </>
+            )}
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={editing.isActive} onChange={(e) => setEditing({ ...editing, isActive: e.target.checked })} />
               Activo en la sucursal

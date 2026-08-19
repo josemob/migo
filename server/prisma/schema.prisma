@@ -650,6 +650,7 @@ model ClinicStaff {
   cmvLicense         String? // carnet del Colegio de Médicos Veterinarios
   collegiateNumber   String? // "Colegiado: #4152"
   specialty          String? // "Cirugía & Medicina Interna"
+  experienceYears    Int? // años de experiencia (chip "Exp: N años" del dashboard)
   verificationStatus VerificationStatus @default(PENDING) // "CMV Verificado"
   verifiedAt         DateTime?
 

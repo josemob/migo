@@ -218,6 +218,7 @@ const updateSchema = z.object({
   position: z.enum(POSITIONS).optional(),
   roleLabel: z.string().optional(),
   specialty: z.string().optional(),
+  experienceYears: z.number().int().min(0).max(80).nullable().optional(),
   cmvLicense: z.string().optional(),
   collegiateNumber: z.string().optional(),
   isActive: z.boolean().optional(),

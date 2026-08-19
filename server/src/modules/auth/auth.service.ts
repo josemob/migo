@@ -170,19 +170,41 @@ export const authService = {
   },
 
   async me(userId: string) {
+    // Turno de HOY (hora de Venezuela, UTC-4) para el chip "Turno" del dashboard vet.
+    const startVe = startOfTodayVenezuela();
+    const endVe = new Date(startVe.getTime() + 24 * 60 * 60 * 1000);
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
         staffProfile: {
-          include: { clinic: { include: { organization: true } } },
+          include: {
+            clinic: { include: { organization: true } },
+            shifts: {
+              where: { date: { gte: startVe, lt: endVe }, shift: { not: 'OFF' } },
+              orderBy: { date: 'desc' },
+              take: 1,
+            },
+          },
         },
       },
     });
     if (!user) throw ApiError.notFound('Usuario no encontrado');
+    // Aplana el turno de hoy en `currentShift` (o null si no tiene guardia hoy).
+    const staffProfile = user.staffProfile
+      ? { ...user.staffProfile, currentShift: user.staffProfile.shifts?.[0]?.shift ?? null }
+      : null;
     return {
       ...publicUser(user),
       nationalId: user.nationalId,
-      staffProfile: user.staffProfile,
+      staffProfile,
     };
   },
 };
+
+// Inicio del día en hora de Venezuela (UTC-4), para filtrar el turno de hoy.
+function startOfTodayVenezuela(): Date {
+  const OFFSET_MS = 4 * 60 * 60 * 1000;
+  const ve = new Date(Date.now() - OFFSET_MS);
+  const veMidnight = Date.UTC(ve.getUTCFullYear(), ve.getUTCMonth(), ve.getUTCDate(), 0, 0, 0, 0);
+  return new Date(veMidnight + OFFSET_MS);
+}

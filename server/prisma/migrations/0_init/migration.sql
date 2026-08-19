@@ -1,4 +1,4 @@
-﻿-- CreateEnum
+-- CreateEnum
 CREATE TYPE "UserRole" AS ENUM ('PET_OWNER', 'VET', 'CLINIC_ADMIN', 'SUPER_ADMIN');
 
 -- CreateEnum
@@ -73,6 +73,18 @@ CREATE TYPE "PayoutStatus" AS ENUM ('DRAFT', 'PROCESSING', 'PAID', 'FAILED');
 -- CreateEnum
 CREATE TYPE "BankAccountType" AS ENUM ('CHECKING', 'SAVINGS');
 
+-- CreateEnum
+CREATE TYPE "KycStatus" AS ENUM ('PENDING', 'UNDER_REVIEW', 'APPROVED', 'REJECTED');
+
+-- CreateEnum
+CREATE TYPE "InvitationStatus" AS ENUM ('PENDING', 'ACCEPTED', 'REJECTED', 'CANCELLED');
+
+-- CreateEnum
+CREATE TYPE "ChatSender" AS ENUM ('OWNER', 'CLINIC', 'SYSTEM');
+
+-- CreateEnum
+CREATE TYPE "ChatUrgency" AS ENUM ('CRITICA', 'MODERADA', 'BAJA');
+
 -- CreateTable
 CREATE TABLE "User" (
     "id" TEXT NOT NULL,
@@ -104,6 +116,95 @@ CREATE TABLE "RefreshToken" (
 );
 
 -- CreateTable
+CREATE TABLE "PushToken" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "token" TEXT NOT NULL,
+    "platform" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "PushToken_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "StaffInvitation" (
+    "id" TEXT NOT NULL,
+    "clinicId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "position" "StaffPosition" NOT NULL,
+    "invitedById" TEXT,
+    "status" "InvitationStatus" NOT NULL DEFAULT 'PENDING',
+    "respondedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "StaffInvitation_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "StaffKyc" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "requestedPosition" "StaffPosition" NOT NULL,
+    "roleLabel" TEXT,
+    "selfieUrl" TEXT,
+    "idDocumentUrl" TEXT,
+    "cmvCardUrl" TEXT,
+    "collegiateNumber" TEXT,
+    "specialty" TEXT,
+    "faceMatchScore" DOUBLE PRECISION,
+    "faceMatchPassed" BOOLEAN,
+    "status" "KycStatus" NOT NULL DEFAULT 'PENDING',
+    "reviewNotes" TEXT,
+    "reviewedById" TEXT,
+    "reviewedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "StaffKyc_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "AiTriageRule" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "keywords" TEXT[],
+    "responseTemplate" TEXT NOT NULL,
+    "severity" TEXT NOT NULL DEFAULT 'MODERADA',
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "AiTriageRule_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "AiKnowledgeEntry" (
+    "id" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "category" TEXT NOT NULL,
+    "severity" TEXT NOT NULL,
+    "description" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "AiKnowledgeEntry_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "PlatformConfig" (
+    "id" TEXT NOT NULL DEFAULT 'singleton',
+    "cplFeeUsd" DECIMAL(10,2) NOT NULL DEFAULT 5,
+    "commissionRate" DECIMAL(4,3) NOT NULL DEFAULT 0.08,
+    "bcvRate" DECIMAL(12,2) NOT NULL DEFAULT 36.5,
+    "paymentGateway" TEXT NOT NULL DEFAULT 'Stripe + Pago Móvil Local (C2P)',
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "PlatformConfig_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "Pet" (
     "id" TEXT NOT NULL,
     "ownerId" TEXT NOT NULL,
@@ -120,6 +221,10 @@ CREATE TABLE "Pet" (
     "isSterilized" BOOLEAN NOT NULL DEFAULT false,
     "status" "PetStatus" NOT NULL DEFAULT 'STABLE',
     "notes" TEXT,
+    "alias" TEXT,
+    "size" TEXT,
+    "specialCondition" TEXT,
+    "frequentVet" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -249,6 +354,8 @@ CREATE TABLE "Clinic" (
     "billingCycle" "BillingCycle" NOT NULL DEFAULT 'MONTHLY',
     "radarSuspended" BOOLEAN NOT NULL DEFAULT false,
     "suspendedAt" TIMESTAMP(3),
+    "manuallyUnavailable" BOOLEAN NOT NULL DEFAULT false,
+    "unavailableUntil" TIMESTAMP(3),
     "verificationStatus" "VerificationStatus" NOT NULL DEFAULT 'PENDING',
     "verifiedAt" TIMESTAMP(3),
     "ratingAvg" DECIMAL(3,2) NOT NULL DEFAULT 0,
@@ -282,9 +389,12 @@ CREATE TABLE "ClinicStaff" (
     "cmvLicense" TEXT,
     "collegiateNumber" TEXT,
     "specialty" TEXT,
+    "experienceYears" INTEGER,
     "verificationStatus" "VerificationStatus" NOT NULL DEFAULT 'PENDING',
     "verifiedAt" TIMESTAMP(3),
     "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "ratingAvg" DECIMAL(3,2) NOT NULL DEFAULT 0,
+    "ratingCount" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -319,6 +429,14 @@ CREATE TABLE "Service" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Service_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ServiceStaff" (
+    "serviceId" TEXT NOT NULL,
+    "staffId" TEXT NOT NULL,
+
+    CONSTRAINT "ServiceStaff_pkey" PRIMARY KEY ("serviceId","staffId")
 );
 
 -- CreateTable
@@ -401,11 +519,43 @@ CREATE TABLE "Teleconsult" (
 );
 
 -- CreateTable
+CREATE TABLE "ChatMessage" (
+    "id" TEXT NOT NULL,
+    "ownerId" TEXT NOT NULL,
+    "clinicId" TEXT NOT NULL,
+    "sender" "ChatSender" NOT NULL,
+    "text" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ChatMessage_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ChatSummary" (
+    "id" TEXT NOT NULL,
+    "ownerId" TEXT NOT NULL,
+    "petId" TEXT,
+    "consultationReason" TEXT NOT NULL,
+    "symptoms" TEXT[],
+    "durationOfSymptoms" TEXT,
+    "perceivedUrgency" "ChatUrgency" NOT NULL,
+    "possibleTriggers" TEXT,
+    "firstAidGiven" TEXT[],
+    "recommendedAction" TEXT NOT NULL,
+    "keyObservationsForVet" TEXT NOT NULL,
+    "source" TEXT NOT NULL DEFAULT 'gemini',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ChatSummary_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "Review" (
     "id" TEXT NOT NULL,
     "clinicId" TEXT NOT NULL,
     "authorId" TEXT NOT NULL,
     "appointmentId" TEXT,
+    "staffId" TEXT,
     "rating" INTEGER NOT NULL,
     "comment" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -544,6 +694,24 @@ CREATE UNIQUE INDEX "RefreshToken_tokenHash_key" ON "RefreshToken"("tokenHash");
 CREATE INDEX "RefreshToken_userId_idx" ON "RefreshToken"("userId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "PushToken_token_key" ON "PushToken"("token");
+
+-- CreateIndex
+CREATE INDEX "PushToken_userId_idx" ON "PushToken"("userId");
+
+-- CreateIndex
+CREATE INDEX "StaffInvitation_userId_status_idx" ON "StaffInvitation"("userId", "status");
+
+-- CreateIndex
+CREATE INDEX "StaffInvitation_clinicId_status_idx" ON "StaffInvitation"("clinicId", "status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "StaffKyc_userId_key" ON "StaffKyc"("userId");
+
+-- CreateIndex
+CREATE INDEX "StaffKyc_status_idx" ON "StaffKyc"("status");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Pet_microchip_key" ON "Pet"("microchip");
 
 -- CreateIndex
@@ -628,6 +796,9 @@ CREATE INDEX "Service_clinicId_idx" ON "Service"("clinicId");
 CREATE INDEX "Service_category_idx" ON "Service"("category");
 
 -- CreateIndex
+CREATE INDEX "ServiceStaff_staffId_idx" ON "ServiceStaff"("staffId");
+
+-- CreateIndex
 CREATE INDEX "Appointment_clinicId_scheduledAt_idx" ON "Appointment"("clinicId", "scheduledAt");
 
 -- CreateIndex
@@ -661,10 +832,22 @@ CREATE INDEX "Teleconsult_vetId_idx" ON "Teleconsult"("vetId");
 CREATE INDEX "Teleconsult_status_idx" ON "Teleconsult"("status");
 
 -- CreateIndex
+CREATE INDEX "ChatMessage_ownerId_clinicId_createdAt_idx" ON "ChatMessage"("ownerId", "clinicId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "ChatSummary_ownerId_createdAt_idx" ON "ChatSummary"("ownerId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "ChatSummary_petId_idx" ON "ChatSummary"("petId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Review_appointmentId_key" ON "Review"("appointmentId");
 
 -- CreateIndex
 CREATE INDEX "Review_clinicId_idx" ON "Review"("clinicId");
+
+-- CreateIndex
+CREATE INDEX "Review_staffId_idx" ON "Review"("staffId");
 
 -- CreateIndex
 CREATE INDEX "Subscription_userId_idx" ON "Subscription"("userId");
@@ -707,6 +890,18 @@ CREATE INDEX "AuditLog_actorId_idx" ON "AuditLog"("actorId");
 
 -- AddForeignKey
 ALTER TABLE "RefreshToken" ADD CONSTRAINT "RefreshToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PushToken" ADD CONSTRAINT "PushToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StaffInvitation" ADD CONSTRAINT "StaffInvitation_clinicId_fkey" FOREIGN KEY ("clinicId") REFERENCES "Clinic"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StaffInvitation" ADD CONSTRAINT "StaffInvitation_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StaffKyc" ADD CONSTRAINT "StaffKyc_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Pet" ADD CONSTRAINT "Pet_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -769,6 +964,12 @@ ALTER TABLE "StaffShift" ADD CONSTRAINT "StaffShift_staffId_fkey" FOREIGN KEY ("
 ALTER TABLE "Service" ADD CONSTRAINT "Service_clinicId_fkey" FOREIGN KEY ("clinicId") REFERENCES "Clinic"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "ServiceStaff" ADD CONSTRAINT "ServiceStaff_serviceId_fkey" FOREIGN KEY ("serviceId") REFERENCES "Service"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ServiceStaff" ADD CONSTRAINT "ServiceStaff_staffId_fkey" FOREIGN KEY ("staffId") REFERENCES "ClinicStaff"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Appointment" ADD CONSTRAINT "Appointment_clinicId_fkey" FOREIGN KEY ("clinicId") REFERENCES "Clinic"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -815,6 +1016,9 @@ ALTER TABLE "Review" ADD CONSTRAINT "Review_authorId_fkey" FOREIGN KEY ("authorI
 
 -- AddForeignKey
 ALTER TABLE "Review" ADD CONSTRAINT "Review_appointmentId_fkey" FOREIGN KEY ("appointmentId") REFERENCES "Appointment"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Review" ADD CONSTRAINT "Review_staffId_fkey" FOREIGN KEY ("staffId") REFERENCES "ClinicStaff"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Subscription" ADD CONSTRAINT "Subscription_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
