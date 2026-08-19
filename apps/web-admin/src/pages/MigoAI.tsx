@@ -94,9 +94,58 @@ export default function MigoAI() {
         </Card>
       </div>
 
+      <div className="mt-6">
+        <GroomingIntervalsCard />
+      </div>
+
       {showRule && <RuleModal onClose={() => setShowRule(false)} onCreated={() => { invalidateRules(); setShowRule(false); }} />}
       {showKb && <KnowledgeModal onClose={() => setShowKb(false)} onCreated={() => { invalidateKb(); setShowKb(false); }} />}
     </div>
+  );
+}
+
+interface GroomInterval { id: string; breed: string; intervalDays: number }
+
+function GroomingIntervalsCard() {
+  const qc = useQueryClient();
+  const list = useQuery({ queryKey: ['admin-grooming'], queryFn: () => api<{ data: GroomInterval[] }>('/admin/grooming-intervals') });
+  const save = useMutation({
+    mutationFn: (v: { breed: string; intervalDays: number }) => api('/admin/grooming-intervals', { method: 'PATCH', body: v }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-grooming'] }),
+  });
+
+  return (
+    <Card>
+      <div className="mb-1 flex items-center gap-2">
+        <Icon name="paw" className="h-5 w-5 text-migo-purple" />
+        <h2 className="text-lg font-bold text-migo-heading">Peluquería por raza — intervalos sugeridos</h2>
+      </div>
+      <p className="mb-4 text-sm text-slate-500">Cada cuántos días Migo sugiere peluquería a cada raza. Alimenta la sugerencia del calendario y "Próximas citas" del dueño (no cambia la reserva).</p>
+      {list.isLoading ? <Spinner /> : list.error ? <ErrorNote error={list.error} /> : (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          {list.data?.data.map((g) => (
+            <div key={g.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 px-3 py-2">
+              <span className="truncate text-sm font-semibold text-slate-800">{g.breed}</span>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <input
+                  type="number"
+                  min={1}
+                  max={365}
+                  defaultValue={g.intervalDays}
+                  onBlur={(e) => {
+                    const v = Number(e.target.value);
+                    if (v >= 1 && v <= 365 && v !== g.intervalDays) save.mutate({ breed: g.breed, intervalDays: v });
+                  }}
+                  className="w-16 rounded-lg border border-slate-200 px-2 py-1 text-right text-sm outline-none focus:border-brand-500"
+                />
+                <span className="text-xs text-slate-400">días</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {save.isError && <div className="mt-3"><ErrorNote error={save.error} /></div>}
+    </Card>
   );
 }
 

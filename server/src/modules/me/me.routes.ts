@@ -240,13 +240,14 @@ router.get(
     const from = new Date(now.getTime() - 45 * 24 * 3600_000); // 45 días atrás
     const to = new Date(now.getTime() + 90 * 24 * 3600_000); // 90 días adelante
 
-    const [appts, vaccines] = await Promise.all([
+    const aiFrom = new Date(now.getTime() - 14 * 24 * 3600_000); // sugerencias IA de los últimos 14 días
+    const [appts, vaccines, pets, intervals, summaries] = await Promise.all([
       prisma.appointment.findMany({
         where: { bookedById: ownerId, status: { not: 'CANCELLED' } },
         orderBy: { scheduledAt: 'asc' },
         include: {
           clinic: { select: { id: true, name: true } },
-          service: { select: { name: true } },
+          service: { select: { name: true, category: true } },
           pet: { select: { id: true, name: true } },
         },
       }),
@@ -256,12 +257,73 @@ router.get(
         orderBy: { nextDueAt: 'asc' },
         include: { pet: { select: { id: true, name: true } }, clinic: { select: { id: true, name: true } } },
       }),
+      prisma.pet.findMany({ where: { ownerId }, select: { id: true, name: true, breed: true, createdAt: true } }),
+      prisma.groomingBreedInterval.findMany(),
+      // Resúmenes recientes del chat de Migo IA con una acción recomendada
+      prisma.chatSummary.findMany({
+        where: { ownerId, createdAt: { gte: aiFrom } },
+        orderBy: { createdAt: 'desc' },
+      }),
     ]);
+
+    // Última peluquería COMPLETADA por mascota (para el intervalo por raza)
+    const lastGrooming = new Map<string, Date>();
+    for (const a of appts) {
+      if (a.service?.category === 'GROOMING' && a.status === 'COMPLETED') {
+        const prev = lastGrooming.get(a.pet.id);
+        if (!prev || a.scheduledAt > prev) lastGrooming.set(a.pet.id, a.scheduledAt);
+      }
+    }
+    const intervalByBreed = new Map(intervals.map((i) => [i.breed.trim().toLowerCase(), i.intervalDays]));
+    const petName = new Map(pets.map((p) => [p.id, p.name]));
+
+    // Sugerencia de peluquería: si desde la última (o el registro) pasó el intervalo de la raza
+    const groomingSuggestions = pets.flatMap((pet) => {
+      const days = pet.breed ? intervalByBreed.get(pet.breed.trim().toLowerCase()) : undefined;
+      if (!days) return [];
+      const base = lastGrooming.get(pet.id) ?? pet.createdAt;
+      const due = new Date(base.getTime() + days * 24 * 3600_000);
+      if (due.getTime() > to.getTime()) return []; // aún no toca dentro de la ventana
+      const when = due.getTime() < now.getTime() ? now : due; // vencida -> hoy
+      return [{
+        kind: 'suggestion' as const,
+        id: `grooming-${pet.id}`,
+        source: 'grooming' as const,
+        title: `Peluquería de ${pet.name}`,
+        date: when.toISOString(),
+        petId: pet.id,
+        petName: pet.name,
+        clinicId: null,
+        clinicName: null,
+        description: `Según su raza (${pet.breed}), Migo recomienda peluquería cada ${days} días.`,
+      }];
+    });
+
+    // Sugerencia de Migo IA: la más reciente por mascota, con acción recomendada
+    const aiSeen = new Set<string>();
+    const aiSuggestions = summaries.flatMap((s) => {
+      const key = s.petId ?? 'sin-mascota';
+      if (aiSeen.has(key) || !s.recommendedAction) return [];
+      aiSeen.add(key);
+      return [{
+        kind: 'suggestion' as const,
+        id: `ai-${s.id}`,
+        source: 'ai' as const,
+        title: s.consultationReason || 'Sugerencia de Migo IA',
+        date: new Date(Math.max(now.getTime(), s.createdAt.getTime())).toISOString(),
+        petId: s.petId,
+        petName: s.petId ? petName.get(s.petId) ?? null : null,
+        clinicId: null,
+        clinicName: null,
+        description: s.recommendedAction,
+      }];
+    });
 
     const events = [
       ...appts.map((a) => ({
         kind: 'appointment' as const,
         id: a.id,
+        source: 'appointment' as const,
         title: a.service?.name ?? a.reason ?? 'Cita veterinaria',
         date: a.scheduledAt.toISOString(),
         status: a.status,
@@ -273,6 +335,7 @@ router.get(
       ...vaccines.map((v) => ({
         kind: 'suggestion' as const,
         id: v.id,
+        source: 'vaccine' as const,
         title: `Refuerzo: ${v.vaccineName}`,
         date: v.nextDueAt!.toISOString(),
         petId: v.pet.id,
@@ -281,6 +344,8 @@ router.get(
         clinicName: v.clinic?.name ?? null,
         description: 'Migo detectó que le toca este refuerzo según su esquema de vacunación.',
       })),
+      ...groomingSuggestions,
+      ...aiSuggestions,
     ].sort((x, y) => x.date.localeCompare(y.date));
 
     res.json({ events });

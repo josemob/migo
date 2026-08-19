@@ -463,6 +463,31 @@ router.delete(
 );
 
 // ─────────────────────────────────────────────────────────────
+//  INTERVALOS DE PELUQUERÍA POR RAZA (sugerencia del calendario)
+// ─────────────────────────────────────────────────────────────
+router.get(
+  '/grooming-intervals',
+  asyncHandler(async (_req, res) => {
+    const data = await prisma.groomingBreedInterval.findMany({ orderBy: { breed: 'asc' } });
+    res.json({ data });
+  }),
+);
+
+router.patch(
+  '/grooming-intervals',
+  validate({ body: z.object({ breed: z.string().min(1), intervalDays: z.number().int().min(1).max(365) }) }),
+  asyncHandler(async (req, res) => {
+    const { breed, intervalDays } = req.body as { breed: string; intervalDays: number };
+    const row = await prisma.groomingBreedInterval.upsert({
+      where: { breed },
+      create: { breed, intervalDays },
+      update: { intervalDays },
+    });
+    res.json(row);
+  }),
+);
+
+// ─────────────────────────────────────────────────────────────
 //  CONFIGURACIÓN GLOBAL
 // ─────────────────────────────────────────────────────────────
 async function getConfig() {

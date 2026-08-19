@@ -931,6 +931,18 @@ model ChatSummary {
   @@index([petId])
 }
 
+// Intervalo de peluquería recomendado por raza (global, editable en Super Admin).
+// Alimenta la SUGERENCIA de peluquería en el calendario/próximas citas del dueño:
+// si desde la última peluquería pasó >= intervalDays, Migo sugiere agendar. No afecta
+// la reserva ni la duración; es solo un recordatorio suave.
+model GroomingBreedInterval {
+  id           String   @id @default(uuid())
+  breed        String   @unique // nombre de la raza (igual que en la lista BREEDS del cliente)
+  intervalDays Int // cada cuántos días se recomienda peluquería para esa raza
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 // ─────────────────────────────────────────────────────────────────────
 //  REVIEWS
 // ─────────────────────────────────────────────────────────────────────

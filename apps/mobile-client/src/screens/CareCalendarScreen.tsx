@@ -9,15 +9,19 @@ import { cardShadow, colors, radius, type } from '../theme';
 interface CareEvent {
   kind: 'appointment' | 'suggestion';
   id: string;
+  source?: 'appointment' | 'vaccine' | 'grooming' | 'ai';
   title: string;
   date: string; // ISO
   status?: string;
-  petId: string;
-  petName: string;
+  petId: string | null;
+  petName: string | null;
   clinicId: string | null;
   clinicName: string | null;
   description?: string;
 }
+
+// Etiqueta corta de la sugerencia según su origen
+const SUGGESTION_BADGE: Record<string, string> = { grooming: 'Peluquería', vaccine: 'Refuerzo', ai: 'Migo IA' };
 
 const WEEKDAYS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
 const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -170,7 +174,7 @@ function TaskCard({ e, navigation }: { e: CareEvent; navigation: any }) {
       <View style={styles.taskBody}>
         <View style={styles.taskTopRow}>
           <Text style={styles.taskTitle} numberOfLines={2}>{e.title}</Text>
-          {!isAppt && <Badge text="IA" color={colors.amber} />}
+          {!isAppt && <Badge text={SUGGESTION_BADGE[e.source ?? ''] ?? 'Sugerencia'} color={colors.amber} />}
         </View>
         <Text style={[styles.taskDate, { color: accent }]}>{dayLabel(d)}</Text>
         {isAppt ? (
@@ -193,7 +197,7 @@ function TaskCard({ e, navigation }: { e: CareEvent; navigation: any }) {
               onPress={() =>
                 e.clinicId
                   ? navigation.navigate('ClinicDetail', { id: e.clinicId, name: e.clinicName })
-                  : navigation.navigate('Directorio', { category: null })
+                  : navigation.navigate('Directorio', { category: e.source === 'grooming' ? 'GROOMING' : null })
               }
             />
           )}

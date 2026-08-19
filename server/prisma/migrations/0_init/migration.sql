@@ -569,6 +569,17 @@ CREATE TABLE "ChatSummary" (
 );
 
 -- CreateTable
+CREATE TABLE "GroomingBreedInterval" (
+    "id" TEXT NOT NULL,
+    "breed" TEXT NOT NULL,
+    "intervalDays" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "GroomingBreedInterval_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "Review" (
     "id" TEXT NOT NULL,
     "clinicId" TEXT NOT NULL,
@@ -864,6 +875,9 @@ CREATE INDEX "ChatSummary_ownerId_createdAt_idx" ON "ChatSummary"("ownerId", "cr
 
 -- CreateIndex
 CREATE INDEX "ChatSummary_petId_idx" ON "ChatSummary"("petId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "GroomingBreedInterval_breed_key" ON "GroomingBreedInterval"("breed");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Review_appointmentId_key" ON "Review"("appointmentId");
