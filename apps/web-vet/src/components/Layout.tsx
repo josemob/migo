@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth, isClinicAdmin } from '../lib/auth';
 import { useEmergencyStream } from '../lib/useEmergencyStream';
@@ -32,6 +32,8 @@ const NAV: {
   },
 ];
 
+const STORAGE_KEY = 'migo_vet_sidebar_collapsed';
+
 export function Layout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   const admin = isClinicAdmin(user);
@@ -41,33 +43,66 @@ export function Layout({ children }: { children: ReactNode }) {
   const clinicName = user?.staffProfile?.clinic?.name ?? 'Sucursal';
   const orgName = user?.staffProfile?.clinic?.organization?.name ?? 'Migo Clínicas';
 
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem(STORAGE_KEY) === '1'; } catch { return false; }
+  });
+  const toggle = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(STORAGE_KEY, next ? '1' : '0'); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Sidebar */}
-      <aside className="flex w-72 shrink-0 flex-col bg-sidebar text-white">
-        <div className="flex items-center gap-3 px-6 py-6">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-500 text-white">
-            <Icon name="paw" className="h-6 w-6" />
+      <aside
+        className={`flex ${collapsed ? 'w-20' : 'w-72'} shrink-0 flex-col bg-sidebar text-white transition-[width] duration-200 ease-in-out`}
+      >
+        {/* Logo + toggle */}
+        <div className={`flex items-center px-4 py-6 ${collapsed ? 'justify-center' : 'justify-between'}`}>
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-500 text-white">
+              <Icon name="paw" className="h-6 w-6" />
+            </div>
+            {!collapsed && (
+              <div>
+                <div className="text-lg font-bold leading-tight">{orgName}</div>
+                <div className="text-xs text-sidebar-muted">Sucursal: {clinicName}</div>
+              </div>
+            )}
           </div>
-          <div>
-            <div className="text-lg font-bold leading-tight">{orgName}</div>
-            <div className="text-xs text-sidebar-muted">Sucursal: {clinicName}</div>
-          </div>
+          {!collapsed && (
+            <button onClick={toggle} title="Colapsar menú" className="rounded-lg p-1.5 text-sidebar-muted transition hover:bg-sidebar-hover hover:text-white">
+              <Icon name="chevronLeft" className="h-5 w-5" />
+            </button>
+          )}
         </div>
+
+        {/* Botón expandir (visible solo colapsado) */}
+        {collapsed && (
+          <button onClick={toggle} title="Expandir menú" className="mx-auto mb-2 rounded-lg p-1.5 text-sidebar-muted transition hover:bg-sidebar-hover hover:text-white">
+            <Icon name="chevronRight" className="h-5 w-5" />
+          </button>
+        )}
 
         <nav className="flex-1 overflow-y-auto px-3 py-2">
           {nav.map((group) => (
-            <div key={group.section} className="mb-6">
-              <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-sidebar-muted">
-                {group.section}
-              </div>
+            <div key={group.section} className={collapsed ? 'mb-3' : 'mb-6'}>
+              {!collapsed && (
+                <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-sidebar-muted">
+                  {group.section}
+                </div>
+              )}
               {group.items.map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}
                   end={item.end}
+                  title={collapsed ? item.label : undefined}
                   className={({ isActive }) =>
-                    `mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                    `mb-1 flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition ${collapsed ? 'justify-center' : 'gap-3'} ${
                       isActive
                         ? 'bg-sidebar-active text-white shadow-lg'
                         : 'text-slate-200 hover:bg-sidebar-hover'
@@ -75,7 +110,7 @@ export function Layout({ children }: { children: ReactNode }) {
                   }
                 >
                   <Icon name={item.icon} className="h-5 w-5 shrink-0" />
-                  {item.label}
+                  {!collapsed && item.label}
                 </NavLink>
               ))}
             </div>
@@ -83,16 +118,18 @@ export function Layout({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="border-t border-white/10 px-4 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-migo-purple text-sm font-bold">
+          <div className={`flex ${collapsed ? 'flex-col items-center gap-3' : 'items-center gap-3'}`}>
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-migo-purple text-sm font-bold">
               {user?.fullName?.[0] ?? 'U'}
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold">{user?.fullName}</div>
-              <div className="text-xs text-sidebar-muted">
-                {user?.staffProfile?.roleLabel ?? user?.role}
+            {!collapsed && (
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-semibold">{user?.fullName}</div>
+                <div className="text-xs text-sidebar-muted">
+                  {user?.staffProfile?.roleLabel ?? user?.role}
+                </div>
               </div>
-            </div>
+            )}
             <button
               onClick={logout}
               title="Cerrar sesión"
@@ -105,7 +142,11 @@ export function Layout({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Content */}
-      <main className="flex-1 overflow-y-auto p-8">{children}</main>
+      <main className="flex-1 overflow-y-auto p-8">
+        {/* Tope de ancho + centrado para pantallas anchas (retina Mac, >1280px): el
+            contenido no se estira de borde a borde en monitores grandes. */}
+        <div className="mx-auto w-full max-w-[1600px]">{children}</div>
+      </main>
     </div>
   );
 }
