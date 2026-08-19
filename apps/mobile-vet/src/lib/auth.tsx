@@ -7,6 +7,13 @@ export interface StaffProfile {
   position: string;
   roleLabel?: string | null;
   specialty?: string | null;
+  collegiateNumber?: string | null;
+  cmvLicense?: string | null;
+  verificationStatus?: string | null; // PENDING | UNDER_REVIEW | VERIFIED | REJECTED
+  ratingAvg?: string | number | null; // Prisma Decimal -> string en JSON
+  ratingCount?: number | null;
+  experienceYears?: number | null; // opcional (backend por wirear)
+  currentShift?: string | null; // turno de hoy (ShiftType), opcional
   clinic?: { name: string } | null;
 }
 
