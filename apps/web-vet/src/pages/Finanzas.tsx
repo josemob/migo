@@ -78,6 +78,18 @@ const PAYOUT_LABEL: Record<Payout['status'], string> = {
   DRAFT: 'Borrador',
 };
 
+interface ReceiptRow {
+  id: string;
+  number: string;
+  concept: string;
+  amountUsd: number;
+  source: 'APP' | 'MANUAL';
+  paymentMethod?: string | null;
+  issuedAt: string;
+  ownerName?: string | null;
+  petName?: string | null;
+}
+
 export default function Finanzas() {
   const qc = useQueryClient();
   const summary = useQuery({ queryKey: ['finance-summary'], queryFn: () => api<FinanceSummary>('/finance/summary') });
@@ -86,9 +98,12 @@ export default function Finanzas() {
   const payouts = useQuery({ queryKey: ['finance-payouts'], queryFn: () => api<{ data: Payout[] }>('/finance/payouts') });
   const settlement = useQuery({ queryKey: ['settlement'], queryFn: () => api<Settlement | null>('/finance/settlement') });
 
+  const receipts = useQuery({ queryKey: ['clinic-receipts'], queryFn: () => api<{ data: ReceiptRow[] }>('/finance/receipts') });
+
   const [payId, setPayId] = useState<string | null>(null);
   const [reference, setReference] = useState('');
   const [editSettlement, setEditSettlement] = useState(false);
+  const [showReceipt, setShowReceipt] = useState(false);
 
   const payInvoice = useMutation({
     mutationFn: (id: string) => api(`/finance/invoices/${id}/pay`, { method: 'POST', body: { reference: reference.trim() || undefined } }),
@@ -287,6 +302,44 @@ export default function Finanzas() {
         </table>
       </Card>
 
+      {/* Recibos a clientes (dueños) */}
+      <Card className="mt-6">
+        <div className="mb-2 flex items-center justify-between">
+          <SectionTitle>Recibos a clientes</SectionTitle>
+          <button className="btn-primary" onClick={() => setShowReceipt(true)}>+ Emitir recibo</button>
+        </div>
+        <p className="mb-3 text-sm text-slate-500">Comprobantes emitidos al dueño (automáticos por pago en la app y manuales). Se envían por correo.</p>
+        {receipts.isLoading ? <Spinner className="mx-auto my-6" /> : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 text-left text-slate-400">
+                <th className="pb-2 font-medium">Nº</th>
+                <th className="pb-2 font-medium">Fecha</th>
+                <th className="pb-2 font-medium">Cliente</th>
+                <th className="pb-2 font-medium">Concepto</th>
+                <th className="pb-2 font-medium">Origen</th>
+                <th className="pb-2 text-right font-medium">Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              {receipts.data?.data.length === 0 && (
+                <tr><td colSpan={6} className="py-6 text-center text-slate-400">Aún no hay recibos emitidos.</td></tr>
+              )}
+              {receipts.data?.data.map((r) => (
+                <tr key={r.id} className="border-b border-slate-50">
+                  <td className="py-3 font-mono text-xs text-slate-500">{r.number}</td>
+                  <td className="py-3 text-slate-500">{date(r.issuedAt)}</td>
+                  <td className="py-3 font-semibold text-slate-800">{r.ownerName ?? '—'}{r.petName && <span className="font-normal text-slate-400"> · {r.petName}</span>}</td>
+                  <td className="py-3 text-slate-500">{r.concept}</td>
+                  <td className="py-3"><Badge tone={r.source === 'APP' ? 'green' : 'slate'}>{r.source === 'APP' ? 'App' : 'Manual'}</Badge></td>
+                  <td className="py-3 text-right font-bold text-migo-purple">{usd(r.amountUsd)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+
       {/* Modal: registrar pago de factura */}
       <Modal
         open={!!payId}
@@ -316,7 +369,88 @@ export default function Finanzas() {
 
       {/* Modal: datos de liquidación */}
       <SettlementModal open={editSettlement} onClose={() => setEditSettlement(false)} current={settlement.data ?? null} />
+
+      {/* Modal: emitir recibo manual */}
+      <ReceiptModal open={showReceipt} onClose={() => setShowReceipt(false)} onIssued={() => { qc.invalidateQueries({ queryKey: ['clinic-receipts'] }); setShowReceipt(false); }} />
     </div>
+  );
+}
+
+interface PatientRow { id: string; ownerId: string; name: string; owner?: { fullName?: string | null } | null }
+
+function ReceiptModal({ open, onClose, onIssued }: { open: boolean; onClose: () => void; onIssued: () => void }) {
+  const [q, setQ] = useState('');
+  const [selected, setSelected] = useState<{ ownerId: string; petId: string; label: string } | null>(null);
+  const [concept, setConcept] = useState('');
+  const [amount, setAmount] = useState('');
+  const [method, setMethod] = useState('efectivo');
+
+  const search = useQuery({
+    queryKey: ['patients-search', q],
+    queryFn: () => api<{ data: PatientRow[] }>(`/patients?search=${encodeURIComponent(q)}`),
+    enabled: open && q.trim().length >= 2 && !selected,
+  });
+
+  const reset = () => { setQ(''); setSelected(null); setConcept(''); setAmount(''); setMethod('efectivo'); };
+  const issue = useMutation({
+    mutationFn: () => api('/finance/receipts', { method: 'POST', body: { ownerId: selected!.ownerId, petId: selected!.petId, concept: concept.trim(), amountUsd: Number(amount), paymentMethod: method } }),
+    onSuccess: () => { reset(); onIssued(); },
+  });
+
+  const disabled = !selected || !concept.trim() || !(Number(amount) > 0) || issue.isPending;
+
+  return (
+    <Modal
+      open={open}
+      onClose={() => { reset(); onClose(); }}
+      title="Emitir recibo a cliente"
+      footer={
+        <>
+          <button className="btn-outline" onClick={() => { reset(); onClose(); }}>Cancelar</button>
+          <button className="btn-primary" disabled={disabled} onClick={() => issue.mutate()}>{issue.isPending ? 'Emitiendo…' : 'Emitir recibo'}</button>
+        </>
+      }
+    >
+      {!selected ? (
+        <Field label="Cliente / paciente">
+          <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Busca por nombre de la mascota…" autoFocus />
+          {q.trim().length >= 2 && (
+            <div className="mt-2 max-h-48 overflow-y-auto rounded-xl border border-slate-100">
+              {search.isFetching && <div className="p-3 text-sm text-slate-400">Buscando…</div>}
+              {search.data?.data.length === 0 && <div className="p-3 text-sm text-slate-400">Sin resultados.</div>}
+              {search.data?.data.map((p) => (
+                <button
+                  key={p.id}
+                  className="block w-full border-b border-slate-50 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                  onClick={() => setSelected({ ownerId: p.ownerId, petId: p.id, label: `${p.name} · ${p.owner?.fullName ?? ''}` })}
+                >
+                  <span className="font-semibold text-slate-800">{p.name}</span> <span className="text-slate-400">· {p.owner?.fullName ?? '—'}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </Field>
+      ) : (
+        <div className="mb-3 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm">
+          <span className="font-semibold text-slate-800">{selected.label}</span>
+          <button className="text-xs font-semibold text-migo-purple" onClick={() => setSelected(null)}>Cambiar</button>
+        </div>
+      )}
+      <Field label="Concepto"><input className="input" value={concept} onChange={(e) => setConcept(e.target.value)} placeholder="Ej: Consulta general + vacuna" /></Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Monto (USD)"><input className="input" type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="25.00" /></Field>
+        <Field label="Método de pago">
+          <select className="input" value={method} onChange={(e) => setMethod(e.target.value)}>
+            <option value="efectivo">Efectivo</option>
+            <option value="transferencia">Transferencia</option>
+            <option value="pago-movil">Pago Móvil</option>
+            <option value="tarjeta">Tarjeta</option>
+          </select>
+        </Field>
+      </div>
+      {issue.isError && <div className="mt-2"><ErrorNote error={issue.error} /></div>}
+      <p className="mt-1 text-xs text-slate-400">El recibo se envía por correo al cliente automáticamente.</p>
+    </Modal>
   );
 }
 
