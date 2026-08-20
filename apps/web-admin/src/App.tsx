@@ -10,6 +10,7 @@ import Emergencias from './pages/Emergencias';
 import Usuarios from './pages/Usuarios';
 import Finanzas from './pages/Finanzas';
 import MigoAI from './pages/MigoAI';
+import Marketing from './pages/Marketing';
 import Configuracion from './pages/Configuracion';
 
 export default function App() {
@@ -55,6 +56,7 @@ export default function App() {
         <Route path="/usuarios" element={<Usuarios />} />
         <Route path="/finanzas" element={<Finanzas />} />
         <Route path="/migo-ai" element={<MigoAI />} />
+        <Route path="/marketing" element={<Marketing />} />
         <Route path="/configuracion" element={<Configuracion />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

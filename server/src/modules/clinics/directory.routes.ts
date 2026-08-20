@@ -66,6 +66,14 @@ router.get(
       lat?: number; lng?: number; city?: string; q?: string; category?: (typeof SERVICE_CATEGORIES)[number];
     };
 
+    // Guarda la última ubicación conocida del usuario (para el push a comercios por
+    // radio). Fire-and-forget: no bloquea ni rompe la búsqueda si falla.
+    if (lat != null && lng != null && req.user?.id) {
+      void prisma.user
+        .update({ where: { id: req.user.id }, data: { lastLat: lat, lastLng: lng, lastLocationAt: new Date() } })
+        .catch(() => {});
+    }
+
     const nowDate = new Date();
     const clinics = await prisma.clinic.findMany({
       where: {

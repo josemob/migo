@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { validate } from '../../middleware/validate';
 import { authenticate, requireRole } from '../../middleware/auth';
 import { ApiError } from '../../utils/ApiError';
-import { sendPush } from '../push/push.service';
+import { sendPush, sendBulkPush } from '../push/push.service';
+import { distanceKm } from '../../lib/geo';
 
 const router = Router();
 router.use(authenticate, requireRole('SUPER_ADMIN'));
@@ -575,6 +577,82 @@ router.post(
       data: { status, reviewNotes: req.body.notes, reviewedById: req.user!.id, reviewedAt: new Date() },
     });
     res.json({ id: updated.id, status: updated.status });
+  }),
+);
+
+// ─────────────────────────────────────────────────────────────
+//  MARKETING (push masivo + push a comercios por radio de km)
+// ─────────────────────────────────────────────────────────────
+
+// IDs de dueños con ubicación reciente (≤60 días) dentro del radio de un comercio.
+async function reachableOwnerIds(clinicId: string, radiusKm: number): Promise<string[]> {
+  const clinic = await prisma.clinic.findUnique({ where: { id: clinicId }, select: { latitude: true, longitude: true } });
+  if (!clinic || clinic.latitude == null || clinic.longitude == null) {
+    throw ApiError.badRequest('El comercio no tiene ubicación registrada.');
+  }
+  const cutoff = new Date(Date.now() - 60 * 24 * 3600_000);
+  const users = await prisma.user.findMany({
+    where: { role: 'PET_OWNER', status: 'ACTIVE', lastLat: { not: null }, lastLng: { not: null }, lastLocationAt: { gte: cutoff } },
+    select: { id: true, lastLat: true, lastLng: true },
+  });
+  const origin = { lat: Number(clinic.latitude), lng: Number(clinic.longitude) };
+  return users
+    .filter((u) => distanceKm(origin, { lat: Number(u.lastLat), lng: Number(u.lastLng) }) <= radiusKm)
+    .map((u) => u.id);
+}
+
+// GET /admin/marketing/reach -> alcance estimado del push a comercios (sin enviar)
+router.get(
+  '/marketing/reach',
+  validate({ query: z.object({ clinicId: z.string().uuid(), radiusKm: z.coerce.number().positive().max(500) }) }),
+  asyncHandler(async (req, res) => {
+    const { clinicId, radiusKm } = req.query as unknown as { clinicId: string; radiusKm: number };
+    const ids = await reachableOwnerIds(clinicId, radiusKm);
+    const devices = ids.length ? await prisma.pushToken.count({ where: { userId: { in: ids } } }) : 0;
+    res.json({ users: ids.length, devices });
+  }),
+);
+
+// POST /admin/marketing/push/general -> push masivo
+router.post(
+  '/marketing/push/general',
+  validate({
+    body: z.object({
+      title: z.string().min(1).max(120),
+      body: z.string().min(1).max(300),
+      audience: z.enum(['owners', 'staff', 'all']).default('owners'),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const { title, body, audience } = req.body as { title: string; body: string; audience: 'owners' | 'staff' | 'all' };
+    const roleFilter: Prisma.UserWhereInput =
+      audience === 'staff' ? { role: { in: ['VET', 'CLINIC_ADMIN'] } } : audience === 'all' ? {} : { role: 'PET_OWNER' };
+    const tokens = await prisma.pushToken.findMany({
+      where: { user: { status: 'ACTIVE', ...roleFilter } },
+      select: { token: true },
+    });
+    const result = await sendBulkPush(tokens.map((t) => t.token), { title, body, data: { type: 'marketing' } });
+    res.json({ devices: tokens.length, sent: result.sent });
+  }),
+);
+
+// POST /admin/marketing/push/commerce -> push a dueños dentro del radio de un comercio
+router.post(
+  '/marketing/push/commerce',
+  validate({
+    body: z.object({
+      clinicId: z.string().uuid(),
+      radiusKm: z.number().positive().max(500).default(10),
+      title: z.string().min(1).max(120),
+      body: z.string().min(1).max(300),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const { clinicId, radiusKm, title, body } = req.body as { clinicId: string; radiusKm: number; title: string; body: string };
+    const ids = await reachableOwnerIds(clinicId, radiusKm);
+    const tokens = ids.length ? await prisma.pushToken.findMany({ where: { userId: { in: ids } }, select: { token: true } }) : [];
+    const result = await sendBulkPush(tokens.map((t) => t.token), { title, body, data: { type: 'marketing', clinicId } });
+    res.json({ reached: ids.length, devices: tokens.length, sent: result.sent });
   }),
 );
 

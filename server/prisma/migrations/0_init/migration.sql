@@ -99,6 +99,9 @@ CREATE TABLE "User" (
     "avatarUrl" TEXT,
     "role" "UserRole" NOT NULL DEFAULT 'PET_OWNER',
     "status" "UserStatus" NOT NULL DEFAULT 'ACTIVE',
+    "lastLat" DECIMAL(9,6),
+    "lastLng" DECIMAL(9,6),
+    "lastLocationAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

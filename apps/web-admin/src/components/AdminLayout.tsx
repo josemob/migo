@@ -11,6 +11,7 @@ const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
   { to: '/usuarios', label: 'Usuarios & Mascotas', icon: 'team' },
   { to: '/finanzas', label: 'Finanzas & Liquidaciones', icon: 'finance' },
   { to: '/migo-ai', label: 'Migo AI & Contenido', icon: 'robot' },
+  { to: '/marketing', label: 'Marketing & Difusión', icon: 'send' },
   { to: '/configuracion', label: 'Configuración Global', icon: 'settings' },
 ];
 

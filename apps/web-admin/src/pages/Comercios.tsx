@@ -4,12 +4,6 @@ import { api } from '../lib/api';
 import { Badge, Card, ErrorNote, PageHeader, SectionTitle, Spinner } from '../components/ui';
 import { Icon } from '../components/Icon';
 
-interface Sponsorship {
-  id: string;
-  plan: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
-  startsAt: string;
-  expiresAt: string;
-}
 interface Clinic {
   id: string;
   name: string;
@@ -19,7 +13,6 @@ interface Clinic {
   plan: string;
   createdAt: string;
   status: 'PENDING' | 'ACTIVE' | 'SUSPENDED';
-  sponsorship?: Sponsorship | null;
 }
 interface ClinicsResp {
   data: Clinic[];
@@ -38,27 +31,16 @@ const statusBadge = (s: Tab) =>
 
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' });
 
-const PLAN_LABEL: Record<'WEEKLY' | 'BIWEEKLY' | 'MONTHLY', string> = { WEEKLY: 'Semanal', BIWEEKLY: 'Quincenal', MONTHLY: 'Mensual' };
 
 export default function Comercios() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>('PENDING');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [sponsorPlan, setSponsorPlan] = useState<'WEEKLY' | 'BIWEEKLY' | 'MONTHLY'>('MONTHLY');
 
   const { data, isLoading, error } = useQuery({ queryKey: ['admin-clinics'], queryFn: () => api<ClinicsResp>('/admin/clinics') });
 
   const mutation = useMutation({
     mutationFn: (v: { id: string; action: string }) => api(`/admin/clinics/${v.id}/status`, { method: 'POST', body: { action: v.action } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-clinics'] }),
-  });
-
-  const sponsorMutation = useMutation({
-    mutationFn: (v: { id: string; plan: string }) => api(`/admin/clinics/${v.id}/sponsorship`, { method: 'POST', body: { plan: v.plan } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-clinics'] }),
-  });
-  const cancelSponsorMutation = useMutation({
-    mutationFn: (id: string) => api(`/admin/clinics/${id}/sponsorship/cancel`, { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-clinics'] }),
   });
 
@@ -173,57 +155,6 @@ export default function Comercios() {
                     )}
                   </div>
                   {mutation.isError && <div className="mt-3"><ErrorNote error={mutation.error} /></div>}
-
-                  {/* ── Contenido patrocinado (destacado en búsqueda del cliente) ── */}
-                  {selected.status === 'ACTIVE' && (
-                    <div className="mt-6 border-t border-slate-100 pt-5">
-                      <div className="flex items-center gap-2">
-                        <Icon name="bolt" className="h-4 w-4 text-amber-500" />
-                        <span className="text-sm font-bold text-slate-800">Contenido patrocinado</span>
-                      </div>
-                      <p className="mt-1 text-xs text-slate-400">Aparece primero en la búsqueda para usuarios a menos de 10 km.</p>
-
-                      {selected.sponsorship ? (
-                        <div className="mt-3">
-                          <div className="flex items-center justify-between rounded-xl bg-amber-50 px-3 py-2 text-sm">
-                            <span className="font-semibold text-amber-700">
-                              {PLAN_LABEL[selected.sponsorship.plan]} · vigente
-                            </span>
-                            <span className="text-xs text-amber-600">hasta {fmtDate(selected.sponsorship.expiresAt)}</span>
-                          </div>
-                          <button
-                            disabled={cancelSponsorMutation.isPending}
-                            onClick={() => cancelSponsorMutation.mutate(selected.id)}
-                            className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-60"
-                          >
-                            Cancelar patrocinio
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="mt-3 flex gap-2">
-                          <select
-                            value={sponsorPlan}
-                            onChange={(e) => setSponsorPlan(e.target.value as typeof sponsorPlan)}
-                            className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm"
-                          >
-                            <option value="WEEKLY">Semanal (7 días)</option>
-                            <option value="BIWEEKLY">Quincenal (15 días)</option>
-                            <option value="MONTHLY">Mensual (30 días)</option>
-                          </select>
-                          <button
-                            disabled={sponsorMutation.isPending}
-                            onClick={() => sponsorMutation.mutate({ id: selected.id, plan: sponsorPlan })}
-                            className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-600 disabled:opacity-60"
-                          >
-                            Activar
-                          </button>
-                        </div>
-                      )}
-                      {(sponsorMutation.isError || cancelSponsorMutation.isError) && (
-                        <div className="mt-3"><ErrorNote error={sponsorMutation.error ?? cancelSponsorMutation.error} /></div>
-                      )}
-                    </div>
-                  )}
                 </div>
               )}
             </Card>

@@ -241,6 +241,12 @@ model User {
   role         UserRole   @default(PET_OWNER)
   status       UserStatus @default(ACTIVE)
 
+  // Última ubicación conocida (para el push a comercios por radio de km). Se
+  // actualiza al registrarse y al buscar en el directorio (la app ya envía lat/lng).
+  lastLat        Decimal?  @db.Decimal(9, 6)
+  lastLng        Decimal?  @db.Decimal(9, 6)
+  lastLocationAt DateTime?
+
   // relaciones
   pets               Pet[]
   ownedOrganizations Organization[] @relation("OrgOwner")
