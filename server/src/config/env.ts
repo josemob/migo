@@ -29,6 +29,12 @@ const schema = z.object({
 
   CPL_FEE_USD: z.coerce.number().default(5),
   BOOKING_COMMISSION_RATE: z.coerce.number().default(0.09),
+
+  // Correo transaccional (Resend). En modo test el remitente es onboarding@resend.dev.
+  RESEND_API_KEY: z.string().optional(),
+  MAIL_FROM: z.string().default('Migo <onboarding@resend.dev>'),
+  // URL pública del panel/app para enlaces dentro de los correos (si aplica).
+  APP_PUBLIC_URL: z.string().default('https://holamigo.app'),
 });
 
 const parsed = schema.safeParse(process.env);

@@ -134,6 +134,18 @@ CREATE TABLE "PushToken" (
 );
 
 -- CreateTable
+CREATE TABLE "PasswordResetCode" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "codeHash" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "usedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "PasswordResetCode_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "StaffInvitation" (
     "id" TEXT NOT NULL,
     "clinicId" TEXT NOT NULL,
@@ -731,6 +743,9 @@ CREATE UNIQUE INDEX "PushToken_token_key" ON "PushToken"("token");
 
 -- CreateIndex
 CREATE INDEX "PushToken_userId_idx" ON "PushToken"("userId");
+
+-- CreateIndex
+CREATE INDEX "PasswordResetCode_userId_idx" ON "PasswordResetCode"("userId");
 
 -- CreateIndex
 CREATE INDEX "StaffInvitation_userId_status_idx" ON "StaffInvitation"("userId", "status");

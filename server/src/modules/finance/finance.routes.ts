@@ -5,6 +5,7 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import { validate } from '../../middleware/validate';
 import { authenticate, requireRole } from '../../middleware/auth';
 import { withClinicContext } from '../../middleware/clinicContext';
+import { sendInvoiceReceiptEmail } from '../mail/mail.service';
 
 const router = Router();
 router.use(authenticate, withClinicContext);
@@ -175,6 +176,24 @@ router.post(
       }
       return inv;
     });
+
+    // Recibo de pago por correo (al admin/dueño del comercio)
+    const clinic = await prisma.clinic.findUnique({
+      where: { id: clinicId },
+      select: { name: true, organization: { select: { owner: { select: { email: true, fullName: true } } } } },
+    });
+    const owner = clinic?.organization?.owner;
+    if (owner?.email) {
+      const dateLabel = (invoice.paidAt ?? new Date()).toLocaleDateString('es-VE', { timeZone: 'America/Caracas', dateStyle: 'long' });
+      void sendInvoiceReceiptEmail(owner.email, owner.fullName ?? '', {
+        invoiceNumber: invoice.id.slice(0, 8).toUpperCase(),
+        amountLabel: `$${Number(invoice.totalUsd).toFixed(2)}`,
+        clinicName: clinic?.name ?? 'tu clínica',
+        dateLabel,
+        concept: 'Facturación Migo (leads CPL + plan) del período',
+      }).catch(() => {});
+    }
+
     res.json(invoice);
   }),
 );

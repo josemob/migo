@@ -8,13 +8,15 @@ import { withClinicContext } from '../../middleware/clinicContext';
 import { ApiError } from '../../utils/ApiError';
 import { env } from '../../config/env';
 import { sendPush } from '../push/push.service';
+import { sendAppointmentConfirmedEmail } from '../mail/mail.service';
 
 const router = Router();
 router.use(authenticate, withClinicContext);
 
 const detailInclude = {
-  pet: { include: { owner: { select: { id: true, fullName: true, phone: true, nationalId: true } } } },
+  pet: { include: { owner: { select: { id: true, fullName: true, email: true, phone: true, nationalId: true } } } },
   service: true,
+  clinic: { select: { name: true } },
   vet: { include: { user: { select: { fullName: true } } } },
 } as const;
 
@@ -196,6 +198,19 @@ router.post(
       };
       const n = NOTIF[req.body.status];
       if (n) void sendPush(ownerId, { ...n, data: { type: 'appointment', appointmentId: updated.id, status: req.body.status } });
+    }
+
+    // Correo de confirmación de cita (además del push)
+    if (req.body.status === 'CONFIRMED' && updated.pet?.owner?.email) {
+      const dateLabel = new Date(updated.scheduledAt).toLocaleString('es-VE', {
+        timeZone: 'America/Caracas', dateStyle: 'long', timeStyle: 'short',
+      });
+      void sendAppointmentConfirmedEmail(updated.pet.owner.email, updated.pet.owner.fullName ?? '', {
+        petName: updated.pet.name ?? 'tu mascota',
+        clinicName: updated.clinic?.name ?? 'la clínica',
+        dateLabel,
+        serviceName: updated.service?.name ?? null,
+      }).catch(() => {});
     }
 
     res.json(updated);

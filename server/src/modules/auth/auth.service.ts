@@ -10,6 +10,7 @@ import {
   ttlToDate,
 } from '../../utils/jwt';
 import { env } from '../../config/env';
+import { sendWelcomeEmail, sendPasswordResetEmail } from '../mail/mail.service';
 
 interface RegisterInput {
   email: string;
@@ -66,8 +67,41 @@ export const authService = {
       },
     });
 
+    // Correo de bienvenida (no bloquea el registro si el mail falla)
+    void sendWelcomeEmail(user.email, user.fullName).catch(() => {});
+
     const tokens = await issueTokens(user, userAgent);
     return { user: publicUser(user), ...tokens };
+  },
+
+  // Solicita restablecer contraseña: envía un código de 6 dígitos al correo.
+  // Nunca revela si el email existe (siempre resuelve OK).
+  async requestPasswordReset(email: string) {
+    const user = await prisma.user.findUnique({ where: { email }, select: { id: true, email: true, fullName: true } });
+    if (!user) return;
+    await prisma.passwordResetCode.updateMany({ where: { userId: user.id, usedAt: null }, data: { usedAt: new Date() } });
+    const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+    await prisma.passwordResetCode.create({
+      data: { userId: user.id, codeHash: hashToken(code), expiresAt: new Date(Date.now() + 15 * 60_000) },
+    });
+    void sendPasswordResetEmail(user.email, user.fullName, code).catch(() => {});
+  },
+
+  // Restablece la contraseña con el código recibido por correo.
+  async resetPassword(email: string, code: string, newPassword: string) {
+    const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+    if (!user) throw ApiError.badRequest('Código inválido o vencido');
+    const rec = await prisma.passwordResetCode.findFirst({
+      where: { userId: user.id, usedAt: null, expiresAt: { gt: new Date() }, codeHash: hashToken(code) },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!rec) throw ApiError.badRequest('Código inválido o vencido');
+    const passwordHash = await hashPassword(newPassword);
+    await prisma.$transaction([
+      prisma.user.update({ where: { id: user.id }, data: { passwordHash } }),
+      prisma.passwordResetCode.update({ where: { id: rec.id }, data: { usedAt: new Date() } }),
+      prisma.refreshToken.updateMany({ where: { userId: user.id, revokedAt: null }, data: { revokedAt: new Date() } }),
+    ]);
   },
 
   /**

@@ -78,4 +78,24 @@ router.get(
   }),
 );
 
+// Recuperación de contraseña por código enviado al correo
+router.post(
+  '/forgot-password',
+  validate({ body: z.object({ email: z.string().email() }) }),
+  asyncHandler(async (req, res) => {
+    await authService.requestPasswordReset(req.body.email);
+    // Respuesta genérica: no revela si el correo existe.
+    res.json({ ok: true });
+  }),
+);
+
+router.post(
+  '/reset-password',
+  validate({ body: z.object({ email: z.string().email(), code: z.string().length(6), newPassword: z.string().min(6) }) }),
+  asyncHandler(async (req, res) => {
+    await authService.resetPassword(req.body.email, req.body.code, req.body.newPassword);
+    res.json({ ok: true });
+  }),
+);
+
 export default router;

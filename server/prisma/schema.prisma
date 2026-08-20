@@ -295,6 +295,18 @@ model PushToken {
   @@index([userId])
 }
 
+// Código de 6 dígitos para restablecer la contraseña (enviado por correo, vence en 15 min).
+model PasswordResetCode {
+  id        String    @id @default(uuid())
+  userId    String
+  codeHash  String // hash del código (no se guarda en claro)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
 // Onboarding/KYC del personal de clínica (app Vet): selfie + cédula (+ carnet CMV si es vet).
 // El face-match automático deja un score; si es dudoso, pasa a revisión del Super Admin.
 enum KycStatus {
