@@ -43,6 +43,7 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import PetProfileScreen from './src/screens/PetProfileScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import RegisterPetScreen from './src/screens/RegisterPetScreen';
+import ReceiptsScreen from './src/screens/ReceiptsScreen';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
 
@@ -94,6 +95,7 @@ function MainApp() {
         <Stack.Screen name="PetDetail" component={PetDetailScreen} options={({ route }: any) => ({ title: route.params?.name ?? 'Ficha' })} />
         <Stack.Screen name="RegisterPet" component={RegisterPetScreen} options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="Configuracion" component={SettingsScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Receipts" component={ReceiptsScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Perfil" component={ProfileScreen} options={{ headerShown: false }} />
         <Stack.Screen name="PetProfile" component={PetProfileScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ClinicDetail" component={ClinicDetailScreen} options={{ headerShown: false }} />

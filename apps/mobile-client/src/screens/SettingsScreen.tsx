@@ -50,6 +50,7 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
       title: 'Cuenta',
       rows: [
         { icon: 'person', title: 'Información personal', sub: 'Cambia tu nombre, correo o foto de perfil.', onPress: () => navigation.navigate('Perfil') },
+        { icon: 'file', title: 'Mis recibos', sub: 'Historial de pagos y comprobantes (PDF).', onPress: () => navigation.navigate('Receipts') },
         { icon: 'finance', title: 'Métodos de pago', sub: 'Tarjetas guardadas y facturación.', onPress: soon },
       ],
     },
