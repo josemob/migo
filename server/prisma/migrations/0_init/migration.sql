@@ -88,6 +88,9 @@ CREATE TYPE "ChatSender" AS ENUM ('OWNER', 'CLINIC', 'SYSTEM');
 -- CreateEnum
 CREATE TYPE "ChatUrgency" AS ENUM ('CRITICA', 'MODERADA', 'BAJA');
 
+-- CreateEnum
+CREATE TYPE "ReceiptSource" AS ENUM ('APP', 'MANUAL');
+
 -- CreateTable
 CREATE TABLE "User" (
     "id" TEXT NOT NULL,
@@ -672,6 +675,23 @@ CREATE TABLE "Invoice" (
 );
 
 -- CreateTable
+CREATE TABLE "Receipt" (
+    "id" TEXT NOT NULL,
+    "clinicId" TEXT NOT NULL,
+    "ownerId" TEXT NOT NULL,
+    "petId" TEXT,
+    "appointmentId" TEXT,
+    "concept" TEXT NOT NULL,
+    "amountUsd" DECIMAL(10,2) NOT NULL,
+    "source" "ReceiptSource" NOT NULL DEFAULT 'APP',
+    "paymentMethod" TEXT,
+    "issuedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Receipt_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "Payout" (
     "id" TEXT NOT NULL,
     "clinicId" TEXT NOT NULL,
@@ -934,6 +954,15 @@ CREATE INDEX "Invoice_clinicId_status_idx" ON "Invoice"("clinicId", "status");
 CREATE INDEX "Invoice_dueAt_idx" ON "Invoice"("dueAt");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "Receipt_appointmentId_key" ON "Receipt"("appointmentId");
+
+-- CreateIndex
+CREATE INDEX "Receipt_ownerId_idx" ON "Receipt"("ownerId");
+
+-- CreateIndex
+CREATE INDEX "Receipt_clinicId_idx" ON "Receipt"("clinicId");
+
+-- CreateIndex
 CREATE INDEX "Payout_clinicId_status_idx" ON "Payout"("clinicId", "status");
 
 -- CreateIndex
@@ -1106,6 +1135,15 @@ ALTER TABLE "LedgerEntry" ADD CONSTRAINT "LedgerEntry_invoiceId_fkey" FOREIGN KE
 
 -- AddForeignKey
 ALTER TABLE "Invoice" ADD CONSTRAINT "Invoice_clinicId_fkey" FOREIGN KEY ("clinicId") REFERENCES "Clinic"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Receipt" ADD CONSTRAINT "Receipt_clinicId_fkey" FOREIGN KEY ("clinicId") REFERENCES "Clinic"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Receipt" ADD CONSTRAINT "Receipt_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Receipt" ADD CONSTRAINT "Receipt_petId_fkey" FOREIGN KEY ("petId") REFERENCES "Pet"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Payout" ADD CONSTRAINT "Payout_clinicId_fkey" FOREIGN KEY ("clinicId") REFERENCES "Clinic"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

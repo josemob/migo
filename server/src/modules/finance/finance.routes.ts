@@ -6,6 +6,7 @@ import { validate } from '../../middleware/validate';
 import { authenticate, requireRole } from '../../middleware/auth';
 import { withClinicContext } from '../../middleware/clinicContext';
 import { sendInvoiceReceiptEmail } from '../mail/mail.service';
+import { issueReceipt, receiptNumber } from '../receipts/receipt.service';
 
 const router = Router();
 router.use(authenticate, withClinicContext);
@@ -243,6 +244,58 @@ router.put(
       update: req.body,
     });
     res.json(account);
+  }),
+);
+
+// POST /finance/receipts -> emitir un recibo MANUAL al dueño (servicio hecho en el local)
+router.post(
+  '/receipts',
+  requireRole('CLINIC_ADMIN', 'SUPER_ADMIN'),
+  validate({
+    body: z.object({
+      ownerId: z.string().uuid(),
+      petId: z.string().uuid().optional(),
+      concept: z.string().min(1).max(200),
+      amountUsd: z.number().positive().max(100000),
+      paymentMethod: z.string().max(40).optional(),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const receipt = await issueReceipt({
+      clinicId: req.clinicId!,
+      ownerId: req.body.ownerId,
+      petId: req.body.petId ?? null,
+      concept: req.body.concept,
+      amountUsd: req.body.amountUsd,
+      source: 'MANUAL',
+      paymentMethod: req.body.paymentMethod ?? null,
+    });
+    res.status(201).json({ id: receipt.id, number: receiptNumber(receipt.id) });
+  }),
+);
+
+// GET /finance/receipts -> recibos emitidos por la clínica (dueño)
+router.get(
+  '/receipts',
+  asyncHandler(async (req, res) => {
+    const rows = await prisma.receipt.findMany({
+      where: { clinicId: req.clinicId! },
+      orderBy: { issuedAt: 'desc' },
+      take: 200,
+      include: { owner: { select: { fullName: true } }, pet: { select: { name: true } } },
+    });
+    const data = rows.map((r) => ({
+      id: r.id,
+      number: receiptNumber(r.id),
+      concept: r.concept,
+      amountUsd: Number(r.amountUsd),
+      source: r.source,
+      paymentMethod: r.paymentMethod,
+      issuedAt: r.issuedAt.toISOString(),
+      ownerName: r.owner?.fullName ?? null,
+      petName: r.pet?.name ?? null,
+    }));
+    res.json({ data });
   }),
 );
 

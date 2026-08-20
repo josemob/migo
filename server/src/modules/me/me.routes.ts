@@ -9,6 +9,7 @@ import { migoAiReply } from '../chat/aiChat.service';
 import { extractChatSummary } from '../chat/chatSummary.service';
 import { createStreamCredentials, streamConfigured, ensureChatChannel } from '../stream/stream.service';
 import { registerPushToken, removePushToken } from '../push/push.service';
+import { issueReceipt, receiptNumber } from '../receipts/receipt.service';
 
 const router = Router();
 router.use(authenticate);
@@ -416,6 +417,20 @@ router.post(
         pet: { select: { name: true } },
       },
     });
+
+    // Pago en la app -> emite recibo al dueño (comprobante + correo), sin bloquear
+    if (paid && priceUsd != null) {
+      void issueReceipt({
+        clinicId,
+        ownerId: req.user!.id,
+        petId,
+        appointmentId: appt.id,
+        concept: derivedReason ?? 'Servicio veterinario',
+        amountUsd: priceUsd,
+        source: 'APP',
+      }).catch(() => {});
+    }
+
     res.status(201).json(appt);
   }),
 );
@@ -705,6 +720,55 @@ router.post(
     if (!pet) throw ApiError.notFound('Mascota no encontrada');
     const allergy = await prisma.allergy.create({ data: { ...req.body, petId: pet.id } });
     res.status(201).json(allergy);
+  }),
+);
+
+// GET /me/receipts -> recibos/comprobantes del dueño
+router.get(
+  '/receipts',
+  asyncHandler(async (req, res) => {
+    const rows = await prisma.receipt.findMany({
+      where: { ownerId: req.user!.id },
+      orderBy: { issuedAt: 'desc' },
+      include: { clinic: { select: { name: true } }, pet: { select: { name: true } } },
+    });
+    const data = rows.map((r) => ({
+      id: r.id,
+      number: receiptNumber(r.id),
+      concept: r.concept,
+      amountUsd: Number(r.amountUsd),
+      source: r.source,
+      paymentMethod: r.paymentMethod,
+      issuedAt: r.issuedAt.toISOString(),
+      clinicName: r.clinic?.name ?? null,
+      petName: r.pet?.name ?? null,
+    }));
+    res.json({ data });
+  }),
+);
+
+// GET /me/receipts/:id -> detalle de un recibo
+router.get(
+  '/receipts/:id',
+  validate({ params: z.object({ id: z.string().uuid() }) }),
+  asyncHandler(async (req, res) => {
+    const r = await prisma.receipt.findFirst({
+      where: { id: req.params.id, ownerId: req.user!.id },
+      include: { clinic: { select: { name: true, address: true } }, pet: { select: { name: true } } },
+    });
+    if (!r) throw ApiError.notFound('Recibo no encontrado');
+    res.json({
+      id: r.id,
+      number: receiptNumber(r.id),
+      concept: r.concept,
+      amountUsd: Number(r.amountUsd),
+      source: r.source,
+      paymentMethod: r.paymentMethod,
+      issuedAt: r.issuedAt.toISOString(),
+      clinicName: r.clinic?.name ?? null,
+      clinicAddress: r.clinic?.address ?? null,
+      petName: r.pet?.name ?? null,
+    });
   }),
 );
 

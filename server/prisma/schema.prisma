@@ -255,6 +255,7 @@ model User {
   appointments       Appointment[]  @relation("AppointmentBookedBy")
   teleconsults       Teleconsult[]  @relation("TeleconsultOwner")
   reviews            Review[]
+  receipts           Receipt[]      @relation("ReceiptOwner")
   subscriptions      Subscription[]
   refreshTokens      RefreshToken[]
   pushTokens         PushToken[]
@@ -442,6 +443,7 @@ model Pet {
   emergencies   Emergency[]
   appointments  Appointment[]
   teleconsults  Teleconsult[]
+  receipts      Receipt[]       @relation("PetReceipts")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -636,6 +638,7 @@ model Clinic {
   invoices            Invoice[]
   settlementAccount   SettlementAccount?
   sponsorships        ClinicSponsorship[]
+  receipts            Receipt[]          @relation("ClinicReceipts")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1079,6 +1082,35 @@ model Invoice {
 
   @@index([clinicId, status])
   @@index([dueAt])
+}
+
+// Origen del recibo al dueño
+enum ReceiptSource {
+  APP // pago realizado en la app
+  MANUAL // emitido a mano por la clínica (servicio hecho en el local)
+}
+
+// Recibo/comprobante emitido por la clínica al DUEÑO por un servicio. Sin datos
+// fiscales (RIF) por ahora — es un comprobante simple. Se genera automáticamente
+// al pagar en la app, o manualmente desde el panel del vet.
+model Receipt {
+  id            String        @id @default(uuid())
+  clinic        Clinic        @relation("ClinicReceipts", fields: [clinicId], references: [id], onDelete: Cascade)
+  clinicId      String
+  owner         User          @relation("ReceiptOwner", fields: [ownerId], references: [id])
+  ownerId       String
+  pet           Pet?          @relation("PetReceipts", fields: [petId], references: [id])
+  petId         String?
+  appointmentId String?       @unique // vínculo opcional con la cita (evita duplicar recibo)
+  concept       String
+  amountUsd     Decimal       @db.Decimal(10, 2)
+  source        ReceiptSource @default(APP)
+  paymentMethod String? // "app" | "efectivo" | "transferencia" ...
+  issuedAt      DateTime      @default(now())
+  createdAt     DateTime      @default(now())
+
+  @@index([ownerId])
+  @@index([clinicId])
 }
 
 // Liquidación / payout a comercios

@@ -98,6 +98,29 @@ export async function sendAppointmentConfirmedEmail(
   });
 }
 
+export async function sendOwnerReceiptEmail(
+  to: string,
+  name: string,
+  d: { number: string; concept: string; amountLabel: string; clinicName: string; dateLabel: string; petName?: string | null },
+) {
+  const first = name?.split(' ')[0] || '';
+  return sendEmail({
+    to,
+    subject: `Recibo ${d.number} · ${d.clinicName}`,
+    html: layout('Recibo de tu pago',
+      p(`Hola${first ? ' ' + first : ''}, gracias por tu pago. Aquí está tu comprobante:`) +
+      `<div style="background:#F5EBFA;border-radius:12px;padding:16px;margin:6px 0 12px">
+        <div style="font-size:14px;color:#64748B">Recibo</div><div style="font-weight:700;margin-bottom:8px">${d.number}</div>
+        <div style="font-size:14px;color:#64748B">Concepto</div><div style="font-weight:700;margin-bottom:8px">${d.concept}</div>
+        ${d.petName ? `<div style="font-size:14px;color:#64748B">Mascota</div><div style="font-weight:700;margin-bottom:8px">${d.petName}</div>` : ''}
+        <div style="font-size:14px;color:#64748B">Clínica</div><div style="font-weight:700;margin-bottom:8px">${d.clinicName}</div>
+        <div style="font-size:14px;color:#64748B">Fecha</div><div style="font-weight:700;margin-bottom:8px">${d.dateLabel}</div>
+        <div style="font-size:14px;color:#64748B">Total pagado</div><div style="font-weight:800;font-size:18px;color:${BRAND}">${d.amountLabel}</div>
+      </div>` +
+      p('Puedes ver y descargar este recibo desde la app Migo. ¡Gracias por confiar en nosotros! 💜')),
+  });
+}
+
 export async function sendInvoiceReceiptEmail(
   to: string,
   name: string,
