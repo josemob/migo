@@ -22,6 +22,7 @@ export default function NewConsultScreen({ navigation, route }: any) {
   const [treatment, setTreatment] = useState('');
   const [rx, setRx] = useState<Rx[]>([]);
   const [busy, setBusy] = useState(false);
+  const [markDone, setMarkDone] = useState(true);
 
   const addRx = () => setRx((s) => [...s, { drug: '', dose: '', frequency: '' }]);
   const setRxAt = (i: number, patch: Partial<Rx>) => setRx((s) => s.map((r, j) => (j === i ? { ...r, ...patch } : r)));
@@ -45,6 +46,20 @@ export default function NewConsultScreen({ navigation, route }: any) {
           prescriptions: rx.filter((r) => r.drug.trim()).map((r) => ({ drug: r.drug.trim(), dose: r.dose.trim() || undefined, frequency: r.frequency.trim() || undefined })),
         },
       });
+
+      // Marca la cita de hoy de este paciente como concluida (si el vet lo dejó activo)
+      if (markDone) {
+        try {
+          const from = new Date(); from.setHours(0, 0, 0, 0);
+          const to = new Date(); to.setHours(23, 59, 59, 999);
+          const appts = await api<{ data: { id: string; status: string; pet: { id: string } }[] }>(
+            `/appointments?from=${from.toISOString()}&to=${to.toISOString()}`,
+          );
+          const match = appts.data.find((a) => a.pet?.id === petId && ['PENDING', 'CONFIRMED', 'IN_PROGRESS'].includes(a.status));
+          if (match) await api(`/appointments/${match.id}/status`, { method: 'POST', body: { status: 'COMPLETED' } });
+        } catch { /* no bloquea la emisión del expediente */ }
+      }
+
       navigation.replace('Report', { recordId: created.id, petId, name });
     } catch (e) {
       appAlert('No se pudo emitir', e instanceof Error ? e.message : 'Intenta de nuevo.');
@@ -117,7 +132,12 @@ export default function NewConsultScreen({ navigation, route }: any) {
           ))}
           <Pressable style={styles.addRx} onPress={addRx}><Text style={styles.addRxTxt}>+ Agregar medicamento</Text></Pressable>
 
-          <View style={{ marginTop: 22, gap: 10 }}>
+          <Pressable style={styles.checkRow} onPress={() => setMarkDone((v) => !v)}>
+            <View style={[styles.checkbox, markDone && styles.checkboxOn]}>{markDone && <Text style={styles.checkMark}>✓</Text>}</View>
+            <Text style={styles.checkLabel}>Marcar la cita de hoy como concluida</Text>
+          </Pressable>
+
+          <View style={{ marginTop: 16, gap: 10 }}>
             <Button title={busy ? 'Guardando…' : '✍️  Finalizar y firmar'} onPress={confirmSign} loading={busy} />
             <Pressable style={styles.draftBtn} onPress={() => emit(false)} disabled={busy}>
               <Text style={styles.draftTxt}>Guardar sin firmar</Text>
@@ -167,4 +187,9 @@ const styles = StyleSheet.create({
   addRxTxt: { color: colors.brand, fontWeight: '800', fontSize: 14 },
   draftBtn: { alignItems: 'center', paddingVertical: 12 },
   draftTxt: { color: colors.muted, fontWeight: '700', fontSize: 14 },
+  checkRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 22 },
+  checkbox: { width: 24, height: 24, borderRadius: 7, borderWidth: 2, borderColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  checkboxOn: { backgroundColor: colors.brand },
+  checkMark: { color: colors.white, fontSize: 15, fontWeight: '900' },
+  checkLabel: { fontSize: 14, fontWeight: '700', color: colors.text, flex: 1 },
 });

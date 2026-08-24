@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
   starOn: { color: colors.accent },
 
   tagsLabel: { fontSize: 15, fontWeight: '800', color: colors.text, marginTop: 22 },
-  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 },
+  tags: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10, marginTop: 12 },
   tag: { borderWidth: 1.5, borderColor: colors.brand, borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: colors.white },
   tagOn: { backgroundColor: colors.brand },
   tagText: { color: colors.brand, fontWeight: '700', fontSize: 13 },

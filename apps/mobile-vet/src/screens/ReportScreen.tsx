@@ -2,7 +2,6 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
-import { appAlert } from '../lib/dialog';
 import { BackButton } from '../components/BackButton';
 import { Button, Loading } from '../components/ui';
 import { cardShadow, colors, radius } from '../theme';
@@ -93,9 +92,6 @@ export default function ReportScreen({ navigation, route }: any) {
           </ScrollView>
 
           <View style={[styles.actions, { paddingBottom: insets.bottom + 20 }]}>
-            <View style={{ flex: 1 }}>
-              <Button title="Reenviar al dueño" variant="outline" onPress={() => appAlert('Informe disponible', 'El informe ya quedó guardado en el expediente digital del dueño; lo verá en su app. (El reenvío por chat/push llega en la próxima entrega.)')} />
-            </View>
             <View style={{ flex: 1 }}>
               <Button title="Volver a la ficha" onPress={() => navigation.goBack()} />
             </View>
