@@ -43,7 +43,7 @@ type TabKey = 'info' | 'services' | 'reviews';
 export default function ClinicDetailScreen({ navigation, route }: any) {
   const { id, distanceKm } = route.params as { id: string; name?: string; distanceKm?: number | null };
   const insets = useSafeAreaInsets();
-  const [tab, setTab] = useState<TabKey>('info');
+  const [tab, setTab] = useState<TabKey>('services');
 
   const { data: clinic, isLoading } = useQuery({
     queryKey: ['clinic', id],
@@ -80,8 +80,8 @@ export default function ClinicDetailScreen({ navigation, route }: any) {
   const showMap = hasCoords;
 
   const tabs: { key: TabKey; label: string }[] = [
-    { key: 'info', label: 'Información' },
     { key: 'services', label: 'Servicios' },
+    { key: 'info', label: 'Información' },
     { key: 'reviews', label: `Opiniones (${clinic.ratingCount})` },
   ];
 
