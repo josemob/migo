@@ -23,6 +23,7 @@ import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import KycScreen from './src/screens/KycScreen';
 import KycPendingScreen, { type Kyc } from './src/screens/KycPendingScreen';
+import IndependentHomeScreen from './src/screens/IndependentHomeScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import ClientsScreen from './src/screens/ClientsScreen';
 import AlertScreen from './src/screens/AlertScreen';
@@ -107,17 +108,21 @@ function MainApp() {
   );
 }
 
-/** Tras iniciar sesión: decide entre la app completa, el KYC o la pantalla de estado. */
+/** Tras iniciar sesión: decide entre la app completa (clínica), el home independiente,
+ *  el KYC o la pantalla de estado. */
 function StaffGate() {
   const [forceKyc, setForceKyc] = useState(false);
-  const q = useQuery({ queryKey: ['staff-kyc-me'], queryFn: () => api<{ kyc: Kyc | null; hasClinic: boolean }>('/staff-kyc/me') });
+  const kycQ = useQuery({ queryKey: ['staff-kyc-me'], queryFn: () => api<{ kyc: Kyc | null; hasClinic: boolean }>('/staff-kyc/me') });
+  const vetQ = useQuery({ queryKey: ['vet-profile-gate'], queryFn: () => api<{ isIndependent: boolean; hasClinic: boolean }>('/me/vet-profile') });
 
-  if (q.isLoading) return <Loading />;
-  const kyc = q.data?.kyc ?? null;
+  if (kycQ.isLoading || vetQ.isLoading) return <Loading />;
+  const kyc = kycQ.data?.kyc ?? null;
+  const refetch = () => { void kycQ.refetch(); void vetQ.refetch(); };
 
-  if (q.data?.hasClinic) return <MainApp />; // ya es staff de una clínica -> app completa
-  if (!kyc || forceKyc) return <KycScreen onSubmitted={() => { setForceKyc(false); void q.refetch(); }} />;
-  return <KycPendingScreen kyc={kyc} onRetry={() => setForceKyc(true)} onRefresh={() => void q.refetch()} />;
+  if (kycQ.data?.hasClinic) return <MainApp />; // ya es staff de una clínica -> app completa
+  if (vetQ.data?.isIndependent) return <IndependentHomeScreen onJoinedClinic={refetch} />; // verificado sin clínica
+  if (!kyc || forceKyc) return <KycScreen onSubmitted={() => { setForceKyc(false); refetch(); }} />;
+  return <KycPendingScreen kyc={kyc} onRetry={() => setForceKyc(true)} onRefresh={refetch} />;
 }
 
 function Root() {

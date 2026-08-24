@@ -582,8 +582,9 @@ CREATE TABLE "EmergencyAlert" (
 CREATE TABLE "Teleconsult" (
     "id" TEXT NOT NULL,
     "ownerId" TEXT NOT NULL,
-    "petId" TEXT NOT NULL,
+    "petId" TEXT,
     "vetId" TEXT,
+    "vetProfileId" TEXT,
     "type" "TeleconsultType" NOT NULL DEFAULT 'PAY_PER_EVENT',
     "status" "TeleconsultStatus" NOT NULL DEFAULT 'SCHEDULED',
     "scheduledAt" TIMESTAMP(3),
@@ -955,6 +956,9 @@ CREATE INDEX "Teleconsult_ownerId_idx" ON "Teleconsult"("ownerId");
 CREATE INDEX "Teleconsult_vetId_idx" ON "Teleconsult"("vetId");
 
 -- CreateIndex
+CREATE INDEX "Teleconsult_vetProfileId_idx" ON "Teleconsult"("vetProfileId");
+
+-- CreateIndex
 CREATE INDEX "Teleconsult_status_idx" ON "Teleconsult"("status");
 
 -- CreateIndex
@@ -1150,10 +1154,13 @@ ALTER TABLE "EmergencyAlert" ADD CONSTRAINT "EmergencyAlert_clinicId_fkey" FOREI
 ALTER TABLE "Teleconsult" ADD CONSTRAINT "Teleconsult_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Teleconsult" ADD CONSTRAINT "Teleconsult_petId_fkey" FOREIGN KEY ("petId") REFERENCES "Pet"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Teleconsult" ADD CONSTRAINT "Teleconsult_petId_fkey" FOREIGN KEY ("petId") REFERENCES "Pet"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Teleconsult" ADD CONSTRAINT "Teleconsult_vetId_fkey" FOREIGN KEY ("vetId") REFERENCES "ClinicStaff"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Teleconsult" ADD CONSTRAINT "Teleconsult_vetProfileId_fkey" FOREIGN KEY ("vetProfileId") REFERENCES "VetProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Review" ADD CONSTRAINT "Review_clinicId_fkey" FOREIGN KEY ("clinicId") REFERENCES "Clinic"("id") ON DELETE CASCADE ON UPDATE CASCADE;

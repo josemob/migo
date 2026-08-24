@@ -1,13 +1,22 @@
 import { useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { appAlert } from '../lib/dialog';
 import { capturePhotoAsDataUri } from '../lib/photo';
 import { Button } from '../components/ui';
+import { SpecialtyPicker } from '../components/SpecialtyPicker';
 import { TabIcon } from '../components/TabIcon';
 import { cardShadow, colors, radius, type } from '../theme';
+
+interface CarnetScan {
+  fullName: string | null;
+  nationalId: string | null;
+  collegiateNumber: string | null;
+  specialty: string | null;
+  source: 'gemini' | 'unavailable';
+}
 
 const ROLES = [
   { key: 'VET', label: 'Veterinario/a', icon: 'medical' },
@@ -27,8 +36,37 @@ export default function KycScreen({ onSubmitted }: { onSubmitted: () => void }) 
   const [collegiateNumber, setCollegiate] = useState('');
   const [specialty, setSpecialty] = useState('');
   const [busy, setBusy] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [scanNote, setScanNote] = useState<string | null>(null);
 
   const isVet = position === 'VET';
+
+  // Fase B: toma el carnet CMV y lo lee con IA (visión) para SUGERIR colegiado/especialidad.
+  // El vet siempre confirma/edita; nunca se guarda a ciegas.
+  const captureCarnet = async () => {
+    const uri = await capturePhotoAsDataUri({ aspect: [16, 10] });
+    if (!uri) return;
+    setCmvCard(uri);
+    setScanning(true);
+    setScanNote(null);
+    try {
+      const r = await api<CarnetScan>('/staff-kyc/scan-carnet', { method: 'POST', body: { image: uri } });
+      if (r.source === 'gemini') {
+        if (r.collegiateNumber && !collegiateNumber.trim()) setCollegiate(r.collegiateNumber);
+        if (r.specialty && !specialty.trim()) setSpecialty(r.specialty);
+        const bits = [
+          r.fullName && `Nombre: ${r.fullName}`,
+          r.collegiateNumber && `Colegiado: ${r.collegiateNumber}`,
+          r.specialty && `Especialidad: ${r.specialty}`,
+        ].filter(Boolean) as string[];
+        setScanNote(bits.length ? `Detectado del carnet — revisa y corrige:\n${bits.join(' · ')}` : 'No pudimos leer datos del carnet. Complétalos manualmente.');
+      }
+    } catch {
+      // silencioso: el ingreso manual siempre está disponible
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const submit = async () => {
     if (!position) return appAlert('Falta el rol', 'Selecciona tu rol en la clínica.');
@@ -89,11 +127,19 @@ export default function KycScreen({ onSubmitted }: { onSubmitted: () => void }) 
 
         {isVet && (
           <>
-            <Capture label="Carnet CMV" hint="Colegio de Médicos Veterinarios" value={cmvCard} onPress={async () => setCmvCard(await capturePhotoAsDataUri({ aspect: [16, 10] }))} icon="medical" />
+            <Capture label="Carnet CMV" hint="Lo leemos con IA para autocompletar" value={cmvCard} onPress={captureCarnet} icon="medical" />
+            {scanning && (
+              <View style={styles.scanRow}>
+                <ActivityIndicator size="small" color={colors.brand} />
+                <Text style={styles.scanTxt}>Leyendo el carnet…</Text>
+              </View>
+            )}
+            {scanNote && <View style={styles.scanNote}><Text style={styles.scanNoteTxt}>{scanNote}</Text></View>}
+
             <Text style={styles.label}>N° de colegiado</Text>
             <TextInput style={styles.input} value={collegiateNumber} onChangeText={setCollegiate} placeholder="CMV-0000" placeholderTextColor={colors.muted} />
             <Text style={styles.label}>Especialidad (opcional)</Text>
-            <TextInput style={styles.input} value={specialty} onChangeText={setSpecialty} placeholder="Ej. Cirugía & Medicina Interna" placeholderTextColor={colors.muted} />
+            <SpecialtyPicker value={specialty} onChange={setSpecialty} />
           </>
         )}
 
@@ -149,4 +195,9 @@ const styles = StyleSheet.create({
 
   label: { ...type.bodySmall, fontWeight: '700', color: colors.text, marginTop: 8, marginBottom: 6 },
   input: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 13, fontSize: 16, color: colors.text },
+
+  scanRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  scanTxt: { fontSize: 13, color: colors.muted, fontWeight: '600' },
+  scanNote: { backgroundColor: colors.brandLight, borderRadius: radius.md, padding: 12, marginBottom: 8 },
+  scanNoteTxt: { fontSize: 13, color: colors.brandDark, lineHeight: 19 },
 });

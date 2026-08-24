@@ -756,6 +756,9 @@ model VetProfile {
   serviceLng      Decimal? @db.Decimal(9, 6)
   serviceRadiusKm Int      @default(15)
 
+  // Teleconsultas atendidas como vet independiente (telemedicina)
+  teleconsults Teleconsult[] @relation("TeleconsultIndependentVet")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -936,10 +939,13 @@ model Teleconsult {
   id      String       @id @default(uuid())
   owner   User         @relation("TeleconsultOwner", fields: [ownerId], references: [id])
   ownerId String
-  pet     Pet          @relation(fields: [petId], references: [id])
-  petId   String
+  pet     Pet?         @relation(fields: [petId], references: [id])
+  petId   String?
   vet     ClinicStaff? @relation("TeleconsultVet", fields: [vetId], references: [id])
   vetId   String?
+  // Vet INDEPENDIENTE que atiende (telemedicina sin clínica). Alternativo a `vet`.
+  vetProfile   VetProfile? @relation("TeleconsultIndependentVet", fields: [vetProfileId], references: [id])
+  vetProfileId String?
 
   type         TeleconsultType   @default(PAY_PER_EVENT)
   status       TeleconsultStatus @default(SCHEDULED)
@@ -957,6 +963,7 @@ model Teleconsult {
 
   @@index([ownerId])
   @@index([vetId])
+  @@index([vetProfileId])
   @@index([status])
 }
 

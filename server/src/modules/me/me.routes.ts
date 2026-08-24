@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { prisma } from '../../config/prisma';
 import { asyncHandler } from '../../utils/asyncHandler';
@@ -866,6 +867,90 @@ router.patch(
     const updated = await prisma.vetProfile.update({ where: { userId: req.user!.id }, data: req.body }).catch(() => null);
     if (!updated) throw ApiError.notFound('Aún no tienes perfil profesional. Completa tu verificación (KYC) primero.');
     res.json({ ok: true });
+  }),
+);
+
+// Gate de telemedicina para el vet INDEPENDIENTE: verificado, sin clínica y con
+// suscripción ACTIVE. Devuelve el perfil o lanza 403 con un mensaje claro.
+async function requireIndependentTelemedicine(userId: string) {
+  const [profile, sub, staff] = await Promise.all([
+    prisma.vetProfile.findUnique({ where: { userId } }),
+    prisma.vetSubscription.findUnique({ where: { userId } }),
+    prisma.clinicStaff.findUnique({ where: { userId }, select: { id: true } }),
+  ]);
+  if (!profile || profile.verificationStatus !== 'VERIFIED') {
+    throw ApiError.forbidden('Tu perfil profesional aún no está verificado.');
+  }
+  if (staff) {
+    throw ApiError.forbidden('Perteneces a una clínica; la teleconsulta se gestiona desde la clínica.');
+  }
+  if (!sub || sub.status !== 'ACTIVE') {
+    throw ApiError.forbidden('Necesitas una suscripción de telemedicina activa.');
+  }
+  return profile;
+}
+
+// GET /me/teleconsults -> historial de teleconsultas atendidas como vet independiente
+router.get(
+  '/teleconsults',
+  asyncHandler(async (req, res) => {
+    const profile = await prisma.vetProfile.findUnique({ where: { userId: req.user!.id }, select: { id: true } });
+    if (!profile) return res.json({ data: [] });
+    const rows = await prisma.teleconsult.findMany({
+      where: { vetProfileId: profile.id },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      include: { owner: { select: { fullName: true } }, pet: { select: { name: true } } },
+    });
+    res.json({
+      data: rows.map((t) => ({
+        id: t.id,
+        status: t.status,
+        createdAt: t.createdAt,
+        scheduledAt: t.scheduledAt,
+        ownerName: t.owner?.fullName ?? null,
+        petName: t.pet?.name ?? null,
+        reason: t.notes ?? null,
+      })),
+    });
+  }),
+);
+
+// POST /me/teleconsults -> el vet independiente inicia una teleconsulta (persiste la sala).
+// El video (Stream) se conecta en una fase posterior usando `agoraChannel`.
+router.post(
+  '/teleconsults',
+  validate({
+    body: z.object({
+      ownerId: z.string().uuid(),
+      petId: z.string().uuid().optional(),
+      reason: z.string().max(500).optional(),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const profile = await requireIndependentTelemedicine(req.user!.id);
+    const { ownerId, petId, reason } = req.body as { ownerId: string; petId?: string; reason?: string };
+
+    const owner = await prisma.user.findUnique({ where: { id: ownerId }, select: { id: true } });
+    if (!owner) throw ApiError.notFound('Dueño no encontrado.');
+    if (petId) {
+      const pet = await prisma.pet.findFirst({ where: { id: petId, ownerId }, select: { id: true } });
+      if (!pet) throw ApiError.badRequest('La mascota no pertenece a ese dueño.');
+    }
+
+    const tele = await prisma.teleconsult.create({
+      data: {
+        ownerId,
+        petId: petId ?? null,
+        vetProfileId: profile.id,
+        type: 'PAY_PER_EVENT',
+        status: 'SCHEDULED',
+        agoraChannel: randomUUID(),
+        notes: reason ?? null,
+      },
+      select: { id: true, status: true, agoraChannel: true, createdAt: true },
+    });
+    res.status(201).json(tele);
   }),
 );
 

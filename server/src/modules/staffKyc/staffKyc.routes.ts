@@ -6,11 +6,37 @@ import { validate } from '../../middleware/validate';
 import { authenticate } from '../../middleware/auth';
 import { ApiError } from '../../utils/ApiError';
 import { matchFaces } from './faceMatch.service';
+import { scanCarnet } from './carnetScan.service';
+import { VET_SPECIALTIES } from './specialties';
 
 const router = Router();
 router.use(authenticate);
 
 const POSITIONS = ['VET', 'GROOMER', 'SUPPORT', 'RECEPTIONIST', 'BRANCH_ADMIN'] as const;
+
+// GET /staff-kyc/specialties -> taxonomía estándar de especialidades (lista cerrada + "Otra")
+router.get(
+  '/specialties',
+  asyncHandler(async (_req, res) => {
+    res.json({ data: VET_SPECIALTIES });
+  }),
+);
+
+// POST /staff-kyc/scan-carnet -> lee el carnet CMV con IA (visión) y devuelve campos
+// SUGERIDOS. No guarda nada: el veterinario los confirma/edita antes de enviar el KYC.
+router.post(
+  '/scan-carnet',
+  validate({ body: z.object({ image: z.string().min(50) }) }),
+  asyncHandler(async (req, res) => {
+    try {
+      const result = await scanCarnet(req.body.image);
+      res.json(result);
+    } catch {
+      // Nunca bloquear el onboarding por una falla de IA: cae a ingreso manual.
+      res.json({ fullName: null, nationalId: null, collegiateNumber: null, specialty: null, source: 'unavailable' });
+    }
+  }),
+);
 
 // GET /staff-kyc/me -> estado del onboarding del usuario logueado (para la pantalla de "en revisión")
 router.get(

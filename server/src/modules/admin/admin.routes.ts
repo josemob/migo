@@ -571,11 +571,35 @@ router.post(
   asyncHandler(async (req, res) => {
     const sub = await prisma.staffKyc.findUnique({ where: { id: req.params.id } });
     if (!sub) throw ApiError.notFound('Solicitud no encontrada');
-    const status = req.body.action === 'approve' ? 'APPROVED' : 'REJECTED';
+    const approve = req.body.action === 'approve';
+    const status = approve ? 'APPROVED' : 'REJECTED';
     const updated = await prisma.staffKyc.update({
       where: { id: sub.id },
       data: { status, reviewNotes: req.body.notes, reviewedById: req.user!.id, reviewedAt: new Date() },
     });
+
+    // Propaga la decisión al perfil profesional INDEPENDIENTE (VetProfile). Al aprobar,
+    // el vet queda VERIFIED (independiente/telemedicina); al rechazar, REJECTED. La
+    // suscripción de telemedicina gratuita se garantiza al aprobar.
+    await prisma.vetProfile
+      .update({
+        where: { userId: sub.userId },
+        data: {
+          verificationStatus: approve ? 'VERIFIED' : 'REJECTED',
+          verifiedAt: approve ? new Date() : null,
+        },
+      })
+      .catch(() => {});
+    if (approve) {
+      await prisma.vetSubscription
+        .upsert({
+          where: { userId: sub.userId },
+          create: { userId: sub.userId, plan: 'FREE', status: 'ACTIVE' },
+          update: {},
+        })
+        .catch(() => {});
+    }
+
     res.json({ id: updated.id, status: updated.status });
   }),
 );
