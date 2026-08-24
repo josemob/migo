@@ -326,6 +326,9 @@ CREATE TABLE "MedicalRecord" (
     "notes" TEXT,
     "attachments" JSONB,
     "signedAt" TIMESTAMP(3),
+    "signedByName" TEXT,
+    "signedByLicense" TEXT,
+    "signedBySpecialty" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

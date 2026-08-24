@@ -112,10 +112,27 @@ router.post(
   }),
   asyncHandler(async (req, res) => {
     const { prescriptions, sign, ...record } = req.body;
+
+    // Al firmar, se guarda un snapshot del firmante (nombre + colegiado + especialidad)
+    // para que la firma persista aunque el vet deje la clínica.
+    let signSnapshot: { signedByName?: string | null; signedByLicense?: string | null; signedBySpecialty?: string | null } = {};
+    if (sign && req.staffId) {
+      const staff = await prisma.clinicStaff.findUnique({
+        where: { id: req.staffId },
+        select: { collegiateNumber: true, specialty: true, user: { select: { fullName: true } } },
+      });
+      signSnapshot = {
+        signedByName: staff?.user?.fullName ?? null,
+        signedByLicense: staff?.collegiateNumber ?? null,
+        signedBySpecialty: staff?.specialty ?? null,
+      };
+    }
+
     const created = await prisma.medicalRecord.create({
       data: {
         ...record,
         signedAt: sign ? new Date() : null,
+        ...signSnapshot,
         petId: req.params.petId,
         clinicId: req.clinicId!,
         vetId: req.staffId,

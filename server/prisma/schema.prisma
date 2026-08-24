@@ -539,6 +539,10 @@ model MedicalRecord {
   notes       String?
   attachments Json? // urls a exámenes/imágenes
   signedAt    DateTime? // "finalizar y firmar": queda firmado por el vet (vetId) en esta fecha
+  // Snapshot del firmante — persiste aunque el vet deje la clínica y se borre su ClinicStaff
+  signedByName      String?
+  signedByLicense   String? // nº colegiado
+  signedBySpecialty String?
 
   prescriptions Prescription[]
 

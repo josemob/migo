@@ -24,6 +24,7 @@ interface RecordDetail {
   signedAt?: string | null;
   vetName?: string | null;
   vetSpecialty?: string | null;
+  vetLicense?: string | null;
   clinicName?: string | null;
   petName?: string | null;
   petBreed?: string | null;
@@ -39,7 +40,7 @@ function recordHtml(r: RecordDetail): string {
       r.prescriptions.map((p) => `<div style="border:1px solid #E2E8F0;border-radius:10px;padding:10px;margin-bottom:8px"><b>${p.drug}</b>${p.dose ? ` · ${p.dose}` : ''}${p.frequency ? ` · ${p.frequency}` : ''}${p.durationDays ? ` · ${p.durationDays} días` : ''}${p.instructions ? `<div style="color:#64748B;font-size:13px;margin-top:3px">${p.instructions}</div>` : ''}</div>`).join('')
     : '';
   const sign = r.signedAt
-    ? `<div style="margin-top:22px;border-top:1px solid #E2E8F0;padding-top:14px"><div style="font-size:13px;color:#2EA84F;font-weight:700">✓ Firmado digitalmente</div><div style="font-size:14px;color:#1E293B;margin-top:2px">${r.vetName ?? 'Médico veterinario'}${r.vetSpecialty ? ` · ${r.vetSpecialty}` : ''}</div><div style="font-size:12px;color:#94A3B8">${longDate(r.signedAt)}${r.clinicName ? ` · ${r.clinicName}` : ''}</div></div>`
+    ? `<div style="margin-top:22px;border-top:1px solid #E2E8F0;padding-top:14px"><div style="font-size:13px;color:#2EA84F;font-weight:700">✓ Firmado digitalmente</div><div style="font-size:14px;color:#1E293B;margin-top:2px">${r.vetName ?? 'Médico veterinario'}${r.vetSpecialty ? ` · ${r.vetSpecialty}` : ''}${r.vetLicense ? ` · Colegiado #${r.vetLicense}` : ''}</div><div style="font-size:12px;color:#94A3B8">${longDate(r.signedAt)}${r.clinicName ? ` · ${r.clinicName}` : ''}</div></div>`
     : `<div style="margin-top:22px;font-size:12px;color:#94A3B8">Informe sin firma.</div>`;
   return `<html><body style="font-family:Helvetica,Arial,sans-serif;color:#1E293B;margin:0;padding:32px">
     <div style="text-align:center;margin-bottom:18px">
@@ -99,7 +100,7 @@ export default function RecordDetailScreen({ route, navigation }: { route: any; 
             <Text style={styles.meta}>{longDate(data.visitedAt)}{data.clinicName ? ` · ${data.clinicName}` : ''}</Text>
             {data.signedAt ? (
               <View style={styles.signed}>
-                <Text style={styles.signedTxt}>✓ Firmado por {data.vetName ?? 'el veterinario'}{data.vetSpecialty ? ` · ${data.vetSpecialty}` : ''}</Text>
+                <Text style={styles.signedTxt}>✓ Firmado por {data.vetName ?? 'el veterinario'}{data.vetSpecialty ? ` · ${data.vetSpecialty}` : ''}{data.vetLicense ? ` · Colegiado #${data.vetLicense}` : ''}</Text>
               </View>
             ) : (
               <View style={styles.draft}><Text style={styles.draftTxt}>Informe sin firmar</Text></View>

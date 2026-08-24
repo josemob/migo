@@ -798,8 +798,10 @@ router.get(
       weightKg: r.weightKg != null ? Number(r.weightKg) : null,
       temperature: r.temperature != null ? Number(r.temperature) : null,
       signedAt: r.signedAt ? r.signedAt.toISOString() : null,
-      vetName: r.vet?.user?.fullName ?? null,
-      vetSpecialty: r.vet?.specialty ?? null,
+      // Prioriza el snapshot de la firma (persiste aunque el vet ya no esté en la clínica)
+      vetName: r.signedByName ?? r.vet?.user?.fullName ?? null,
+      vetSpecialty: r.signedBySpecialty ?? r.vet?.specialty ?? null,
+      vetLicense: r.signedByLicense ?? r.vet?.collegiateNumber ?? null,
       clinicName: r.clinic?.name ?? null,
       petName: r.pet?.name ?? null,
       petBreed: r.pet?.breed ?? null,
