@@ -68,7 +68,8 @@
       "expo-sharing",
       "@maplibre/maplibre-react-native",
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "@react-native-google-signin/google-signin"
     ],
     "extra": {
       "eas": {
