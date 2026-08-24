@@ -772,4 +772,46 @@ router.get(
   }),
 );
 
+// GET /me/records/:id -> detalle de una consulta del expediente (del dueño)
+router.get(
+  '/records/:id',
+  validate({ params: z.object({ id: z.string().uuid() }) }),
+  asyncHandler(async (req, res) => {
+    const r = await prisma.medicalRecord.findFirst({
+      where: { id: req.params.id, pet: { ownerId: req.user!.id } },
+      include: {
+        pet: { select: { name: true, breed: true } },
+        clinic: { select: { name: true } },
+        vet: { include: { user: { select: { fullName: true } } } },
+        prescriptions: true,
+      },
+    });
+    if (!r) throw ApiError.notFound('Consulta no encontrada');
+    res.json({
+      id: r.id,
+      visitedAt: r.visitedAt.toISOString(),
+      reason: r.reason,
+      symptoms: r.symptoms,
+      diagnosis: r.diagnosis,
+      treatment: r.treatment,
+      notes: r.notes,
+      weightKg: r.weightKg != null ? Number(r.weightKg) : null,
+      temperature: r.temperature != null ? Number(r.temperature) : null,
+      signedAt: r.signedAt ? r.signedAt.toISOString() : null,
+      vetName: r.vet?.user?.fullName ?? null,
+      vetSpecialty: r.vet?.specialty ?? null,
+      clinicName: r.clinic?.name ?? null,
+      petName: r.pet?.name ?? null,
+      petBreed: r.pet?.breed ?? null,
+      prescriptions: r.prescriptions.map((pr) => ({
+        drug: pr.drug,
+        dose: pr.dose,
+        frequency: pr.frequency,
+        durationDays: pr.durationDays,
+        instructions: pr.instructions,
+      })),
+    });
+  }),
+);
+
 export default router;

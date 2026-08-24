@@ -1,5 +1,8 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { api } from '../lib/api';
 import { appAlert } from '../lib/dialog';
 import { Badge, Button, Card, Loading, Muted, Screen } from '../components/ui';
@@ -14,7 +17,7 @@ interface Ficha {
   conditions: { name: string }[];
   vaccinations: { vaccineName: string; nextDueAt?: string }[];
   prescriptions: { drug: string; frequency?: string }[];
-  records: { id: string; visitedAt: string; reason?: string; clinic?: { name: string } }[];
+  records: { id: string; visitedAt: string; reason?: string; signedAt?: string | null; clinic?: { name: string } }[];
 }
 
 interface AiSummary {
@@ -33,10 +36,25 @@ const URGENCY: Record<AiSummary['perceivedUrgency'], { label: string; color: str
   BAJA: { label: 'Baja', color: colors.green },
 };
 
-export default function PetDetailScreen({ route }: { route: any }) {
+export default function PetDetailScreen({ route, navigation }: { route: any; navigation: any }) {
   const { id } = route.params;
+  const [exporting, setExporting] = useState(false);
   const { data, isLoading } = useQuery({ queryKey: ['pet', id], queryFn: () => api<Ficha>(`/me/pets/${id}`) });
   const ai = useQuery({ queryKey: ['pet-ai', id], queryFn: () => api<{ data: AiSummary[] }>(`/me/pets/${id}/chat-summaries`) });
+
+  const exportPdf = async () => {
+    if (!data) return;
+    try {
+      setExporting(true);
+      const { uri } = await Print.printToFileAsync({ html: expedienteHtml(data) });
+      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: `Expediente de ${data.name}`, UTI: 'com.adobe.pdf' });
+      else appAlert('Expediente', `PDF generado en: ${uri}`);
+    } catch (e) {
+      appAlert('No se pudo exportar', e instanceof Error ? e.message : 'Intenta de nuevo');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   if (isLoading || !data) return <Loading />;
   const upToDate = (d?: string) => !d || new Date(d) > new Date();
@@ -84,12 +102,18 @@ export default function PetDetailScreen({ route }: { route: any }) {
         <Text style={styles.section}>Historial de visitas</Text>
         {data.records.length === 0 && <Muted>Sin visitas registradas.</Muted>}
         {data.records.map((r) => (
-          <View key={r.id} style={styles.visit}>
-            <Text style={styles.item}>{r.reason ?? 'Consulta'}</Text>
-            <Muted>
-              {new Date(r.visitedAt).toLocaleDateString('es-VE')} {r.clinic ? `· ${r.clinic.name}` : ''}
-            </Muted>
-          </View>
+          <Pressable key={r.id} style={styles.visit} onPress={() => navigation.navigate('RecordDetail', { id: r.id })}>
+            <View style={{ flex: 1 }}>
+              <View style={styles.visitTop}>
+                <Text style={styles.item}>{r.reason ?? 'Consulta'}</Text>
+                {r.signedAt ? <Badge text="Firmado" color={colors.green} /> : null}
+              </View>
+              <Muted>
+                {new Date(r.visitedAt).toLocaleDateString('es-VE')} {r.clinic ? `· ${r.clinic.name}` : ''}
+              </Muted>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </Pressable>
         ))}
       </Card>
 
@@ -117,12 +141,36 @@ export default function PetDetailScreen({ route }: { route: any }) {
       </Card>
 
       <Button
-        title="Exportar expediente médico"
+        title={exporting ? 'Generando PDF…' : 'Exportar expediente médico (PDF)'}
         variant="outline"
-        onPress={() => appAlert('Migo', 'Exportación del expediente disponible próximamente.')}
+        loading={exporting}
+        onPress={exportPdf}
       />
     </Screen>
   );
+}
+
+// PDF del expediente completo (resumen) para compartir/descargar.
+function expedienteHtml(d: Ficha): string {
+  const sec = (t: string, inner: string) => `<div style="margin-top:16px"><div style="font-size:13px;font-weight:800;color:#8A2FA0;margin-bottom:6px">${t}</div>${inner}</div>`;
+  const li = (t: string) => `<div style="font-size:14px;color:#1E293B;padding:3px 0">• ${t}</div>`;
+  const visits = d.records.length
+    ? d.records.map((r) => `<div style="font-size:14px;padding:4px 0;border-top:1px solid #EEE">${r.reason ?? 'Consulta'} <span style="color:#94A3B8">— ${new Date(r.visitedAt).toLocaleDateString('es-VE')}${r.clinic ? ` · ${r.clinic.name}` : ''}${r.signedAt ? ' · ✓ firmado' : ''}</span></div>`).join('')
+    : '<div style="color:#94A3B8;font-size:14px">Sin visitas.</div>';
+  return `<html><body style="font-family:Helvetica,Arial,sans-serif;color:#1E293B;margin:0;padding:32px">
+    <div style="text-align:center;margin-bottom:14px">
+      <div style="display:inline-block;width:48px;height:48px;line-height:48px;border-radius:14px;background:#8A2FA0;color:#fff;font-size:24px;font-weight:800">M</div>
+      <div style="font-size:22px;font-weight:800;margin-top:8px">Expediente médico</div>
+      <div style="color:#94A3B8;font-size:13px">${d.name}${d.breed ? ` · ${d.breed}` : ''}${d.weightKg ? ` · ${d.weightKg} kg` : ''}</div>
+    </div>
+    <div style="border:1px solid #E2E8F0;border-radius:14px;padding:20px">
+      ${d.allergies.length ? sec('Alergias', d.allergies.map((a) => li(a.substance)).join('')) : ''}
+      ${d.conditions.length ? sec('Preexistencias', d.conditions.map((c) => li(c.name)).join('')) : ''}
+      ${d.vaccinations.length ? sec('Vacunación', d.vaccinations.map((v) => li(v.vaccineName)).join('')) : ''}
+      ${sec('Historial de visitas', visits)}
+    </div>
+    <p style="text-align:center;color:#94A3B8;font-size:12px;margin-top:16px">Generado por Migo. Resumen del expediente.</p>
+  </body></html>`;
 }
 
 const styles = StyleSheet.create({
@@ -131,7 +179,9 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   item: { fontSize: 15, color: colors.text },
   vaxRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
-  visit: { paddingVertical: 6, borderTopWidth: 1, borderTopColor: colors.border },
+  visit: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.border },
+  visitTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  chevron: { fontSize: 24, color: '#C9BBD3' },
   aiItem: { paddingVertical: 10, gap: 4, borderTopWidth: 1, borderTopColor: colors.border },
   aiHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   aiReason: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.text },

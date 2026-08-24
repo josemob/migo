@@ -325,6 +325,7 @@ CREATE TABLE "MedicalRecord" (
     "temperature" DECIMAL(4,1),
     "notes" TEXT,
     "attachments" JSONB,
+    "signedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

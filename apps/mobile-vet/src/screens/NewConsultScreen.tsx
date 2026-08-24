@@ -27,7 +27,7 @@ export default function NewConsultScreen({ navigation, route }: any) {
   const setRxAt = (i: number, patch: Partial<Rx>) => setRx((s) => s.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const delRx = (i: number) => setRx((s) => s.filter((_, j) => j !== i));
 
-  const emit = async () => {
+  const emit = async (sign: boolean) => {
     if (!symptoms.trim() && !diagnosis.trim()) return appAlert('Faltan datos', 'Ingresa al menos los síntomas o el diagnóstico.');
     setBusy(true);
     try {
@@ -41,6 +41,7 @@ export default function NewConsultScreen({ navigation, route }: any) {
           weightKg: weight ? Number(weight) : undefined,
           temperature: temp ? Number(temp) : undefined,
           notes: fc ? `F.C.: ${fc} lpm` : undefined,
+          sign,
           prescriptions: rx.filter((r) => r.drug.trim()).map((r) => ({ drug: r.drug.trim(), dose: r.dose.trim() || undefined, frequency: r.frequency.trim() || undefined })),
         },
       });
@@ -51,6 +52,12 @@ export default function NewConsultScreen({ navigation, route }: any) {
       setBusy(false);
     }
   };
+
+  const confirmSign = () =>
+    appAlert('Finalizar y firmar', 'Al firmar, el informe queda finalizado y visible para el dueño con tu firma. ¿Continuar?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Firmar', onPress: () => emit(true) },
+    ]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -110,8 +117,11 @@ export default function NewConsultScreen({ navigation, route }: any) {
           ))}
           <Pressable style={styles.addRx} onPress={addRx}><Text style={styles.addRxTxt}>+ Agregar medicamento</Text></Pressable>
 
-          <View style={{ marginTop: 22 }}>
-            <Button title={busy ? 'Emitiendo…' : 'Firmar y Emitir Informe'} onPress={emit} loading={busy} />
+          <View style={{ marginTop: 22, gap: 10 }}>
+            <Button title={busy ? 'Guardando…' : '✍️  Finalizar y firmar'} onPress={confirmSign} loading={busy} />
+            <Pressable style={styles.draftBtn} onPress={() => emit(false)} disabled={busy}>
+              <Text style={styles.draftTxt}>Guardar sin firmar</Text>
+            </Pressable>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -155,4 +165,6 @@ const styles = StyleSheet.create({
   rxDel: { fontSize: 13, color: colors.red, fontWeight: '700' },
   addRx: { alignItems: 'center', paddingVertical: 12, marginTop: 10, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.brand, borderStyle: 'dashed' },
   addRxTxt: { color: colors.brand, fontWeight: '800', fontSize: 14 },
+  draftBtn: { alignItems: 'center', paddingVertical: 12 },
+  draftTxt: { color: colors.muted, fontWeight: '700', fontSize: 14 },
 });

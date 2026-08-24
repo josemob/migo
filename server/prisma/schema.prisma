@@ -538,6 +538,7 @@ model MedicalRecord {
   temperature Decimal? @db.Decimal(4, 1)
   notes       String?
   attachments Json? // urls a exámenes/imágenes
+  signedAt    DateTime? // "finalizar y firmar": queda firmado por el vet (vetId) en esta fecha
 
   prescriptions Prescription[]
 

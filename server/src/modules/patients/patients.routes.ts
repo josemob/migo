@@ -96,6 +96,7 @@ router.post(
       weightKg: z.number().positive().optional(),
       temperature: z.number().optional(),
       notes: z.string().optional(),
+      sign: z.boolean().optional(), // "Finalizar y firmar": deja el expediente firmado por el vet
       prescriptions: z
         .array(
           z.object({
@@ -110,10 +111,11 @@ router.post(
     }),
   }),
   asyncHandler(async (req, res) => {
-    const { prescriptions, ...record } = req.body;
+    const { prescriptions, sign, ...record } = req.body;
     const created = await prisma.medicalRecord.create({
       data: {
         ...record,
+        signedAt: sign ? new Date() : null,
         petId: req.params.petId,
         clinicId: req.clinicId!,
         vetId: req.staffId,
