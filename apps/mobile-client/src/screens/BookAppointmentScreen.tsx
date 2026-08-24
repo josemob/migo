@@ -65,6 +65,7 @@ export default function BookAppointmentScreen({ navigation, route }: any) {
     if (!pet || !slot) return;
     const when = new Date(selectedDay);
     when.setHours(slot.h, slot.m, 0, 0);
+    if (when.getTime() <= Date.now()) return appAlert('Horario no disponible', 'Ese horario ya pasó. Elige otro.');
     setBooking(true);
     try {
       await api('/me/appointments', {
@@ -130,7 +131,7 @@ export default function BookAppointmentScreen({ navigation, route }: any) {
         <Text style={styles.label}>SELECCIONA EL DÍA</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
           {days.map((d, i) => (
-            <Pressable key={i} onPress={() => setDayIdx(i)} style={{ alignItems: 'center' }}>
+            <Pressable key={i} onPress={() => { setDayIdx(i); setSlotIdx(null); }} style={{ alignItems: 'center' }}>
               <View style={[styles.day, dayIdx === i && styles.dayOn]}>
                 <Text style={[styles.dayDow, dayIdx === i && styles.dayTextOn]}>{DOW[d.getDay()]}</Text>
                 <Text style={[styles.dayNum, dayIdx === i && styles.dayTextOn]}>{d.getDate()}</Text>
@@ -145,18 +146,23 @@ export default function BookAppointmentScreen({ navigation, route }: any) {
         <Text style={styles.label}>HORARIOS DISPONIBLES</Text>
         <View style={styles.slots}>
           {SLOTS.map((s, i) => {
+            // Deshabilita horas ya pasadas (solo afecta a "Hoy"; días futuros siempre en el futuro).
+            const slotDate = new Date(selectedDay);
+            slotDate.setHours(s.h, s.m, 0, 0);
+            const past = slotDate.getTime() <= Date.now();
+            const disabled = s.off || past;
             const on = slotIdx === i;
-            const kind = s.off ? 'x' : s.h < 12 ? 'sunrise' : 'sun';
-            const iconColor = s.off ? '#9CA3AF' : on ? colors.brand : '#6B7280';
+            const kind = disabled ? 'x' : s.h < 12 ? 'sunrise' : 'sun';
+            const iconColor = disabled ? '#9CA3AF' : on ? colors.brand : '#6B7280';
             return (
               <Pressable
                 key={i}
-                disabled={s.off}
+                disabled={disabled}
                 onPress={() => setSlotIdx(i)}
-                style={[styles.slot, on && styles.slotOn, s.off && styles.slotOff]}
+                style={[styles.slot, on && styles.slotOn, disabled && styles.slotOff]}
               >
                 <SlotIcon kind={kind} color={iconColor} size={22} />
-                <Text style={[styles.slotText, on && styles.slotTextOn, s.off && styles.slotTextOff]}>{s.label}</Text>
+                <Text style={[styles.slotText, on && styles.slotTextOn, disabled && styles.slotTextOff]}>{s.label}</Text>
               </Pressable>
             );
           })}
