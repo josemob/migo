@@ -65,6 +65,34 @@ router.post(
       update: { ...data, reviewNotes: null, reviewedById: null, reviewedAt: null },
       create: { userId: req.user!.id, ...data },
     });
+
+    // Perfil profesional INDEPENDIENTE + suscripción de telemedicina (gratis). Existe
+    // aunque el vet no pertenezca a ninguna clínica; se verifica al aprobar el KYC.
+    const verified = status === 'APPROVED';
+    await prisma.vetProfile
+      .upsert({
+        where: { userId: req.user!.id },
+        create: {
+          userId: req.user!.id,
+          position: kyc.requestedPosition,
+          specialty: kyc.specialty ?? null,
+          collegiateNumber: kyc.collegiateNumber ?? null,
+          verificationStatus: verified ? 'VERIFIED' : 'PENDING',
+          verifiedAt: verified ? new Date() : null,
+        },
+        update: {
+          position: kyc.requestedPosition,
+          specialty: kyc.specialty ?? undefined,
+          collegiateNumber: kyc.collegiateNumber ?? undefined,
+          verificationStatus: verified ? 'VERIFIED' : 'PENDING',
+          verifiedAt: verified ? new Date() : undefined,
+        },
+      })
+      .catch(() => {});
+    await prisma.vetSubscription
+      .upsert({ where: { userId: req.user!.id }, create: { userId: req.user!.id, plan: 'FREE', status: 'ACTIVE' }, update: {} })
+      .catch(() => {});
+
     res.status(201).json(saved);
   }),
 );

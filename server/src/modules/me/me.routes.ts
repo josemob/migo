@@ -816,4 +816,57 @@ router.get(
   }),
 );
 
+// GET /me/vet-profile -> perfil profesional (independiente de clínica) + estado telemedicina
+router.get(
+  '/vet-profile',
+  asyncHandler(async (req, res) => {
+    const [profile, sub, staff] = await Promise.all([
+      prisma.vetProfile.findUnique({ where: { userId: req.user!.id } }),
+      prisma.vetSubscription.findUnique({ where: { userId: req.user!.id } }),
+      prisma.clinicStaff.findUnique({ where: { userId: req.user!.id }, select: { clinicId: true, clinic: { select: { name: true } } } }),
+    ]);
+    if (!profile) return res.json({ profile: null, isIndependent: false, hasClinic: !!staff });
+    const verified = profile.verificationStatus === 'VERIFIED';
+    const hasClinic = !!staff;
+    res.json({
+      profile: {
+        position: profile.position,
+        specialty: profile.specialty,
+        collegiateNumber: profile.collegiateNumber,
+        experienceYears: profile.experienceYears,
+        verificationStatus: profile.verificationStatus,
+        serviceLat: profile.serviceLat != null ? Number(profile.serviceLat) : null,
+        serviceLng: profile.serviceLng != null ? Number(profile.serviceLng) : null,
+        serviceRadiusKm: profile.serviceRadiusKm,
+        ratingAvg: Number(profile.ratingAvg),
+        ratingCount: profile.ratingCount,
+      },
+      subscription: sub ? { plan: sub.plan, status: sub.status } : null,
+      isIndependent: verified && !hasClinic, // verificado y sin clínica = vet independiente
+      hasClinic,
+      clinicName: staff?.clinic?.name ?? null,
+      telemedicineActive: verified && !hasClinic && sub?.status === 'ACTIVE',
+    });
+  }),
+);
+
+// PATCH /me/vet-profile -> el profesional actualiza su especialidad y ubicación de servicio
+router.patch(
+  '/vet-profile',
+  validate({
+    body: z.object({
+      specialty: z.string().max(120).optional(),
+      experienceYears: z.number().int().min(0).max(80).nullable().optional(),
+      serviceLat: z.number().optional(),
+      serviceLng: z.number().optional(),
+      serviceRadiusKm: z.number().int().min(1).max(200).optional(),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const updated = await prisma.vetProfile.update({ where: { userId: req.user!.id }, data: req.body }).catch(() => null);
+    if (!updated) throw ApiError.notFound('Aún no tienes perfil profesional. Completa tu verificación (KYC) primero.');
+    res.json({ ok: true });
+  }),
+);
+
 export default router;

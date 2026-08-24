@@ -83,6 +83,9 @@ CREATE TYPE "KycStatus" AS ENUM ('PENDING', 'UNDER_REVIEW', 'APPROVED', 'REJECTE
 CREATE TYPE "InvitationStatus" AS ENUM ('PENDING', 'ACCEPTED', 'REJECTED', 'CANCELLED');
 
 -- CreateEnum
+CREATE TYPE "VetPlanStatus" AS ENUM ('ACTIVE', 'PAST_DUE', 'CANCELLED', 'EXPIRED');
+
+-- CreateEnum
 CREATE TYPE "ChatSender" AS ENUM ('OWNER', 'CLINIC', 'SYSTEM');
 
 -- CreateEnum
@@ -440,6 +443,42 @@ CREATE TABLE "ClinicStaff" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "ClinicStaff_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "VetProfile" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "position" "StaffPosition" NOT NULL DEFAULT 'VET',
+    "specialty" TEXT,
+    "cmvLicense" TEXT,
+    "collegiateNumber" TEXT,
+    "experienceYears" INTEGER,
+    "verificationStatus" "VerificationStatus" NOT NULL DEFAULT 'PENDING',
+    "verifiedAt" TIMESTAMP(3),
+    "ratingAvg" DECIMAL(3,2) NOT NULL DEFAULT 0,
+    "ratingCount" INTEGER NOT NULL DEFAULT 0,
+    "serviceLat" DECIMAL(9,6),
+    "serviceLng" DECIMAL(9,6),
+    "serviceRadiusKm" INTEGER NOT NULL DEFAULT 15,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "VetProfile_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "VetSubscription" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "plan" TEXT NOT NULL DEFAULT 'FREE',
+    "status" "VetPlanStatus" NOT NULL DEFAULT 'ACTIVE',
+    "startedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "VetSubscription_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -862,6 +901,15 @@ CREATE INDEX "ClinicStaff_position_idx" ON "ClinicStaff"("position");
 CREATE INDEX "ClinicStaff_verificationStatus_idx" ON "ClinicStaff"("verificationStatus");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "VetProfile_userId_key" ON "VetProfile"("userId");
+
+-- CreateIndex
+CREATE INDEX "VetProfile_verificationStatus_idx" ON "VetProfile"("verificationStatus");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "VetSubscription_userId_key" ON "VetSubscription"("userId");
+
+-- CreateIndex
 CREATE INDEX "StaffShift_date_idx" ON "StaffShift"("date");
 
 -- CreateIndex
@@ -1049,6 +1097,12 @@ ALTER TABLE "ClinicStaff" ADD CONSTRAINT "ClinicStaff_userId_fkey" FOREIGN KEY (
 
 -- AddForeignKey
 ALTER TABLE "ClinicStaff" ADD CONSTRAINT "ClinicStaff_clinicId_fkey" FOREIGN KEY ("clinicId") REFERENCES "Clinic"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "VetProfile" ADD CONSTRAINT "VetProfile_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "VetSubscription" ADD CONSTRAINT "VetSubscription_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "StaffShift" ADD CONSTRAINT "StaffShift_staffId_fkey" FOREIGN KEY ("staffId") REFERENCES "ClinicStaff"("id") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -251,6 +251,8 @@ model User {
   pets               Pet[]
   ownedOrganizations Organization[] @relation("OrgOwner")
   staffProfile       ClinicStaff?
+  vetProfile         VetProfile?
+  vetSubscription    VetSubscription?
   emergencies        Emergency[]    @relation("EmergencyOwner")
   appointments       Appointment[]  @relation("AppointmentBookedBy")
   teleconsults       Teleconsult[]  @relation("TeleconsultOwner")
@@ -731,6 +733,55 @@ model ClinicStaff {
   @@index([clinicId])
   @@index([position])
   @@index([verificationStatus])
+}
+
+// Perfil profesional INDEPENDIENTE de clínica (1:1 con el usuario). Es la identidad
+// profesional que persiste aunque el vet no pertenezca a ninguna clínica. Se crea al
+// enviar el KYC; al ser reclutado por una clínica se crea el ClinicStaff (sin borrar esto).
+model VetProfile {
+  id                 String             @id @default(uuid())
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId             String             @unique
+  position           StaffPosition      @default(VET)
+  specialty          String?
+  cmvLicense         String?
+  collegiateNumber   String?
+  experienceYears    Int?
+  verificationStatus VerificationStatus @default(PENDING)
+  verifiedAt         DateTime?
+  ratingAvg          Decimal            @default(0) @db.Decimal(3, 2)
+  ratingCount        Int                @default(0)
+  // Ubicación de servicio (para el ruteo por radio de emergencias/telemedicina)
+  serviceLat      Decimal? @db.Decimal(9, 6)
+  serviceLng      Decimal? @db.Decimal(9, 6)
+  serviceRadiusKm Int      @default(15)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([verificationStatus])
+}
+
+enum VetPlanStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+}
+
+// Suscripción de telemedicina del vet INDEPENDIENTE. Gate: solo con status ACTIVE puede
+// ejercer telemedicina. Arranca gratis (plan "FREE", ACTIVE) al enviar el KYC.
+model VetSubscription {
+  id        String        @id @default(uuid())
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String        @unique
+  plan      String        @default("FREE") // "FREE" | "PRO" | ...
+  status    VetPlanStatus @default(ACTIVE)
+  startedAt DateTime      @default(now())
+  expiresAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // Guardias / turnos del staff ("Guardias & Especialistas Hoy")
