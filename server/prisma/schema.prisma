@@ -758,6 +758,9 @@ model VetProfile {
 
   // Teleconsultas atendidas como vet independiente (telemedicina)
   teleconsults Teleconsult[] @relation("TeleconsultIndependentVet")
+  // Emergencias ruteadas / aceptadas como vet independiente (Fase C)
+  emergencyAlerts     EmergencyAlert[] @relation("EmergencyAlertIndependentVet")
+  acceptedEmergencies Emergency[]      @relation("EmergencyAcceptedVet")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -895,9 +898,15 @@ model Emergency {
   latitude  Decimal? @db.Decimal(9, 6)
   longitude Decimal? @db.Decimal(9, 6)
 
+  // Especialidad sugerida por la IA para rutear a vets independientes (Fase C)
+  requiredSpecialty String?
+
   status           EmergencyStatus @default(TRIAGING)
   acceptedClinic   Clinic?         @relation("EmergencyAcceptedClinic", fields: [acceptedClinicId], references: [id])
   acceptedClinicId String?
+  // Vet INDEPENDIENTE que aceptó la urgencia (alternativo a la clínica)
+  acceptedVetProfile   VetProfile? @relation("EmergencyAcceptedVet", fields: [acceptedVetProfileId], references: [id])
+  acceptedVetProfileId String?
   acceptedAt       DateTime?
   attendedAt       DateTime?
 
@@ -917,8 +926,11 @@ model EmergencyAlert {
   id          String               @id @default(uuid())
   emergency   Emergency            @relation(fields: [emergencyId], references: [id], onDelete: Cascade)
   emergencyId String
-  clinic      Clinic               @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  clinicId    String
+  // Destino de la alerta: una CLÍNICA o un VET INDEPENDIENTE (uno de los dos)
+  clinic      Clinic?              @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  clinicId    String?
+  vetProfile   VetProfile?         @relation("EmergencyAlertIndependentVet", fields: [vetProfileId], references: [id], onDelete: Cascade)
+  vetProfileId String?
   status      EmergencyAlertStatus @default(SENT)
   distanceKm  Decimal?             @db.Decimal(6, 2) // "1.2 km"
   etaMinutes  Int? // "~4 min de llegada"
@@ -928,7 +940,9 @@ model EmergencyAlert {
   createdAt   DateTime             @default(now())
 
   @@unique([emergencyId, clinicId])
+  @@unique([emergencyId, vetProfileId])
   @@index([clinicId, status])
+  @@index([vetProfileId, status])
 }
 
 // ─────────────────────────────────────────────────────────────────────

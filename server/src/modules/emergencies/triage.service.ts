@@ -1,10 +1,13 @@
 import type { TriageLevel } from '@prisma/client';
 import { env } from '../../config/env';
+import { VET_SPECIALTIES } from '../staffKyc/specialties';
 
 export interface TriageResult {
   triageLevel: TriageLevel;
   aiSummary: string;
   aiFirstAid: string;
+  // Especialidad sugerida (taxonomía cerrada) para rutear a vets independientes; null = general
+  requiredSpecialty: string | null;
   source: 'gemini' | 'heuristic';
 }
 
@@ -42,9 +45,10 @@ Condiciones preexistentes: ${input.conditions?.join(', ') || 'ninguna'}
 Síntomas reportados: "${input.symptoms}"
 
 Devuelve exactamente este formato:
-{"triageLevel":"RED|ORANGE|YELLOW|GREEN","aiSummary":"resumen clínico en 1 frase","aiFirstAid":"primeros auxilios concretos para el dueño mientras traslada, 1-2 frases"}
+{"triageLevel":"RED|ORANGE|YELLOW|GREEN","aiSummary":"resumen clínico en 1 frase","aiFirstAid":"primeros auxilios concretos para el dueño mientras traslada, 1-2 frases","requiredSpecialty":"una de la lista o null"}
 
-Criterio: RED = riesgo vital inmediato (dificultad respiratoria, convulsiones, hemorragia, trauma grave, intoxicación). ORANGE = urgente. YELLOW = atención pronta. GREEN = orientación, no urgente.`;
+Criterio: RED = riesgo vital inmediato (dificultad respiratoria, convulsiones, hemorragia, trauma grave, intoxicación). ORANGE = urgente. YELLOW = atención pronta. GREEN = orientación, no urgente.
+requiredSpecialty: la especialidad veterinaria más adecuada para este caso, EXACTAMENTE una de: ${VET_SPECIALTIES.join(', ')}. Si no aplica una específica o es general, usa null.`;
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent?key=${env.GEMINI_API_KEY}`;
   const res = await fetch(url, {
@@ -64,10 +68,16 @@ Criterio: RED = riesgo vital inmediato (dificultad respiratoria, convulsiones, h
   const level = (['RED', 'ORANGE', 'YELLOW', 'GREEN'] as const).includes(parsed.triageLevel)
     ? parsed.triageLevel
     : 'ORANGE';
+  // Solo aceptamos una especialidad que exista en la taxonomía cerrada.
+  const specialty =
+    parsed.requiredSpecialty && (VET_SPECIALTIES as readonly string[]).includes(parsed.requiredSpecialty)
+      ? parsed.requiredSpecialty
+      : null;
   return {
     triageLevel: level,
     aiSummary: parsed.aiSummary ?? input.symptoms,
     aiFirstAid: parsed.aiFirstAid ?? 'Mantén al paciente calmado y trasládalo de inmediato.',
+    requiredSpecialty: specialty,
     source: 'gemini',
   };
 }
@@ -95,6 +105,7 @@ function heuristicTriage(input: TriageInput): TriageResult {
     triageLevel: level,
     aiSummary: input.symptoms,
     aiFirstAid: firstAid[level],
+    requiredSpecialty: null, // sin IA no inferimos especialidad → se rutea a todos
     source: 'heuristic',
   };
 }

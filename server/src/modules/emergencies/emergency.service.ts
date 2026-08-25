@@ -7,8 +7,58 @@ import { runTriage } from './triage.service';
 
 const BROADCAST_RADIUS_KM = 15;
 const MAX_CLINICS = 10;
+const MAX_INDEPENDENT_VETS = 10;
+// Especialidades que siempre califican para cualquier urgencia (generalistas).
+const GENERALIST_SPECIALTIES = ['Medicina general', 'Emergencias y cuidados intensivos'];
 // Una urgencia que nadie aceptó se cierra sola pasados estos minutos.
 const UNATTENDED_TIMEOUT_MIN = 20;
+
+// Datos del dueño + mascota que ve el profesional al recibir una urgencia.
+const vetEmergencyInclude = {
+  pet: {
+    include: {
+      owner: { select: { fullName: true, phone: true } },
+      allergies: true,
+      conditions: { where: { isActive: true } },
+    },
+  },
+} as const;
+
+/**
+ * Vets INDEPENDIENTES elegibles para una urgencia (Fase C): verificados, sin clínica,
+ * con suscripción de telemedicina ACTIVE y ubicación de servicio; cuya especialidad
+ * califique (match exacto, generalista, o sin especialidad declarada) y cuyo radio de
+ * servicio propio cubra la ubicación de la urgencia. Ordenados por cercanía.
+ */
+async function findEligibleIndependentVets(
+  origin: { lat: number; lng: number },
+  requiredSpecialty: string | null,
+) {
+  const vets = await prisma.vetProfile.findMany({
+    where: {
+      verificationStatus: 'VERIFIED',
+      serviceLat: { not: null },
+      serviceLng: { not: null },
+      user: { staffProfile: { is: null }, vetSubscription: { status: 'ACTIVE' } },
+    },
+    select: { id: true, userId: true, specialty: true, serviceLat: true, serviceLng: true, serviceRadiusKm: true },
+  });
+
+  const specialtyQualifies = (specialty: string | null) => {
+    if (!requiredSpecialty) return true; // sin especialidad sugerida → todos
+    if (!specialty) return true; // vet sin especialidad declarada → generalista
+    return specialty === requiredSpecialty || GENERALIST_SPECIALTIES.includes(specialty);
+  };
+
+  return vets
+    .map((v) => {
+      const km = distanceKm(origin, { lat: Number(v.serviceLat), lng: Number(v.serviceLng) });
+      return { id: v.id, userId: v.userId, specialty: v.specialty, radiusKm: v.serviceRadiusKm, km, eta: etaMinutes(km) };
+    })
+    .filter((v) => v.km <= v.radiusKm && specialtyQualifies(v.specialty)) // dentro del radio propio + especialidad
+    .sort((a, b) => a.km - b.km)
+    .slice(0, MAX_INDEPENDENT_VETS);
+}
 
 /**
  * Cierra automáticamente las urgencias que nadie atendió: si siguen en
@@ -120,7 +170,11 @@ export const emergencyService = {
       .sort((a, b) => a.km - b.km)
       .slice(0, MAX_CLINICS);
 
-    // 4) Actualizar triaje + estado, y crear las alertas (broadcast)
+    // 3.b) Vets INDEPENDIENTES elegibles por especialidad + radio (Fase C)
+    const nearbyVets = await findEligibleIndependentVets(origin, triage.requiredSpecialty);
+    const hasTargets = nearby.length > 0 || nearbyVets.length > 0;
+
+    // 4) Actualizar triaje + estado, y crear las alertas (broadcast a clínicas y vets)
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 min para responder
     const [updated] = await prisma.$transaction([
       prisma.emergency.update({
@@ -129,17 +183,27 @@ export const emergencyService = {
           triageLevel: triage.triageLevel,
           aiSummary: triage.aiSummary,
           aiFirstAid: triage.aiFirstAid,
-          status: nearby.length ? 'BROADCASTING' : 'EXPIRED',
+          requiredSpecialty: triage.requiredSpecialty,
+          status: hasTargets ? 'BROADCASTING' : 'EXPIRED',
         },
       }),
       prisma.emergencyAlert.createMany({
-        data: nearby.map((c) => ({
-          emergencyId: emergency.id,
-          clinicId: c.clinicId,
-          distanceKm: Number(c.km.toFixed(2)),
-          etaMinutes: c.eta,
-          expiresAt,
-        })),
+        data: [
+          ...nearby.map((c) => ({
+            emergencyId: emergency.id,
+            clinicId: c.clinicId,
+            distanceKm: Number(c.km.toFixed(2)),
+            etaMinutes: c.eta,
+            expiresAt,
+          })),
+          ...nearbyVets.map((v) => ({
+            emergencyId: emergency.id,
+            vetProfileId: v.id,
+            distanceKm: Number(v.km.toFixed(2)),
+            etaMinutes: v.eta,
+            expiresAt,
+          })),
+        ],
       }),
     ]);
 
@@ -174,10 +238,31 @@ export const emergencyService = {
       console.error('[emergency] push a clínicas falló', e);
     }
 
+    // Push a los vets INDEPENDIENTES ruteados (Fase C)
+    try {
+      if (nearbyVets.length) {
+        const critical = triage.triageLevel === 'RED';
+        const title = critical ? '🚨 Emergencia crítica cerca' : '🚑 Nueva emergencia cerca';
+        const body = `${pet.name}: ${input.symptoms}`.replace(/\s+/g, ' ').trim().slice(0, 140);
+        await Promise.all(
+          nearbyVets.map((v) =>
+            sendPush(v.userId, {
+              title,
+              body,
+              data: { type: 'emergency', emergencyId: emergency.id, triageLevel: triage.triageLevel },
+            }),
+          ),
+        );
+      }
+    } catch (e) {
+      console.error('[emergency] push a vets independientes falló', e);
+    }
+
     return {
       emergency: updated,
       triage,
       broadcastedTo: nearby.length,
+      broadcastedToVets: nearbyVets.length,
     };
   },
 
@@ -230,10 +315,66 @@ export const emergencyService = {
     });
 
     // Avisa a las clínicas alertadas para que la quiten del panel (SSE)
-    const clinicIds = [...new Set(emergency.alerts.map((a) => a.clinicId))];
+    const clinicIds = [...new Set(emergency.alerts.map((a) => a.clinicId).filter((c): c is string => !!c))];
     for (const clinicId of clinicIds) {
       bus.emit(EMERGENCY_UPDATE, { clinicId, emergencyId: id });
     }
     return updated;
+  },
+
+  // ─── Lado VET INDEPENDIENTE (Fase C) ───────────────────────────────
+
+  /** Urgencias en curso ruteadas a este vet independiente. */
+  async listIncomingForVet(userId: string) {
+    await expireStaleEmergencies().catch(() => {});
+    const profile = await prisma.vetProfile.findUnique({ where: { userId }, select: { id: true } });
+    if (!profile) return [];
+    return prisma.emergencyAlert.findMany({
+      where: {
+        vetProfileId: profile.id,
+        status: { in: ['SENT', 'SEEN', 'ACCEPTED'] },
+        emergency: { status: { in: ['BROADCASTING', 'ACCEPTED', 'EN_ROUTE'] } },
+      },
+      include: { emergency: { include: vetEmergencyInclude } },
+      orderBy: { createdAt: 'desc' },
+    });
+  },
+
+  /** El vet independiente acepta una urgencia (primero en aceptar, clínica o vet, gana). */
+  async acceptByVet(userId: string, alertId: string) {
+    const profile = await prisma.vetProfile.findUnique({ where: { userId }, select: { id: true } });
+    if (!profile) throw ApiError.forbidden('Aún no tienes perfil profesional verificado.');
+
+    const alert = await prisma.emergencyAlert.findFirst({
+      where: { id: alertId, vetProfileId: profile.id },
+      include: { emergency: { include: { alerts: { select: { clinicId: true } } } } },
+    });
+    if (!alert) throw ApiError.notFound('Alerta no encontrada');
+    if (alert.emergency.status !== 'BROADCASTING' && alert.emergency.acceptedVetProfileId !== profile.id) {
+      throw ApiError.conflict('Esta urgencia ya fue tomada por otro profesional');
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const emergency = await tx.emergency.update({
+        where: { id: alert.emergencyId },
+        data: { status: 'ACCEPTED', acceptedVetProfileId: profile.id, acceptedAt: new Date() },
+      });
+      await tx.emergencyAlert.update({
+        where: { id: alert.id },
+        data: { status: 'ACCEPTED', respondedAt: new Date() },
+      });
+      await tx.emergencyAlert.updateMany({
+        where: { emergencyId: alert.emergencyId, id: { not: alert.id }, status: { in: ['SENT', 'SEEN'] } },
+        data: { status: 'EXPIRED' },
+      });
+      return emergency;
+    });
+
+    // Avisa a las clínicas alertadas para que la quiten del panel (SSE)
+    const clinicIds = [...new Set(alert.emergency.alerts.map((a) => a.clinicId).filter((c): c is string => !!c))];
+    for (const clinicId of clinicIds) {
+      bus.emit(EMERGENCY_UPDATE, { clinicId, emergencyId: alert.emergencyId });
+    }
+    return result;
   },
 };

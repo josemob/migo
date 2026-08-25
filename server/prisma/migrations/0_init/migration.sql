@@ -552,8 +552,10 @@ CREATE TABLE "Emergency" (
     "aiFirstAid" TEXT,
     "latitude" DECIMAL(9,6),
     "longitude" DECIMAL(9,6),
+    "requiredSpecialty" TEXT,
     "status" "EmergencyStatus" NOT NULL DEFAULT 'TRIAGING',
     "acceptedClinicId" TEXT,
+    "acceptedVetProfileId" TEXT,
     "acceptedAt" TIMESTAMP(3),
     "attendedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -566,7 +568,8 @@ CREATE TABLE "Emergency" (
 CREATE TABLE "EmergencyAlert" (
     "id" TEXT NOT NULL,
     "emergencyId" TEXT NOT NULL,
-    "clinicId" TEXT NOT NULL,
+    "clinicId" TEXT,
+    "vetProfileId" TEXT,
     "status" "EmergencyAlertStatus" NOT NULL DEFAULT 'SENT',
     "distanceKm" DECIMAL(6,2),
     "etaMinutes" INTEGER,
@@ -947,7 +950,13 @@ CREATE INDEX "Emergency_triageLevel_idx" ON "Emergency"("triageLevel");
 CREATE INDEX "EmergencyAlert_clinicId_status_idx" ON "EmergencyAlert"("clinicId", "status");
 
 -- CreateIndex
+CREATE INDEX "EmergencyAlert_vetProfileId_status_idx" ON "EmergencyAlert"("vetProfileId", "status");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "EmergencyAlert_emergencyId_clinicId_key" ON "EmergencyAlert"("emergencyId", "clinicId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "EmergencyAlert_emergencyId_vetProfileId_key" ON "EmergencyAlert"("emergencyId", "vetProfileId");
 
 -- CreateIndex
 CREATE INDEX "Teleconsult_ownerId_idx" ON "Teleconsult"("ownerId");
@@ -1145,10 +1154,16 @@ ALTER TABLE "Emergency" ADD CONSTRAINT "Emergency_petId_fkey" FOREIGN KEY ("petI
 ALTER TABLE "Emergency" ADD CONSTRAINT "Emergency_acceptedClinicId_fkey" FOREIGN KEY ("acceptedClinicId") REFERENCES "Clinic"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "Emergency" ADD CONSTRAINT "Emergency_acceptedVetProfileId_fkey" FOREIGN KEY ("acceptedVetProfileId") REFERENCES "VetProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "EmergencyAlert" ADD CONSTRAINT "EmergencyAlert_emergencyId_fkey" FOREIGN KEY ("emergencyId") REFERENCES "Emergency"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "EmergencyAlert" ADD CONSTRAINT "EmergencyAlert_clinicId_fkey" FOREIGN KEY ("clinicId") REFERENCES "Clinic"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "EmergencyAlert" ADD CONSTRAINT "EmergencyAlert_vetProfileId_fkey" FOREIGN KEY ("vetProfileId") REFERENCES "VetProfile"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Teleconsult" ADD CONSTRAINT "Teleconsult_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

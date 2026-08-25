@@ -11,6 +11,7 @@ import { extractChatSummary } from '../chat/chatSummary.service';
 import { createStreamCredentials, streamConfigured, ensureChatChannel } from '../stream/stream.service';
 import { registerPushToken, removePushToken } from '../push/push.service';
 import { issueReceipt, receiptNumber } from '../receipts/receipt.service';
+import { emergencyService } from '../emergencies/emergency.service';
 
 const router = Router();
 router.use(authenticate);
@@ -951,6 +952,23 @@ router.post(
       select: { id: true, status: true, agoraChannel: true, createdAt: true },
     });
     res.status(201).json(tele);
+  }),
+);
+
+// GET /me/emergencies -> urgencias ruteadas a este vet independiente (Fase C)
+router.get(
+  '/emergencies',
+  asyncHandler(async (req, res) => {
+    res.json({ data: await emergencyService.listIncomingForVet(req.user!.id) });
+  }),
+);
+
+// POST /me/emergencies/alerts/:alertId/accept -> el vet independiente acepta la urgencia
+router.post(
+  '/emergencies/alerts/:alertId/accept',
+  validate({ params: z.object({ alertId: z.string().uuid() }) }),
+  asyncHandler(async (req, res) => {
+    res.json(await emergencyService.acceptByVet(req.user!.id, req.params.alertId!));
   }),
 );
 
