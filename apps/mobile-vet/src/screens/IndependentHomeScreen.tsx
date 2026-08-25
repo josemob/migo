@@ -9,6 +9,7 @@ import { appAlert } from '../lib/dialog';
 import { Badge, Button, Card, Loading } from '../components/ui';
 import { SpecialtyPicker } from '../components/SpecialtyPicker';
 import { BiometricToggle } from '../components/BiometricToggle';
+import { IncomingEmergencies } from '../components/IncomingEmergencies';
 import { cardShadow, colors, radius } from '../theme';
 
 interface VetProfileResp {
@@ -132,6 +133,9 @@ export default function IndependentHomeScreen({ onJoinedClinic }: { onJoinedClin
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40, gap: 16 }} showsVerticalScrollIndicator={false}>
+        {/* Emergencias entrantes ruteadas por IA (Fase C) — prioridad arriba */}
+        <IncomingEmergencies />
+
         {/* Estado de verificación + telemedicina */}
         <Card>
           <View style={styles.rowBetween}>
