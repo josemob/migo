@@ -28,8 +28,10 @@ export async function biometricSupported(): Promise<boolean> {
 export async function biometricLabel(): Promise<string> {
   try {
     const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-    if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) return 'rostro';
+    // La huella es lo más común en Android y coincide con el ícono del botón; si el
+    // equipo soporta ambas, preferimos "huella".
     if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) return 'huella';
+    if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) return 'rostro';
   } catch {
     /* noop */
   }
