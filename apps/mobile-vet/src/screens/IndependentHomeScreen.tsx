@@ -54,7 +54,13 @@ const TELE_STATUS: Record<string, { label: string; color: string }> = {
   NO_SHOW: { label: 'No asistió', color: colors.red },
 };
 
-export default function IndependentHomeScreen({ onJoinedClinic }: { onJoinedClinic: () => void }) {
+export default function IndependentHomeScreen({
+  onJoinedClinic,
+  onEnterDashboard,
+}: {
+  onJoinedClinic: () => void;
+  onEnterDashboard?: () => void;
+}) {
   const { user, logout, refreshUser } = useAuth();
   const insets = useSafeAreaInsets();
 
@@ -150,6 +156,11 @@ export default function IndependentHomeScreen({ onJoinedClinic }: { onJoinedClin
             </Text>
           </View>
           <Text style={styles.hint}>Puedes atender teleconsultas mientras tu suscripción esté activa.</Text>
+          {onEnterDashboard && (
+            <View style={{ marginTop: 14 }}>
+              <Button title="Ir al panel principal →" onPress={onEnterDashboard} />
+            </View>
+          )}
         </Card>
 
         {/* Perfil profesional editable */}

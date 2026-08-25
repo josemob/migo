@@ -46,8 +46,10 @@ async function findEligibleIndependentVets(
 
   const specialtyQualifies = (specialty: string | null) => {
     if (!requiredSpecialty) return true; // sin especialidad sugerida → todos
-    if (!specialty) return true; // vet sin especialidad declarada → generalista
-    return specialty === requiredSpecialty || GENERALIST_SPECIALTIES.includes(specialty);
+    // El vet puede tener varias especialidades separadas por coma.
+    const list = (specialty ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+    if (list.length === 0) return true; // sin especialidad declarada → generalista
+    return list.includes(requiredSpecialty) || list.some((s) => GENERALIST_SPECIALTIES.includes(s));
   };
 
   return vets

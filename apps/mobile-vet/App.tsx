@@ -14,6 +14,7 @@ import { OUTFIT_FONTS, enableOutfit } from './src/lib/fonts';
 import { registerForPush } from './src/lib/push';
 import { AuthProvider, useAuth } from './src/lib/auth';
 import { StreamProvider } from './src/lib/stream';
+import { IndependentBackContext } from './src/lib/independentMode';
 import { api } from './src/lib/api';
 import { DialogHost } from './src/lib/dialog';
 import { Loading } from './src/components/ui';
@@ -63,7 +64,7 @@ function Tabs() {
   );
 }
 
-function MainApp() {
+function MainApp({ onBackToIndependent }: { onBackToIndependent?: () => void }) {
   useEffect(() => {
     registerForPush();
     // Navega a la pantalla de Alerta cuando el vet toca una notificación de emergencia.
@@ -95,17 +96,26 @@ function MainApp() {
 
   return (
     <StreamProvider>
-      <NavigationContainer ref={navigationRef}>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="Tabs" component={Tabs} />
-          <Stack.Screen name="PatientDetail" component={PatientDetailScreen} />
-          <Stack.Screen name="NewConsult" component={NewConsultScreen} options={{ presentation: 'modal' }} />
-          <Stack.Screen name="Report" component={ReportScreen} />
-          <Stack.Screen name="ChatThread" component={ChatThreadScreen} />
-        </Stack.Navigator>
-      </NavigationContainer>
+      <IndependentBackContext.Provider value={onBackToIndependent ?? null}>
+        <NavigationContainer ref={navigationRef}>
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Tabs" component={Tabs} />
+            <Stack.Screen name="PatientDetail" component={PatientDetailScreen} />
+            <Stack.Screen name="NewConsult" component={NewConsultScreen} options={{ presentation: 'modal' }} />
+            <Stack.Screen name="Report" component={ReportScreen} />
+            <Stack.Screen name="ChatThread" component={ChatThreadScreen} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </IndependentBackContext.Provider>
     </StreamProvider>
   );
+}
+
+/** Vet independiente: alterna entre su panel propio y el dashboard principal. */
+function IndependentRoot({ onJoinedClinic }: { onJoinedClinic: () => void }) {
+  const [dashboard, setDashboard] = useState(false);
+  if (dashboard) return <MainApp onBackToIndependent={() => setDashboard(false)} />;
+  return <IndependentHomeScreen onJoinedClinic={onJoinedClinic} onEnterDashboard={() => setDashboard(true)} />;
 }
 
 /** Tras iniciar sesión: decide entre la app completa (clínica), el home independiente,
@@ -120,7 +130,7 @@ function StaffGate() {
   const refetch = () => { void kycQ.refetch(); void vetQ.refetch(); };
 
   if (kycQ.data?.hasClinic) return <MainApp />; // ya es staff de una clínica -> app completa
-  if (vetQ.data?.isIndependent) return <IndependentHomeScreen onJoinedClinic={refetch} />; // verificado sin clínica
+  if (vetQ.data?.isIndependent) return <IndependentRoot onJoinedClinic={refetch} />; // verificado sin clínica
   if (!kyc || forceKyc) return <KycScreen onSubmitted={() => { setForceKyc(false); refetch(); }} />;
   return <KycPendingScreen kyc={kyc} onRetry={() => setForceKyc(true)} onRefresh={refetch} />;
 }

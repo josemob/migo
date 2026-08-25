@@ -1,12 +1,14 @@
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../lib/auth';
+import { useIndependentBack } from '../lib/independentMode';
 import { Button } from '../components/ui';
 import { BiometricToggle } from '../components/BiometricToggle';
 import { cardShadow, colors, radius } from '../theme';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
+  const backToIndependent = useIndependentBack();
   const s = user?.staffProfile;
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -27,6 +29,9 @@ export default function ProfileScreen() {
             </View>
           )}
         </View>
+        {backToIndependent && (
+          <Button title="← Volver a mi panel independiente" onPress={backToIndependent} />
+        )}
         <BiometricToggle />
         <Button title="Cerrar sesión" variant="outline" onPress={logout} />
       </View>
