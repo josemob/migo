@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import { syncBiometricToken } from './biometric';
 
 // El teléfono no puede ver "localhost" de la PC. Derivamos la IP de la red
 // local a partir del host de Metro (ej. "192.168.1.5:8081") y apuntamos al :8080.
@@ -25,6 +26,9 @@ export const tokens = {
   get access() {
     return accessToken;
   },
+  get refresh() {
+    return refreshToken;
+  },
   async load() {
     accessToken = await AsyncStorage.getItem(ACCESS_KEY);
     refreshToken = await AsyncStorage.getItem(REFRESH_KEY);
@@ -36,6 +40,8 @@ export const tokens = {
       [ACCESS_KEY, a],
       [REFRESH_KEY, r],
     ]);
+    // Mantiene el token del login biométrico al día cuando el refresh rota.
+    await syncBiometricToken(r);
   },
   async clear() {
     accessToken = null;

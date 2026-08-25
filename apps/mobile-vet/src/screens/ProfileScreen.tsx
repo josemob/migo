@@ -2,6 +2,7 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../lib/auth';
 import { Button } from '../components/ui';
+import { BiometricToggle } from '../components/BiometricToggle';
 import { cardShadow, colors, radius } from '../theme';
 
 export default function ProfileScreen() {
@@ -26,6 +27,7 @@ export default function ProfileScreen() {
             </View>
           )}
         </View>
+        <BiometricToggle />
         <Button title="Cerrar sesión" variant="outline" onPress={logout} />
       </View>
     </SafeAreaView>

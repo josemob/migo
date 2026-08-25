@@ -8,6 +8,7 @@ import { useAuth } from '../lib/auth';
 import { appAlert } from '../lib/dialog';
 import { Badge, Button, Card, Loading } from '../components/ui';
 import { SpecialtyPicker } from '../components/SpecialtyPicker';
+import { BiometricToggle } from '../components/BiometricToggle';
 import { cardShadow, colors, radius } from '../theme';
 
 interface VetProfileResp {
@@ -172,6 +173,9 @@ export default function IndependentHomeScreen({ onJoinedClinic }: { onJoinedClin
             <Button title={save.isPending ? 'Guardando…' : 'Guardar perfil'} onPress={() => save.mutate()} loading={save.isPending} />
           </View>
         </Card>
+
+        {/* Acceso por huella / rostro */}
+        <BiometricToggle />
 
         {/* Invitaciones de clínicas (aún puede ser reclutado) */}
         {invites.length > 0 && (

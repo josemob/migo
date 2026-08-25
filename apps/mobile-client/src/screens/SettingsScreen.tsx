@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '../lib/api';
+import { api, tokens } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { appAlert } from '../lib/dialog';
+import { biometricSupported, enableBiometric, disableBiometric, isBiometricEnabled } from '../lib/biometric';
 import { Button } from '../components/ui';
 import { TabIcon } from '../components/TabIcon';
 import { BackButton } from '../components/BackButton';
@@ -28,7 +29,21 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
   // dispositivo tiene un inset inferior mayor (barra visible) se usa ese alto real
   // para que la construcción no quede solapada por la barra del sistema.
   const bottomPad = insets.bottom + 34;
-  const [bio, setBio] = useState(true);
+  const [bio, setBio] = useState(false);
+  useEffect(() => { isBiometricEnabled().then(setBio); }, []);
+
+  const toggleBiometric = async (next: boolean) => {
+    if (next) {
+      if (!(await biometricSupported())) {
+        return appAlert('Biometría no disponible', 'Primero configura una huella o rostro en los ajustes de tu teléfono.');
+      }
+      setBio(await enableBiometric(tokens.refresh));
+    } else {
+      await disableBiometric();
+      setBio(false);
+    }
+  };
+
   const pets = useQuery({ queryKey: ['pets'], queryFn: () => api<{ data: Pet[] }>('/me/pets') });
   const petNames = pets.data?.data.map((p) => p.name).join(', ') || 'Sin mascotas aún';
 
@@ -109,7 +124,7 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
               {section.rows.map((row, i) => (
                 <Pressable
                   key={row.title}
-                  onPress={row.toggle ? () => setBio((v) => !v) : row.onPress}
+                  onPress={row.toggle ? () => toggleBiometric(!bio) : row.onPress}
                   style={[styles.row, i > 0 && styles.rowBorder]}
                 >
                   <View style={[styles.rowIcon, row.accent && { backgroundColor: colors.accent }]}>
@@ -120,7 +135,7 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
                     <Text style={styles.rowSub}>{row.sub}</Text>
                   </View>
                   {row.toggle ? (
-                    <Toggle value={bio} onChange={setBio} />
+                    <Toggle value={bio} onChange={toggleBiometric} />
                   ) : (
                     <Text style={styles.chevron}>›</Text>
                   )}

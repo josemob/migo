@@ -1,18 +1,25 @@
-import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../lib/auth';
 import { useGoogleSignIn } from '../lib/google';
+import { hasBiometricSession } from '../lib/biometric';
 import { Button } from '../components/ui';
+import { TabIcon } from '../components/TabIcon';
 import { colors, radius, type } from '../theme';
 
 export default function LoginScreen({ navigation }: any) {
-  const { login } = useAuth();
+  const { login, loginWithBiometric } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [bioAvailable, setBioAvailable] = useState(false);
+  const [bioBusy, setBioBusy] = useState(false);
   const { signIn: googleSignIn, googleBusy, googleReady } = useGoogleSignIn(setError);
+
+  // Muestra el botón de huella solo si hay una sesión biométrica guardada en este equipo.
+  useEffect(() => { hasBiometricSession().then(setBioAvailable); }, []);
 
   const submit = async () => {
     setError('');
@@ -23,6 +30,19 @@ export default function LoginScreen({ navigation }: any) {
       setError(e instanceof Error ? e.message : 'No se pudo iniciar sesión');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const doBiometric = async () => {
+    setError('');
+    setBioBusy(true);
+    try {
+      await loginWithBiometric();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo iniciar con biometría');
+      setBioAvailable(await hasBiometricSession());
+    } finally {
+      setBioBusy(false);
     }
   };
 
@@ -54,8 +74,15 @@ export default function LoginScreen({ navigation }: any) {
           value={password}
           onChangeText={setPassword}
         />
-        <View style={{ marginTop: 8 }}>
-          <Button title={busy ? 'Ingresando…' : 'Iniciar sesión'} onPress={submit} loading={busy} />
+        <View style={[styles.loginRow, { marginTop: 8 }]}>
+          <View style={{ flex: 1 }}>
+            <Button title={busy ? 'Ingresando…' : 'Iniciar sesión'} onPress={submit} loading={busy} />
+          </View>
+          {bioAvailable && (
+            <Pressable style={styles.bioBtn} onPress={doBiometric} disabled={bioBusy} accessibilityLabel="Iniciar sesión con huella">
+              {bioBusy ? <ActivityIndicator color={colors.brand} /> : <TabIcon name="fingerprint" color={colors.brand} size={28} />}
+            </Pressable>
+          )}
         </View>
 
         <View style={styles.divider}>
@@ -94,6 +121,8 @@ const styles = StyleSheet.create({
   input: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: colors.text },
   errorBox: { backgroundColor: '#FDECEC', borderRadius: radius.md, padding: 12, borderWidth: 1, borderColor: '#F8CBCB' },
   errorText: { ...type.bodySmall, color: colors.red },
+  loginRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  bioBtn: { width: 56, height: 56, borderRadius: 16, borderWidth: 1.5, borderColor: colors.brand, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white },
   divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 18 },
   line: { flex: 1, height: 1, backgroundColor: colors.border },
   dividerText: { color: colors.muted, fontSize: 13 },

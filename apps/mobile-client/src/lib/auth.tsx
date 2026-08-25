@@ -1,5 +1,34 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { api, tokens } from './api';
+import { appAlert } from './dialog';
+import {
+  getBiometricToken,
+  promptBiometric,
+  disableBiometric,
+  biometricSupported,
+  isBiometricEnabled,
+  biometricAlreadyAsked,
+  markBiometricAsked,
+  enableBiometric,
+  biometricLabel,
+} from './biometric';
+
+// Tras un login normal, ofrece una vez activar el acceso biométrico (si el equipo lo
+// soporta y aún no está activo). No bloquea el flujo.
+async function offerBiometricEnrollment() {
+  try {
+    if ((await isBiometricEnabled()) || (await biometricAlreadyAsked())) return;
+    if (!(await biometricSupported())) return;
+    await markBiometricAsked();
+    const label = await biometricLabel();
+    appAlert('Acceso rápido', `¿Quieres iniciar sesión con tu ${label} la próxima vez?`, [
+      { text: 'Ahora no', style: 'cancel' },
+      { text: 'Activar', onPress: () => { void enableBiometric(tokens.refresh); } },
+    ]);
+  } catch {
+    /* noop */
+  }
+}
 
 export interface AuthUser {
   id: string;
@@ -15,6 +44,7 @@ interface AuthCtx {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
+  loginWithBiometric: () => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -56,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     await tokens.set(res.accessToken, res.refreshToken);
     setUser(await api<AuthUser>('/auth/me'));
+    void offerBiometricEnrollment();
   };
 
   const loginWithGoogle = async (idToken: string) => {
@@ -66,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     await tokens.set(res.accessToken, res.refreshToken);
     setUser(await api<AuthUser>('/auth/me'));
+    void offerBiometricEnrollment();
   };
 
   const register = async (input: RegisterInput) => {
@@ -76,9 +108,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     await tokens.set(res.accessToken, res.refreshToken);
     setUser(await api<AuthUser>('/auth/me'));
+    void offerBiometricEnrollment();
+  };
+
+  // Restaura la sesión con huella/rostro: exige biometría y canjea el refresh token
+  // guardado. Mantiene la biometría activa tras cerrar sesión (no revoca en logout).
+  const loginWithBiometric = async () => {
+    if (!(await promptBiometric('Inicia sesión con biometría'))) throw new Error('Autenticación cancelada');
+    const saved = await getBiometricToken();
+    if (!saved) throw new Error('No hay una sesión guardada. Inicia sesión una vez para activar la biometría.');
+    let res: { accessToken: string; refreshToken: string };
+    try {
+      res = await api<{ accessToken: string; refreshToken: string }>('/auth/refresh', { method: 'POST', body: { refreshToken: saved }, auth: false });
+    } catch {
+      await disableBiometric();
+      throw new Error('Tu sesión guardada expiró. Inicia sesión con tu contraseña.');
+    }
+    await tokens.set(res.accessToken, res.refreshToken);
+    setUser(await api<AuthUser>('/auth/me'));
   };
 
   const logout = async () => {
+    // No revocamos el refresh en el servidor para que el login biométrico siga sirviendo.
     await tokens.clear();
     setUser(null);
   };
@@ -88,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{ user, loading, login, loginWithGoogle, register, logout, refreshUser }}>
+    <Ctx.Provider value={{ user, loading, login, loginWithGoogle, loginWithBiometric, register, logout, refreshUser }}>
       {children}
     </Ctx.Provider>
   );

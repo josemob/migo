@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { DevSettings, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api, tokens } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { appAlert } from '../lib/dialog';
+import { biometricSupported, enableBiometric, disableBiometric, isBiometricEnabled } from '../lib/biometric';
 import { editField } from '../lib/editField';
 import { pickPhotoAsDataUri } from '../lib/photo';
 import { Button } from '../components/ui';
@@ -25,8 +26,22 @@ interface Pet {
 export default function ProfileScreen({ navigation }: { navigation: any }) {
   const { user, logout, refreshUser } = useAuth();
   const insets = useSafeAreaInsets();
-  const [faceId, setFaceId] = useState(true);
+  const [faceId, setFaceId] = useState(false);
   const [push, setPush] = useState(true);
+
+  useEffect(() => { isBiometricEnabled().then(setFaceId); }, []);
+
+  const toggleBiometric = async (next: boolean) => {
+    if (next) {
+      if (!(await biometricSupported())) {
+        return appAlert('Biometría no disponible', 'Primero configura una huella o rostro en los ajustes de tu teléfono.');
+      }
+      setFaceId(await enableBiometric(tokens.refresh));
+    } else {
+      await disableBiometric();
+      setFaceId(false);
+    }
+  };
   const [avatarOverride, setAvatarOverride] = useState<string | null>(null);
   const avatar = avatarOverride ?? user?.avatarUrl ?? null;
 
@@ -128,8 +143,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
         <View style={[styles.card, { marginTop: 24 }]}>
           <Text style={styles.cardTitle}>Seguridad</Text>
           <Row icon="lock" label="Contraseña" onPress={soon} />
-          <Row icon="fingerprint" label="Iniciar sesión con FaceID / TouchID" toggle value={faceId} onToggle={setFaceId} border />
-          <Row icon="shield" label="Doble factor de autenticación" sub="Protege tu cuenta con tu número móvil." onPress={soon} border />
+          <Row icon="fingerprint" label="Iniciar sesión con huella / rostro" toggle value={faceId} onToggle={toggleBiometric} border />
         </View>
 
         {/* Preferencias */}
