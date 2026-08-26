@@ -8,7 +8,7 @@ import { authenticate } from '../../middleware/auth';
 import { ApiError } from '../../utils/ApiError';
 import { migoAiReply } from '../chat/aiChat.service';
 import { extractChatSummary } from '../chat/chatSummary.service';
-import { createStreamCredentials, streamConfigured, ensureChatChannel } from '../stream/stream.service';
+import { createStreamCredentials, streamConfigured, ensureChatChannel, createIndependentRingingCall } from '../stream/stream.service';
 import { registerPushToken, removePushToken } from '../push/push.service';
 import { issueReceipt, receiptNumber } from '../receipts/receipt.service';
 import { emergencyService } from '../emergencies/emergency.service';
@@ -1071,6 +1071,38 @@ router.post(
   validate({ params: z.object({ alertId: z.string().uuid() }) }),
   asyncHandler(async (req, res) => {
     res.json(await emergencyService.acceptByVet(req.user!.id, req.params.alertId!));
+  }),
+);
+
+// POST /me/emergencies/:emergencyId/call -> el vet independiente "anilla" al dueño (videollamada)
+// La llamada se crea a nombre del vet en el servidor, así aparece en su overlay (useCalls).
+router.post(
+  '/emergencies/:emergencyId/call',
+  validate({ params: z.object({ emergencyId: z.string().uuid() }) }),
+  asyncHandler(async (req, res) => {
+    if (!streamConfigured()) throw ApiError.badRequest('GetStream no está configurado en el servidor.');
+    const profile = await prisma.vetProfile.findUnique({
+      where: { userId: req.user!.id },
+      select: { id: true },
+    });
+    if (!profile) throw ApiError.forbidden('Solo un vet independiente puede iniciar la videollamada.');
+    const emergency = await prisma.emergency.findFirst({
+      where: { id: req.params.emergencyId, acceptedVetProfileId: profile.id },
+      select: { ownerId: true },
+    });
+    if (!emergency) throw ApiError.notFound('Urgencia no encontrada o no aceptada por ti.');
+    const me = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { fullName: true, avatarUrl: true },
+    });
+    const callId = randomUUID();
+    const call = await createIndependentRingingCall({
+      callId,
+      vet: { id: req.user!.id, name: me?.fullName, avatarUrl: me?.avatarUrl },
+      ownerId: emergency.ownerId,
+      video: true,
+    });
+    res.status(201).json(call);
   }),
 );
 

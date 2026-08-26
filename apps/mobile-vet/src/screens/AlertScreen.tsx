@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { appAlert } from '../lib/dialog';
 import { useStream } from '../lib/stream';
+import { requestCallPermissions } from '../lib/callPermissions';
 import { Loading } from '../components/ui';
 import { TabIcon } from '../components/TabIcon';
 import { cardShadow, colors, radius, triageColor, triageLabel } from '../theme';
@@ -47,7 +48,11 @@ export default function AlertScreen({ navigation }: { navigation: any }) {
   });
 
   const videoCall = useMutation({
-    mutationFn: (ownerId: string) => api('/clinic/teleconsults', { method: 'POST', body: { ownerId, video: true } }),
+    mutationFn: async (ownerId: string) => {
+      const ok = await requestCallPermissions();
+      if (!ok) throw new Error('Activa cámara y micrófono para hacer videollamadas.');
+      return api('/clinic/teleconsults', { method: 'POST', body: { ownerId, video: true } });
+    },
     onError: (e) => appAlert('No se pudo iniciar la videollamada', e instanceof Error ? e.message : 'Intenta de nuevo.'),
   });
 

@@ -149,3 +149,36 @@ export async function createRingingCall(params: {
 
   return { callType: 'default', callId: params.callId, cid: `default:${params.callId}`, createdBy: clinicUserId };
 }
+
+/**
+ * Igual que createRingingCall pero para el VET INDEPENDIENTE: su identidad en Stream
+ * es su propio userId (no `clinic_<id>`), así que la llamada se crea a su nombre y él
+ * la recibe como saliente en su overlay (useCalls). Se invoca desde un endpoint /me
+ * autenticado tras verificar que aceptó la urgencia.
+ */
+export async function createIndependentRingingCall(params: {
+  callId: string;
+  vet: { id: string; name?: string | null; avatarUrl?: string | null };
+  ownerId: string;
+  video: boolean;
+}): Promise<{ callType: string; callId: string; cid: string; createdBy: string }> {
+  await getStreamClient().upsertUser({
+    id: params.vet.id,
+    name: params.vet.name ?? undefined,
+    image: safeStreamImage(params.vet.avatarUrl),
+    role: 'user',
+    migo_role: 'vet',
+  } as never);
+
+  const call = getVideoClient().video.call('default', params.callId);
+  await call.getOrCreate({
+    ring: true,
+    data: {
+      created_by_id: params.vet.id,
+      members: [{ user_id: params.vet.id }, { user_id: params.ownerId }],
+      custom: { migo_vet_id: params.vet.id, video: params.video },
+    },
+  });
+
+  return { callType: 'default', callId: params.callId, cid: `default:${params.callId}`, createdBy: params.vet.id };
+}

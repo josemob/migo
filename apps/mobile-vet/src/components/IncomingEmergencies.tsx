@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { appAlert } from '../lib/dialog';
 import { useVetVideo } from '../lib/vetVideo';
+import { requestCallPermissions } from '../lib/callPermissions';
 import { TabIcon } from './TabIcon';
 import { cardShadow, colors, radius, triageColor, triageLabel } from '../theme';
 
@@ -34,7 +35,7 @@ interface IncomingAlert {
 
 /** Emergencias ruteadas al vet independiente (Fase C): listar + aceptar. Poll cada 15s. */
 export function IncomingEmergencies() {
-  const { client: videoClient, userId: myStreamId } = useVetVideo();
+  const { client: videoClient } = useVetVideo();
   const [calling, setCalling] = useState(false);
 
   const q = useQuery({
@@ -43,15 +44,19 @@ export function IncomingEmergencies() {
     refetchInterval: 15000,
   });
 
-  // Inicia una videollamada al dueño: crea la sala Stream y "anilla" (el overlay la muestra).
-  const startVideoCall = async (ownerId: string) => {
-    if (!videoClient || !myStreamId) {
-      return appAlert('Video no disponible', 'No pudimos conectar el servicio de video. Reintenta en unos segundos.');
+  // Inicia una videollamada al dueño: el servidor "anilla" a nombre del vet y la
+  // llamada llega a este dispositivo por el overlay (useCalls). Pide permisos primero.
+  const startVideoCall = async (emergencyId: string) => {
+    if (!videoClient) {
+      return appAlert('Video no disponible', 'Conectando el servicio de video… reintenta en unos segundos.');
+    }
+    const ok = await requestCallPermissions();
+    if (!ok) {
+      return appAlert('Permisos necesarios', 'Activa cámara y micrófono para hacer videollamadas.');
     }
     setCalling(true);
     try {
-      const call = videoClient.call('default', `emg_${ownerId}_${Date.now()}`);
-      await call.getOrCreate({ ring: true, data: { members: [{ user_id: myStreamId }, { user_id: ownerId }] } });
+      await api(`/me/emergencies/${emergencyId}/call`, { method: 'POST' });
     } catch (e) {
       appAlert('No se pudo iniciar la llamada', e instanceof Error ? e.message : 'Intenta de nuevo.');
     } finally {
@@ -107,7 +112,7 @@ export function IncomingEmergencies() {
                   <Text style={styles.med}>Condiciones: {e.pet.conditions.map((x) => x.name).join(', ')}</Text>
                 )}
                 <View style={styles.actionRow}>
-                  <Pressable style={[styles.actionBtn, styles.video, calling && { opacity: 0.6 }]} disabled={calling} onPress={() => startVideoCall(e.pet.owner.id)}>
+                  <Pressable style={[styles.actionBtn, styles.video, calling && { opacity: 0.6 }]} disabled={calling} onPress={() => startVideoCall(e.id)}>
                     <TabIcon name="video" color={colors.white} size={18} />
                     <Text style={styles.actionTxt}>{calling ? 'Llamando…' : 'Videollamada'}</Text>
                   </Pressable>
