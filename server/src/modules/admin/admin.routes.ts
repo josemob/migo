@@ -604,6 +604,62 @@ router.post(
   }),
 );
 
+// ── Solicitudes de cambio de ESPECIALIDAD (avaladas con documentos) ──
+
+// GET /admin/specialty-requests -> solicitudes pendientes de aprobar
+router.get(
+  '/specialty-requests',
+  asyncHandler(async (_req, res) => {
+    const rows = await prisma.vetSpecialtyRequest.findMany({
+      where: { status: 'PENDING' },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        vetProfile: {
+          select: { specialty: true, collegiateNumber: true, user: { select: { fullName: true, email: true } } },
+        },
+      },
+    });
+    res.json({
+      data: rows.map((r) => ({
+        id: r.id,
+        requestedSpecialty: r.requestedSpecialty,
+        documents: r.documents,
+        createdAt: r.createdAt,
+        currentSpecialty: r.vetProfile.specialty,
+        collegiateNumber: r.vetProfile.collegiateNumber,
+        vetName: r.vetProfile.user.fullName,
+        vetEmail: r.vetProfile.user.email,
+      })),
+      count: rows.length,
+    });
+  }),
+);
+
+// POST /admin/specialty-requests/:id/review -> aprobar (aplica la especialidad) / rechazar
+router.post(
+  '/specialty-requests/:id/review',
+  validate({
+    params: z.object({ id: z.string().uuid() }),
+    body: z.object({ action: z.enum(['approve', 'reject']), notes: z.string().optional() }),
+  }),
+  asyncHandler(async (req, res) => {
+    const reqRow = await prisma.vetSpecialtyRequest.findUnique({ where: { id: req.params.id } });
+    if (!reqRow) throw ApiError.notFound('Solicitud no encontrada');
+    if (reqRow.status !== 'PENDING') throw ApiError.conflict('Esta solicitud ya fue resuelta');
+    const approve = req.body.action === 'approve';
+    await prisma.$transaction(async (tx) => {
+      await tx.vetSpecialtyRequest.update({
+        where: { id: reqRow.id },
+        data: { status: approve ? 'APPROVED' : 'REJECTED', reviewNote: req.body.notes, reviewedById: req.user!.id, reviewedAt: new Date() },
+      });
+      if (approve) {
+        await tx.vetProfile.update({ where: { id: reqRow.vetProfileId }, data: { specialty: reqRow.requestedSpecialty } });
+      }
+    });
+    res.json({ id: reqRow.id, status: approve ? 'APPROVED' : 'REJECTED' });
+  }),
+);
+
 // ─────────────────────────────────────────────────────────────
 //  MARKETING (push masivo + push a comercios por radio de km)
 // ─────────────────────────────────────────────────────────────

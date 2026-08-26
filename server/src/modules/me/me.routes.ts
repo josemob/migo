@@ -831,6 +831,12 @@ router.get(
     if (!profile) return res.json({ profile: null, isIndependent: false, hasClinic: !!staff });
     const verified = profile.verificationStatus === 'VERIFIED';
     const hasClinic = !!staff;
+    // Solicitud de cambio de especialidad pendiente (bloquea la edición hasta que el admin resuelva)
+    const pending = await prisma.vetSpecialtyRequest.findFirst({
+      where: { vetProfileId: profile.id, status: 'PENDING' },
+      orderBy: { createdAt: 'desc' },
+      select: { requestedSpecialty: true, createdAt: true },
+    });
     res.json({
       profile: {
         position: profile.position,
@@ -849,16 +855,17 @@ router.get(
       hasClinic,
       clinicName: staff?.clinic?.name ?? null,
       telemedicineActive: verified && !hasClinic && sub?.status === 'ACTIVE',
+      pendingSpecialty: pending?.requestedSpecialty ?? null, // hay cambio en revisión
     });
   }),
 );
 
-// PATCH /me/vet-profile -> el profesional actualiza su especialidad y ubicación de servicio
+// PATCH /me/vet-profile -> el profesional actualiza su experiencia y ubicación de servicio.
+// La ESPECIALIDAD ya no se edita aquí: va por /me/specialty-request (requiere documentos + aprobación).
 router.patch(
   '/vet-profile',
   validate({
     body: z.object({
-      specialty: z.string().max(120).optional(),
       experienceYears: z.number().int().min(0).max(80).nullable().optional(),
       serviceLat: z.number().optional(),
       serviceLng: z.number().optional(),
@@ -869,6 +876,42 @@ router.patch(
     const updated = await prisma.vetProfile.update({ where: { userId: req.user!.id }, data: req.body }).catch(() => null);
     if (!updated) throw ApiError.notFound('Aún no tienes perfil profesional. Completa tu verificación (KYC) primero.');
     res.json({ ok: true });
+  }),
+);
+
+// POST /me/specialty-request -> el vet solicita cambiar sus especialidades, avalado con
+// documentos (carnet, postgrado, etc.). Queda PENDING hasta que el Super Admin lo apruebe.
+router.post(
+  '/specialty-request',
+  validate({
+    body: z.object({
+      specialty: z.string().min(2).max(200), // hasta 3 especialidades separadas por coma
+      documents: z
+        .array(
+          z.object({
+            type: z.string().min(1).max(40), // Carnet CMV | Postgrado | Diplomado | Otro
+            label: z.string().max(120).optional(),
+            url: z.string().min(1), // data URI (imagen o PDF)
+          }),
+        )
+        .min(1, 'Adjunta al menos un documento que avale tu especialidad'),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const profile = await prisma.vetProfile.findUnique({ where: { userId: req.user!.id }, select: { id: true } });
+    if (!profile) throw ApiError.notFound('Aún no tienes perfil profesional. Completa tu verificación (KYC) primero.');
+    const existing = await prisma.vetSpecialtyRequest.findFirst({ where: { vetProfileId: profile.id, status: 'PENDING' } });
+    if (existing) throw ApiError.conflict('Ya tienes una solicitud de especialidad en revisión.');
+    const created = await prisma.vetSpecialtyRequest.create({
+      data: {
+        vetProfileId: profile.id,
+        requestedSpecialty: req.body.specialty,
+        documents: req.body.documents,
+        status: 'PENDING',
+      },
+      select: { id: true, status: true, createdAt: true },
+    });
+    res.status(201).json(created);
   }),
 );
 

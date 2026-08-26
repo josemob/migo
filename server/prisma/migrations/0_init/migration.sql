@@ -471,6 +471,21 @@ CREATE TABLE "VetProfile" (
 );
 
 -- CreateTable
+CREATE TABLE "VetSpecialtyRequest" (
+    "id" TEXT NOT NULL,
+    "vetProfileId" TEXT NOT NULL,
+    "requestedSpecialty" TEXT NOT NULL,
+    "documents" JSONB NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "reviewNote" TEXT,
+    "reviewedById" TEXT,
+    "reviewedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "VetSpecialtyRequest_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "VetSubscription" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -914,6 +929,12 @@ CREATE UNIQUE INDEX "VetProfile_userId_key" ON "VetProfile"("userId");
 CREATE INDEX "VetProfile_verificationStatus_idx" ON "VetProfile"("verificationStatus");
 
 -- CreateIndex
+CREATE INDEX "VetSpecialtyRequest_status_idx" ON "VetSpecialtyRequest"("status");
+
+-- CreateIndex
+CREATE INDEX "VetSpecialtyRequest_vetProfileId_idx" ON "VetSpecialtyRequest"("vetProfileId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "VetSubscription_userId_key" ON "VetSubscription"("userId");
 
 -- CreateIndex
@@ -1116,6 +1137,9 @@ ALTER TABLE "ClinicStaff" ADD CONSTRAINT "ClinicStaff_clinicId_fkey" FOREIGN KEY
 
 -- AddForeignKey
 ALTER TABLE "VetProfile" ADD CONSTRAINT "VetProfile_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "VetSpecialtyRequest" ADD CONSTRAINT "VetSpecialtyRequest_vetProfileId_fkey" FOREIGN KEY ("vetProfileId") REFERENCES "VetProfile"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "VetSubscription" ADD CONSTRAINT "VetSubscription_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -766,11 +766,31 @@ model VetProfile {
   // Emergencias ruteadas / aceptadas como vet independiente (Fase C)
   emergencyAlerts     EmergencyAlert[] @relation("EmergencyAlertIndependentVet")
   acceptedEmergencies Emergency[]      @relation("EmergencyAcceptedVet")
+  // Solicitudes de cambio de especialidad (con documentos, aprobadas por Super Admin)
+  specialtyRequests   VetSpecialtyRequest[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([verificationStatus])
+}
+
+// Solicitud de cambio de especialidades del vet, avalada con documentos (carnet,
+// postgrado, etc.). Requiere aprobación del Super Admin para aplicarse a VetProfile.
+model VetSpecialtyRequest {
+  id                 String     @id @default(uuid())
+  vetProfile         VetProfile @relation(fields: [vetProfileId], references: [id], onDelete: Cascade)
+  vetProfileId       String
+  requestedSpecialty String     // especialidades separadas por coma (hasta 3)
+  documents          Json       // [{ type, label, url }] — url = data URI (imagen o PDF)
+  status             String     @default("PENDING") // PENDING | APPROVED | REJECTED
+  reviewNote         String?
+  reviewedById       String?
+  reviewedAt         DateTime?
+  createdAt          DateTime   @default(now())
+
+  @@index([status])
+  @@index([vetProfileId])
 }
 
 enum VetPlanStatus {
