@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { appAlert } from '../lib/dialog';
+import { useVetVideo } from '../lib/vetVideo';
 import { cardShadow, colors, radius, triageColor, triageLabel } from '../theme';
 
 interface IncomingAlert {
@@ -20,7 +22,7 @@ interface IncomingAlert {
       name: string;
       breed?: string | null;
       species: string;
-      owner: { fullName: string; phone?: string | null };
+      owner: { id: string; fullName: string; phone?: string | null };
       allergies: { substance: string }[];
       conditions: { name: string }[];
     };
@@ -29,11 +31,30 @@ interface IncomingAlert {
 
 /** Emergencias ruteadas al vet independiente (Fase C): listar + aceptar. Poll cada 15s. */
 export function IncomingEmergencies() {
+  const { client: videoClient, userId: myStreamId } = useVetVideo();
+  const [calling, setCalling] = useState(false);
+
   const q = useQuery({
     queryKey: ['my-emergencies'],
     queryFn: () => api<{ data: IncomingAlert[] }>('/me/emergencies'),
     refetchInterval: 15000,
   });
+
+  // Inicia una videollamada al dueño: crea la sala Stream y "anilla" (el overlay la muestra).
+  const startVideoCall = async (ownerId: string) => {
+    if (!videoClient || !myStreamId) {
+      return appAlert('Video no disponible', 'No pudimos conectar el servicio de video. Reintenta en unos segundos.');
+    }
+    setCalling(true);
+    try {
+      const call = videoClient.call('default', `emg_${ownerId}_${Date.now()}`);
+      await call.getOrCreate({ ring: true, data: { members: [{ user_id: myStreamId }, { user_id: ownerId }] } });
+    } catch (e) {
+      appAlert('No se pudo iniciar la llamada', e instanceof Error ? e.message : 'Intenta de nuevo.');
+    } finally {
+      setCalling(false);
+    }
+  };
 
   const accept = useMutation({
     mutationFn: (alertId: string) => api(`/me/emergencies/alerts/${alertId}/accept`, { method: 'POST' }),
@@ -72,6 +93,13 @@ export function IncomingEmergencies() {
               <View style={styles.acceptedBox}>
                 <Text style={styles.acceptedTitle}>✅ Aceptada · contacto del dueño</Text>
                 <Text style={styles.ownerName}>{e.pet.owner.fullName}</Text>
+                <Pressable
+                  style={[styles.videoBtn, calling && { opacity: 0.6 }]}
+                  disabled={calling}
+                  onPress={() => startVideoCall(e.pet.owner.id)}
+                >
+                  <Text style={styles.videoTxt}>{calling ? 'Llamando…' : '📹 Iniciar videollamada'}</Text>
+                </Pressable>
                 {e.pet.allergies.length > 0 && (
                   <Text style={styles.med}>Alergias: {e.pet.allergies.map((x) => x.substance).join(', ')}</Text>
                 )}
@@ -123,4 +151,6 @@ const styles = StyleSheet.create({
   med: { fontSize: 13, color: colors.muted },
   callBtn: { backgroundColor: colors.green, borderRadius: radius.md, paddingVertical: 12, alignItems: 'center', marginTop: 6 },
   callTxt: { color: colors.white, fontWeight: '800', fontSize: 15 },
+  videoBtn: { backgroundColor: colors.brand, borderRadius: radius.md, paddingVertical: 12, alignItems: 'center', marginTop: 6 },
+  videoTxt: { color: colors.white, fontWeight: '800', fontSize: 15 },
 });

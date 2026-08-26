@@ -17,7 +17,7 @@ const UNATTENDED_TIMEOUT_MIN = 20;
 const vetEmergencyInclude = {
   pet: {
     include: {
-      owner: { select: { fullName: true, phone: true } },
+      owner: { select: { id: true, fullName: true, phone: true } }, // id para iniciar la videollamada
       allergies: true,
       conditions: { where: { isActive: true } },
     },

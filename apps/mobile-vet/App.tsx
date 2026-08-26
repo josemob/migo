@@ -15,6 +15,7 @@ import { registerForPush } from './src/lib/push';
 import { AuthProvider, useAuth } from './src/lib/auth';
 import { StreamProvider } from './src/lib/stream';
 import { IndependentBackContext } from './src/lib/independentMode';
+import { IndependentVideoProvider } from './src/lib/vetVideo';
 import { api } from './src/lib/api';
 import { DialogHost } from './src/lib/dialog';
 import { Loading } from './src/components/ui';
@@ -115,7 +116,11 @@ function MainApp({ onBackToIndependent }: { onBackToIndependent?: () => void }) 
 function IndependentRoot({ onJoinedClinic }: { onJoinedClinic: () => void }) {
   const [dashboard, setDashboard] = useState(false);
   if (dashboard) return <MainApp onBackToIndependent={() => setDashboard(false)} />;
-  return <IndependentHomeScreen onJoinedClinic={onJoinedClinic} onEnterDashboard={() => setDashboard(true)} />;
+  return (
+    <IndependentVideoProvider>
+      <IndependentHomeScreen onJoinedClinic={onJoinedClinic} onEnterDashboard={() => setDashboard(true)} />
+    </IndependentVideoProvider>
+  );
 }
 
 /** Tras iniciar sesión: decide entre la app completa (clínica), el home independiente,
