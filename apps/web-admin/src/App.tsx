@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import General from './pages/General';
 import Comercios from './pages/Comercios';
 import Veterinarios from './pages/Veterinarios';
+import Especialidades from './pages/Especialidades';
 import Emergencias from './pages/Emergencias';
 import Usuarios from './pages/Usuarios';
 import Finanzas from './pages/Finanzas';
@@ -52,6 +53,7 @@ export default function App() {
         <Route path="/" element={<General />} />
         <Route path="/comercios" element={<Comercios />} />
         <Route path="/veterinarios" element={<Veterinarios />} />
+        <Route path="/especialidades" element={<Especialidades />} />
         <Route path="/emergencias" element={<Emergencias />} />
         <Route path="/usuarios" element={<Usuarios />} />
         <Route path="/finanzas" element={<Finanzas />} />

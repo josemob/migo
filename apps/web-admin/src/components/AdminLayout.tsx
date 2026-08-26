@@ -7,6 +7,7 @@ const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
   { to: '/', label: 'General & Métricas', icon: 'dashboard', end: true },
   { to: '/comercios', label: 'Gestión de Comercios', icon: 'store' },
   { to: '/veterinarios', label: 'Verificación de Veterinarios', icon: 'hospital' },
+  { to: '/especialidades', label: 'Solicitudes de Especialidad', icon: 'shield' },
   { to: '/emergencias', label: 'Monitor de Emergencias', icon: 'emergency' },
   { to: '/usuarios', label: 'Usuarios & Mascotas', icon: 'team' },
   { to: '/finanzas', label: 'Finanzas & Liquidaciones', icon: 'finance' },
