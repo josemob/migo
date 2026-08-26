@@ -11,6 +11,7 @@ import { editField } from '../lib/editField';
 import { pickPhotoAsDataUri } from '../lib/photo';
 import { Button } from '../components/ui';
 import { ChangePasswordModal } from '../components/ChangePasswordModal';
+import { DeleteAccountModal } from '../components/DeleteAccountModal';
 import { TabIcon } from '../components/TabIcon';
 import { BackButton } from '../components/BackButton';
 import { cardShadow, colors, radius } from '../theme';
@@ -30,8 +31,15 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
   const [faceId, setFaceId] = useState(false);
   const [push, setPush] = useState(true);
   const [pwOpen, setPwOpen] = useState(false);
+  const [delOpen, setDelOpen] = useState(false);
 
   useEffect(() => { isBiometricEnabled().then(setFaceId); }, []);
+  useEffect(() => { api<{ push: boolean }>('/me/notification-prefs').then((p) => setPush(p.push)).catch(() => {}); }, []);
+
+  const togglePush = (v: boolean) => {
+    setPush(v);
+    api('/me/notification-prefs', { method: 'PATCH', body: { push: v } }).catch(() => {});
+  };
 
   const toggleBiometric = async (next: boolean) => {
     if (next) {
@@ -78,11 +86,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
     DevSettings.reload();
   };
 
-  const confirmDelete = () =>
-    appAlert('Eliminar cuenta', 'Esta acción es permanente. ¿Deseas continuar?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Eliminar', style: 'destructive', onPress: soon },
-    ]);
+  const confirmDelete = () => setDelOpen(true);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -151,7 +155,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
         {/* Preferencias */}
         <View style={[styles.card, { marginTop: 20 }]}>
           <Text style={styles.cardTitle}>Preferencias</Text>
-          <Row icon="bell" label="Notificaciones Push" toggle value={push} onToggle={setPush} />
+          <Row icon="bell" label="Notificaciones Push" toggle value={push} onToggle={togglePush} />
         </View>
 
         <View style={{ gap: 12, marginTop: 24 }}>
@@ -161,6 +165,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
         </View>
       </ScrollView>
       <ChangePasswordModal visible={pwOpen} onClose={() => setPwOpen(false)} />
+      <DeleteAccountModal visible={delOpen} onClose={() => setDelOpen(false)} onDeleted={logout} />
     </SafeAreaView>
   );
 }

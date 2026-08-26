@@ -12,6 +12,7 @@ import { createStreamCredentials, streamConfigured, ensureChatChannel } from '..
 import { registerPushToken, removePushToken } from '../push/push.service';
 import { issueReceipt, receiptNumber } from '../receipts/receipt.service';
 import { emergencyService } from '../emergencies/emergency.service';
+import { hashPassword, verifyPassword } from '../../utils/password';
 
 const router = Router();
 router.use(authenticate);
@@ -952,6 +953,64 @@ router.post(
       select: { id: true, status: true, agoraChannel: true, createdAt: true },
     });
     res.status(201).json(tele);
+  }),
+);
+
+// GET /me/notification-prefs -> preferencias de notificación del usuario
+router.get(
+  '/notification-prefs',
+  asyncHandler(async (req, res) => {
+    const u = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { notifyPush: true, notifyEmail: true, notifyWhatsapp: true },
+    });
+    res.json({ push: u?.notifyPush ?? true, email: u?.notifyEmail ?? true, whatsapp: u?.notifyWhatsapp ?? true });
+  }),
+);
+
+// PATCH /me/notification-prefs -> actualizar preferencias (push/email/whatsapp)
+router.patch(
+  '/notification-prefs',
+  validate({ body: z.object({ push: z.boolean().optional(), email: z.boolean().optional(), whatsapp: z.boolean().optional() }) }),
+  asyncHandler(async (req, res) => {
+    const { push, email, whatsapp } = req.body as { push?: boolean; email?: boolean; whatsapp?: boolean };
+    await prisma.user.update({
+      where: { id: req.user!.id },
+      data: { notifyPush: push, notifyEmail: email, notifyWhatsapp: whatsapp },
+    });
+    res.json({ ok: true });
+  }),
+);
+
+// POST /me/delete-account -> el usuario elimina su cuenta (borrado suave + anonimización)
+router.post(
+  '/delete-account',
+  validate({ body: z.object({ password: z.string().min(1) }) }),
+  asyncHandler(async (req, res) => {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { id: true, passwordHash: true } });
+    if (!user) throw ApiError.notFound('Usuario no encontrado');
+    if (!(await verifyPassword(req.body.password, user.passwordHash))) {
+      throw ApiError.badRequest('Contraseña incorrecta');
+    }
+    // Anonimiza los datos personales y libera email/teléfono/cédula (constraints únicos).
+    const deadHash = await hashPassword(randomUUID() + randomUUID());
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: user.id },
+        data: {
+          status: 'DELETED',
+          email: `deleted_${user.id}@deleted.migo`,
+          phone: null,
+          nationalId: null,
+          fullName: 'Cuenta eliminada',
+          avatarUrl: null,
+          passwordHash: deadHash,
+        },
+      }),
+      prisma.refreshToken.updateMany({ where: { userId: user.id, revokedAt: null }, data: { revokedAt: new Date() } }),
+      prisma.pushToken.deleteMany({ where: { userId: user.id } }),
+    ]);
+    res.json({ ok: true });
   }),
 );
 

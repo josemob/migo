@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { api, tokens } from '../lib/api';
@@ -8,9 +8,14 @@ import { appAlert } from '../lib/dialog';
 import { biometricSupported, enableBiometric, disableBiometric, isBiometricEnabled } from '../lib/biometric';
 import { Button } from '../components/ui';
 import { ChangePasswordModal } from '../components/ChangePasswordModal';
+import { NotificationPrefsModal } from '../components/NotificationPrefsModal';
+import { DeleteAccountModal } from '../components/DeleteAccountModal';
 import { TabIcon } from '../components/TabIcon';
 import { BackButton } from '../components/BackButton';
 import { cardShadow, colors, radius } from '../theme';
+
+// Contacto de soporte (provisional hasta tener dominio/WhatsApp de soporte propio).
+const SUPPORT_EMAIL = 'mediagreenpop@gmail.com';
 
 interface Pet { id: string; name: string }
 
@@ -32,6 +37,8 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
   const bottomPad = insets.bottom + 34;
   const [bio, setBio] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [delOpen, setDelOpen] = useState(false);
   useEffect(() => { isBiometricEnabled().then(setBio); }, []);
 
   const toggleBiometric = async (next: boolean) => {
@@ -81,8 +88,8 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
     {
       title: 'Preferencias y agendas',
       rows: [
-        { icon: 'calendar', title: 'Agenda de cuidados', sub: 'Gestiona alertas de vacunas, desparasitación y citas.', onPress: soon },
-        { icon: 'bell', title: 'Notificaciones de la app', sub: 'Elige si prefieres alertas por Push, Email o WhatsApp.', onPress: soon },
+        { icon: 'calendar', title: 'Agenda de cuidados', sub: 'Gestiona alertas de vacunas, desparasitación y citas.', onPress: () => navigation.navigate('Tabs', { screen: 'Citas' }) },
+        { icon: 'bell', title: 'Notificaciones de la app', sub: 'Elige si prefieres alertas por Push, Email o WhatsApp.', onPress: () => setNotifOpen(true) },
       ],
     },
     {
@@ -95,17 +102,13 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
     {
       title: 'Migo app',
       rows: [
-        { icon: 'chat', title: 'Soporte técnico', sub: 'Chatea con nuestro equipo de asistencia.', onPress: soon },
+        { icon: 'chat', title: 'Soporte técnico', sub: 'Escríbenos y te ayudamos.', onPress: () => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Soporte Migo')}`).catch(() => appAlert('Soporte', `Escríbenos a ${SUPPORT_EMAIL}`)) },
         { icon: 'file', title: 'Políticas de privacidad', sub: 'Términos, condiciones y protección de datos.', onPress: soon },
       ],
     },
   ];
 
-  const confirmDelete = () =>
-    appAlert('Eliminar cuenta', 'Esta acción es permanente. ¿Deseas continuar?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Eliminar', style: 'destructive', onPress: soon },
-    ]);
+  const confirmDelete = () => setDelOpen(true);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -153,6 +156,8 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
         </View>
       </ScrollView>
       <ChangePasswordModal visible={pwOpen} onClose={() => setPwOpen(false)} />
+      <NotificationPrefsModal visible={notifOpen} onClose={() => setNotifOpen(false)} />
+      <DeleteAccountModal visible={delOpen} onClose={() => setDelOpen(false)} onDeleted={logout} />
     </SafeAreaView>
   );
 }

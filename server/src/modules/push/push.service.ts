@@ -29,6 +29,9 @@ interface PushPayload {
  */
 export async function sendPush(userId: string, payload: PushPayload) {
   try {
+    // Respeta la preferencia del usuario: si desactivó las push, no se le envían.
+    const pref = await prisma.user.findUnique({ where: { id: userId }, select: { notifyPush: true } });
+    if (pref && !pref.notifyPush) return;
     const tokens = await prisma.pushToken.findMany({ where: { userId }, select: { token: true } });
     const messages: ExpoPushMessage[] = tokens
       .map((t) => t.token)
