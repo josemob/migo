@@ -128,17 +128,25 @@ Si detectas señales de urgencia (dificultad para respirar, convulsiones, sangra
     .map((m) => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.text }] }));
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent?key=${env.GEMINI_API_KEY}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: system }] },
-      contents,
-      // Presupuesto alto: los modelos flash nuevos gastan tokens en "pensamiento";
-      // con poco margen la respuesta visible se corta (finishReason MAX_TOKENS).
-      generationConfig: { temperature: 0.6, maxOutputTokens: 1200 },
-    }),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20000);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: system }] },
+        contents,
+        // Presupuesto alto: los modelos flash nuevos gastan tokens en "pensamiento";
+        // con poco margen la respuesta visible se corta (finishReason MAX_TOKENS).
+        generationConfig: { temperature: 0.6, maxOutputTokens: 1200 },
+      }),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) throw new Error(`Gemini HTTP ${res.status}`);
   const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
   const text = (data.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? '').join('').trim();
