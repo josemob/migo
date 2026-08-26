@@ -7,7 +7,7 @@ import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { appAlert } from '../lib/dialog';
 import { Badge, Button, Card, Loading } from '../components/ui';
-import { SpecialtyPicker } from '../components/SpecialtyPicker';
+import { SpecialtyRequestModal } from '../components/SpecialtyRequestModal';
 import { BiometricToggle } from '../components/BiometricToggle';
 import { IncomingEmergencies } from '../components/IncomingEmergencies';
 import { cardShadow, colors, radius } from '../theme';
@@ -28,6 +28,7 @@ interface VetProfileResp {
   isIndependent: boolean;
   hasClinic: boolean;
   telemedicineActive: boolean;
+  pendingSpecialty: string | null; // cambio de especialidad en revisión
 }
 
 interface Teleconsult {
@@ -73,16 +74,15 @@ export default function IndependentHomeScreen({
   });
 
   // Estado editable del perfil (se siembra cuando llega la data)
-  const [specialty, setSpecialty] = useState('');
   const [experience, setExperience] = useState('');
   const [radius_, setRadius] = useState('');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [seeded, setSeeded] = useState(false);
+  const [specialtyModal, setSpecialtyModal] = useState(false);
 
   useEffect(() => {
     const p = profileQ.data?.profile;
     if (p && !seeded) {
-      setSpecialty(p.specialty ?? '');
       setExperience(p.experienceYears != null ? String(p.experienceYears) : '');
       setRadius(String(p.serviceRadiusKm ?? 15));
       if (p.serviceLat != null && p.serviceLng != null) setCoords({ lat: p.serviceLat, lng: p.serviceLng });
@@ -102,7 +102,6 @@ export default function IndependentHomeScreen({
       api('/me/vet-profile', {
         method: 'PATCH',
         body: {
-          specialty: specialty.trim() || undefined,
           experienceYears: experience.trim() ? Number(experience) : null,
           serviceRadiusKm: radius_.trim() ? Number(radius_) : undefined,
           ...(coords ? { serviceLat: coords.lat, serviceLng: coords.lng } : {}),
@@ -170,8 +169,23 @@ export default function IndependentHomeScreen({
             <Text style={styles.metaLine}>Colegiado: <Text style={styles.metaStrong}>{data.profile.collegiateNumber}</Text></Text>
           ) : null}
 
-          <Text style={styles.label}>Especialidad</Text>
-          <SpecialtyPicker value={specialty} onChange={setSpecialty} />
+          <Text style={styles.label}>Especialidades</Text>
+          {data?.pendingSpecialty ? (
+            <View style={styles.pendingBox}>
+              <Text style={styles.pendingTitle}>⏳ Cambio en revisión</Text>
+              <Text style={styles.pendingVal}>{data.pendingSpecialty}</Text>
+              <Text style={styles.pendingHint}>Se aplicará cuando el Super Admin apruebe tus documentos.</Text>
+            </View>
+          ) : (
+            <>
+              <View style={styles.specBox}>
+                <Text style={styles.specVal}>{data?.profile?.specialty || 'Sin especialidad definida'}</Text>
+              </View>
+              <Pressable style={styles.editSpecBtn} onPress={() => setSpecialtyModal(true)}>
+                <Text style={styles.editSpecTxt}>Editar especialidades</Text>
+              </Pressable>
+            </>
+          )}
 
           <Text style={styles.label}>Años de experiencia</Text>
           <TextInput style={styles.input} value={experience} onChangeText={setExperience} keyboardType="number-pad" placeholder="Ej. 5" placeholderTextColor={colors.muted} />
@@ -250,6 +264,13 @@ export default function IndependentHomeScreen({
           </Card>
         ) : null}
       </ScrollView>
+
+      <SpecialtyRequestModal
+        visible={specialtyModal}
+        initialSpecialty={data?.profile?.specialty ?? ''}
+        onClose={() => setSpecialtyModal(false)}
+        onSubmitted={() => void profileQ.refetch()}
+      />
     </SafeAreaView>
   );
 }
@@ -270,6 +291,15 @@ const styles = StyleSheet.create({
   hint: { fontSize: 13, color: colors.muted, marginTop: 8, lineHeight: 19 },
   metaLine: { fontSize: 14, color: colors.muted, marginTop: 6 },
   metaStrong: { color: colors.text, fontWeight: '700' },
+
+  specBox: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12 },
+  specVal: { fontSize: 15, color: colors.text, fontWeight: '600' },
+  editSpecBtn: { borderWidth: 1.5, borderColor: colors.brand, borderRadius: radius.md, paddingVertical: 11, alignItems: 'center', marginTop: 8 },
+  editSpecTxt: { color: colors.brand, fontWeight: '800', fontSize: 14 },
+  pendingBox: { backgroundColor: '#FDEEC8', borderRadius: radius.md, padding: 14 },
+  pendingTitle: { fontSize: 14, fontWeight: '800', color: colors.amber },
+  pendingVal: { fontSize: 15, color: colors.text, fontWeight: '700', marginTop: 4 },
+  pendingHint: { fontSize: 12, color: colors.muted, marginTop: 4, lineHeight: 17 },
 
   label: { fontSize: 14, fontWeight: '700', color: colors.text, marginTop: 16, marginBottom: 8 },
   input: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, color: colors.text },

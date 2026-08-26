@@ -1,5 +1,24 @@
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 import { appAlert } from './dialog';
+
+/**
+ * Deja elegir un PDF (o imagen) y lo devuelve como data URI base64 + su nombre.
+ * null si se cancela. Limita a ~8MB para no reventar el payload.
+ */
+export async function pickDocumentAsDataUri(): Promise<{ url: string; name: string } | null> {
+  const res = await DocumentPicker.getDocumentAsync({ type: ['application/pdf', 'image/*'], copyToCacheDirectory: true });
+  if (res.canceled || !res.assets?.[0]) return null;
+  const asset = res.assets[0];
+  if (asset.size && asset.size > 8 * 1024 * 1024) {
+    appAlert('Archivo muy grande', 'El documento supera los 8MB. Usa uno más liviano.');
+    return null;
+  }
+  const mime = asset.mimeType ?? (asset.name?.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+  const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: 'base64' as FileSystem.EncodingType });
+  return { url: `data:${mime};base64,${base64}`, name: asset.name ?? 'documento' };
+}
 
 /**
  * Abre la galería, recorta a cuadrado y devuelve la imagen como data URI
