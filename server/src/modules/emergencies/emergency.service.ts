@@ -3,7 +3,7 @@ import { ApiError } from '../../utils/ApiError';
 import { distanceKm, etaMinutes } from '../../lib/geo';
 import { bus, EMERGENCY_NEW, EMERGENCY_UPDATE } from '../../lib/events';
 import { sendPush } from '../push/push.service';
-import { runTriage } from './triage.service';
+import { runTriage, quickTriage } from './triage.service';
 
 const BROADCAST_RADIUS_KM = 15;
 const MAX_CLINICS = 10;
@@ -60,6 +60,69 @@ async function findEligibleIndependentVets(
     .filter((v) => v.km <= v.radiusKm && specialtyQualifies(v.specialty)) // dentro del radio propio + especialidad
     .sort((a, b) => a.km - b.km)
     .slice(0, MAX_INDEPENDENT_VETS);
+}
+
+/**
+ * Refinamiento en SEGUNDO PLANO (no bloquea la respuesta al dueño): corre el triaje con IA
+ * (Gemini con timeout → heurística), enriquece la urgencia (gravedad, resumen, primeros
+ * auxilios, especialidad) y rutea a los vets INDEPENDIENTES por especialidad + radio.
+ */
+async function refineTriageAndRouteVets(
+  emergencyId: string,
+  triageInput: Parameters<typeof runTriage>[0],
+  origin: { lat: number; lng: number },
+  petName: string,
+  symptoms: string,
+) {
+  const triage = await runTriage(triageInput);
+
+  // Enriquecer el triaje SOLO si la urgencia sigue en curso (no aceptada/cancelada)
+  await prisma.emergency.updateMany({
+    where: { id: emergencyId, status: { in: ['TRIAGING', 'BROADCASTING'] } },
+    data: {
+      triageLevel: triage.triageLevel,
+      aiSummary: triage.aiSummary,
+      aiFirstAid: triage.aiFirstAid,
+      requiredSpecialty: triage.requiredSpecialty,
+    },
+  });
+
+  // Rutear a vets independientes por especialidad + radio
+  const nearbyVets = await findEligibleIndependentVets(origin, triage.requiredSpecialty);
+  if (nearbyVets.length) {
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    await prisma.emergencyAlert.createMany({
+      data: nearbyVets.map((v) => ({
+        emergencyId,
+        vetProfileId: v.id,
+        distanceKm: Number(v.km.toFixed(2)),
+        etaMinutes: v.eta,
+        expiresAt,
+      })),
+      skipDuplicates: true,
+    });
+    try {
+      const critical = triage.triageLevel === 'RED';
+      const title = critical ? '🚨 Emergencia crítica cerca' : '🚑 Nueva emergencia cerca';
+      const body = `${petName}: ${symptoms}`.replace(/\s+/g, ' ').trim().slice(0, 140);
+      await Promise.all(
+        nearbyVets.map((v) => sendPush(v.userId, { title, body, data: { type: 'emergency', emergencyId, triageLevel: triage.triageLevel } })),
+      );
+    } catch (e) {
+      console.error('[emergency] push a vets independientes falló', e);
+    }
+  }
+
+  // Refrescar los paneles de clínica con el triaje enriquecido (SSE)
+  const clinicAlerts = await prisma.emergencyAlert.findMany({ where: { emergencyId, clinicId: { not: null } }, select: { clinicId: true } });
+  const clinicIds = [...new Set(clinicAlerts.map((a) => a.clinicId).filter((c): c is string => !!c))];
+  for (const clinicId of clinicIds) bus.emit(EMERGENCY_UPDATE, { clinicId, emergencyId });
+
+  // Si nadie quedó alertado (ni clínicas ni vets), expira la urgencia
+  const total = await prisma.emergencyAlert.count({ where: { emergencyId } });
+  if (total === 0) {
+    await prisma.emergency.updateMany({ where: { id: emergencyId, status: { in: ['TRIAGING', 'BROADCASTING'] } }, data: { status: 'EXPIRED' } });
+  }
 }
 
 /**
@@ -124,7 +187,7 @@ export const emergencyService = {
     });
     if (!pet) throw ApiError.notFound('Mascota no encontrada');
 
-    // 1) Crear la urgencia en estado de triaje
+    // 1) Crear la urgencia
     const emergency = await prisma.emergency.create({
       data: {
         ownerId,
@@ -137,20 +200,22 @@ export const emergencyService = {
       },
     });
 
-    // 2) Triaje con Migo AI (Gemini o heurística)
     const ageYears = pet.birthDate
       ? Math.floor((Date.now() - pet.birthDate.getTime()) / (365.25 * 86400000))
       : null;
-    const triage = await runTriage({
+    const triageInput = {
       species: pet.species,
       breed: pet.breed,
       symptoms: input.symptoms,
       ageYears,
       knownAllergies: pet.allergies.map((a) => a.substance),
       conditions: pet.conditions.map((c) => c.name),
-    });
+    };
 
-    // 3) Buscar clínicas candidatas y calcular distancia
+    // 2) Triaje RÁPIDO (heurística, instantáneo) — para difundir de inmediato, sin esperar IA
+    const quick = quickTriage(triageInput);
+
+    // 3) Clínicas cercanas (pura geolocalización, instantáneo)
     const clinics = await prisma.clinic.findMany({
       where: {
         acceptsEmergencies: true,
@@ -161,7 +226,6 @@ export const emergencyService = {
       },
       select: { id: true, latitude: true, longitude: true },
     });
-
     const origin = { lat: input.latitude, lng: input.longitude };
     const nearby = clinics
       .map((c) => {
@@ -172,100 +236,53 @@ export const emergencyService = {
       .sort((a, b) => a.km - b.km)
       .slice(0, MAX_CLINICS);
 
-    // 3.b) Vets INDEPENDIENTES elegibles por especialidad + radio (Fase C)
-    const nearbyVets = await findEligibleIndependentVets(origin, triage.requiredSpecialty);
-    const hasTargets = nearby.length > 0 || nearbyVets.length > 0;
-
-    // 4) Actualizar triaje + estado, y crear las alertas (broadcast a clínicas y vets)
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 min para responder
+    // 4) DIFUNDIR YA a las clínicas (con el triaje rápido); la respuesta al dueño no espera a la IA
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     const [updated] = await prisma.$transaction([
       prisma.emergency.update({
         where: { id: emergency.id },
         data: {
-          triageLevel: triage.triageLevel,
-          aiSummary: triage.aiSummary,
-          aiFirstAid: triage.aiFirstAid,
-          requiredSpecialty: triage.requiredSpecialty,
-          status: hasTargets ? 'BROADCASTING' : 'EXPIRED',
+          triageLevel: quick.triageLevel,
+          aiSummary: quick.aiSummary,
+          aiFirstAid: quick.aiFirstAid,
+          status: 'BROADCASTING',
         },
       }),
       prisma.emergencyAlert.createMany({
-        data: [
-          ...nearby.map((c) => ({
-            emergencyId: emergency.id,
-            clinicId: c.clinicId,
-            distanceKm: Number(c.km.toFixed(2)),
-            etaMinutes: c.eta,
-            expiresAt,
-          })),
-          ...nearbyVets.map((v) => ({
-            emergencyId: emergency.id,
-            vetProfileId: v.id,
-            distanceKm: Number(v.km.toFixed(2)),
-            etaMinutes: v.eta,
-            expiresAt,
-          })),
-        ],
+        data: nearby.map((c) => ({
+          emergencyId: emergency.id,
+          clinicId: c.clinicId,
+          distanceKm: Number(c.km.toFixed(2)),
+          etaMinutes: c.eta,
+          expiresAt,
+        })),
       }),
     ]);
 
-    // Push en tiempo real a las clínicas alertadas (SSE, para el panel web)
-    for (const c of nearby) {
-      bus.emit(EMERGENCY_NEW, { clinicId: c.clinicId, emergencyId: emergency.id });
-    }
-
-    // Notificación push a los profesionales (app vet): suena y es clicable → pantalla de alerta
+    // Push/SSE inmediato a las clínicas
+    for (const c of nearby) bus.emit(EMERGENCY_NEW, { clinicId: c.clinicId, emergencyId: emergency.id });
     try {
       const clinicIds = nearby.map((c) => c.clinicId);
       if (clinicIds.length) {
-        const staff = await prisma.clinicStaff.findMany({
-          where: { clinicId: { in: clinicIds }, isActive: true },
-          select: { userId: true },
-        });
-        const critical = triage.triageLevel === 'RED';
+        const staff = await prisma.clinicStaff.findMany({ where: { clinicId: { in: clinicIds }, isActive: true }, select: { userId: true } });
+        const critical = quick.triageLevel === 'RED';
         const title = critical ? '🚨 Emergencia crítica cerca' : '🚑 Nueva emergencia cerca';
         const body = `${pet.name}: ${input.symptoms}`.replace(/\s+/g, ' ').trim().slice(0, 140);
         const targets = [...new Set(staff.map((s) => s.userId))];
         await Promise.all(
-          targets.map((userId) =>
-            sendPush(userId, {
-              title,
-              body,
-              data: { type: 'emergency', emergencyId: emergency.id, triageLevel: triage.triageLevel },
-            }),
-          ),
+          targets.map((userId) => sendPush(userId, { title, body, data: { type: 'emergency', emergencyId: emergency.id, triageLevel: quick.triageLevel } })),
         );
       }
     } catch (e) {
       console.error('[emergency] push a clínicas falló', e);
     }
 
-    // Push a los vets INDEPENDIENTES ruteados (Fase C)
-    try {
-      if (nearbyVets.length) {
-        const critical = triage.triageLevel === 'RED';
-        const title = critical ? '🚨 Emergencia crítica cerca' : '🚑 Nueva emergencia cerca';
-        const body = `${pet.name}: ${input.symptoms}`.replace(/\s+/g, ' ').trim().slice(0, 140);
-        await Promise.all(
-          nearbyVets.map((v) =>
-            sendPush(v.userId, {
-              title,
-              body,
-              data: { type: 'emergency', emergencyId: emergency.id, triageLevel: triage.triageLevel },
-            }),
-          ),
-        );
-      }
-    } catch (e) {
-      console.error('[emergency] push a vets independientes falló', e);
-    }
+    // 5) Triaje IA + ruteo a vets INDEPENDIENTES en SEGUNDO PLANO (no bloquea la respuesta)
+    void refineTriageAndRouteVets(emergency.id, triageInput, origin, pet.name, input.symptoms).catch((e) =>
+      console.error('[emergency] refinamiento async falló', e),
+    );
 
-    return {
-      emergency: updated,
-      triage,
-      broadcastedTo: nearby.length,
-      broadcastedToVets: nearbyVets.length,
-    };
+    return { emergency: updated, triage: quick, broadcastedTo: nearby.length };
   },
 
   async listForOwner(ownerId: string) {

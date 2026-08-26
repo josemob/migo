@@ -96,6 +96,12 @@ const RED = ['no respira', 'respirac', 'ahog', 'convuls', 'sangr', 'hemorrag', '
 const ORANGE = ['vómito con sangre', 'no come', 'no puede', 'dolor intenso', 'hinchaz', 'fractura', 'cojea mucho', 'temperatura muy'];
 const YELLOW = ['vómit', 'diarrea', 'fiebre', 'cojea', 'decaíd', 'no quiere comer', 'letárg'];
 
+// Triaje instantáneo (sin red): se usa para difundir la urgencia de inmediato,
+// mientras el triaje con IA se refina en segundo plano.
+export function quickTriage(input: TriageInput): TriageResult {
+  return heuristicTriage(input);
+}
+
 function heuristicTriage(input: TriageInput): TriageResult {
   const s = input.symptoms.toLowerCase();
   let level: TriageLevel = 'GREEN';
