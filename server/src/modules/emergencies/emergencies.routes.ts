@@ -124,7 +124,7 @@ router.post(
 const emergencyInclude = {
   pet: {
     include: {
-      owner: { select: { fullName: true, phone: true, nationalId: true } },
+      owner: { select: { id: true, fullName: true, phone: true, nationalId: true } }, // id para chat/videollamada
       allergies: true,
       conditions: { where: { isActive: true } },
     },

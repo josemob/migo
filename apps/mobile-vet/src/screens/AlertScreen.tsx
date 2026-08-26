@@ -1,9 +1,11 @@
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { appAlert } from '../lib/dialog';
+import { useStream } from '../lib/stream';
 import { Loading } from '../components/ui';
+import { TabIcon } from '../components/TabIcon';
 import { cardShadow, colors, radius, triageColor, triageLabel } from '../theme';
 
 interface ActiveAlert {
@@ -18,21 +20,20 @@ interface ActiveAlert {
     aiSummary?: string | null;
     aiFirstAid?: string | null;
     status: string;
-    latitude?: string | number | null;
-    longitude?: string | number | null;
     pet: {
       name: string;
       breed?: string | null;
       species?: string;
-      owner: { fullName: string; phone?: string | null; nationalId?: string | null };
+      owner: { id: string; fullName: string; phone?: string | null; nationalId?: string | null };
       allergies: { substance: string }[];
       conditions: { name: string }[];
     };
   };
 }
 
-export default function AlertScreen() {
+export default function AlertScreen({ navigation }: { navigation: any }) {
   const qc = useQueryClient();
+  const { chatClient } = useStream();
   const q = useQuery({
     queryKey: ['vet-active-emergencies'],
     queryFn: () => api<{ data: ActiveAlert[] }>('/emergencies/active'),
@@ -45,15 +46,20 @@ export default function AlertScreen() {
     onError: (e) => appAlert('No se pudo aceptar', e instanceof Error ? e.message : 'Puede que otra clínica ya la haya tomado.'),
   });
 
-  const attended = useMutation({
-    mutationFn: (emergencyId: string) => api(`/emergencies/${emergencyId}/attended`, { method: 'POST', body: {} }),
-    onSuccess: () => { appAlert('Registrada', 'Urgencia marcada como atendida.'); qc.invalidateQueries({ queryKey: ['vet-active-emergencies'] }); },
-    onError: (e) => appAlert('No se pudo registrar', e instanceof Error ? e.message : 'Intenta de nuevo.'),
+  const videoCall = useMutation({
+    mutationFn: (ownerId: string) => api('/clinic/teleconsults', { method: 'POST', body: { ownerId, video: true } }),
+    onError: (e) => appAlert('No se pudo iniciar la videollamada', e instanceof Error ? e.message : 'Intenta de nuevo.'),
   });
 
-  const openRoute = (lat?: string | number | null, lng?: string | number | null) => {
-    if (lat == null || lng == null) return appAlert('Sin ubicación', 'Esta urgencia no tiene ubicación registrada.');
-    Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`).catch(() => {});
+  const openChat = async (ownerId: string, clientName: string) => {
+    if (!chatClient?.userID) return appAlert('Chat no disponible', 'Conectando el chat… reintenta en unos segundos.');
+    try {
+      const ch = chatClient.channel('messaging', { members: [chatClient.userID, ownerId] });
+      await ch.watch();
+      navigation.navigate('ChatThread', { channelType: 'messaging', channelId: ch.id, clientName });
+    } catch (e) {
+      appAlert('No se pudo abrir el chat', e instanceof Error ? e.message : 'Intenta de nuevo.');
+    }
   };
 
   const alerts = q.data?.data ?? [];
@@ -77,7 +83,6 @@ export default function AlertScreen() {
             const tc = triageColor[level] ?? colors.amber;
             const mine = a.status === 'ACCEPTED'; // esta clínica la aceptó
             const km = a.distanceKm != null ? `${Number(a.distanceKm).toFixed(1)} km` : null;
-            const phone = e.pet.owner.phone;
             return (
               <View key={a.id} style={[styles.card, { borderColor: tc }]}>
                 <View style={styles.top}>
@@ -96,12 +101,15 @@ export default function AlertScreen() {
                     {e.pet.allergies.length > 0 && <Text style={styles.med}>Alergias: {e.pet.allergies.map((x) => x.substance).join(', ')}</Text>}
                     {e.pet.conditions.length > 0 && <Text style={styles.med}>Condiciones: {e.pet.conditions.map((x) => x.name).join(', ')}</Text>}
                     <View style={styles.actionRow}>
-                      <Pressable style={[styles.actionBtn, styles.route]} onPress={() => openRoute(e.latitude, e.longitude)}><Text style={styles.actionTxt}>🧭 Ver ruta</Text></Pressable>
-                      {phone ? <Pressable style={[styles.actionBtn, styles.call]} onPress={() => Linking.openURL(`tel:${phone}`)}><Text style={styles.actionTxt}>📞 Llamar</Text></Pressable> : null}
+                      <Pressable style={[styles.actionBtn, styles.chat]} onPress={() => openChat(e.pet.owner.id, e.pet.owner.fullName)}>
+                        <TabIcon name="chat" color={colors.white} size={18} />
+                        <Text style={styles.actionTxt}>Chat</Text>
+                      </Pressable>
+                      <Pressable style={[styles.actionBtn, styles.video, videoCall.isPending && { opacity: 0.6 }]} disabled={videoCall.isPending} onPress={() => videoCall.mutate(e.pet.owner.id)}>
+                        <TabIcon name="video" color={colors.white} size={18} />
+                        <Text style={styles.actionTxt}>{videoCall.isPending ? 'Llamando…' : 'Videollamada'}</Text>
+                      </Pressable>
                     </View>
-                    <Pressable style={styles.attendedBtn} disabled={attended.isPending} onPress={() => appAlert('Marcar atendida', '¿Confirmas que atendiste esta urgencia? Se registrará el servicio.', [{ text: 'Cancelar', style: 'cancel' }, { text: 'Sí, atendida', onPress: () => attended.mutate(e.id) }])}>
-                      <Text style={styles.attendedTxt}>Marcar como atendida</Text>
-                    </Pressable>
                   </View>
                 ) : (
                   <Pressable style={[styles.acceptBtn, accept.isPending && { opacity: 0.6 }]} disabled={accept.isPending} onPress={() => accept.mutate(a.id)}>
@@ -141,11 +149,9 @@ const styles = StyleSheet.create({
   acceptedTitle: { fontSize: 14, fontWeight: '800', color: colors.green },
   ownerName: { fontSize: 16, fontWeight: '800', color: colors.text },
   med: { fontSize: 13, color: colors.muted },
-  actionRow: { flexDirection: 'row', gap: 8, marginTop: 6 },
-  actionBtn: { flex: 1, borderRadius: radius.md, paddingVertical: 12, alignItems: 'center' },
-  route: { backgroundColor: colors.brand },
-  call: { backgroundColor: colors.green },
+  actionRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  actionBtn: { flex: 1, flexDirection: 'row', gap: 6, borderRadius: radius.md, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
+  chat: { backgroundColor: colors.brandDark },
+  video: { backgroundColor: colors.brand },
   actionTxt: { color: colors.white, fontWeight: '800', fontSize: 14 },
-  attendedBtn: { borderWidth: 1.5, borderColor: colors.brand, borderRadius: radius.md, paddingVertical: 11, alignItems: 'center', marginTop: 6 },
-  attendedTxt: { color: colors.brand, fontWeight: '800', fontSize: 14 },
 });

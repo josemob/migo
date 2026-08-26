@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { appAlert } from '../lib/dialog';
 import { useVetVideo } from '../lib/vetVideo';
+import { TabIcon } from './TabIcon';
 import { cardShadow, colors, radius, triageColor, triageLabel } from '../theme';
 
 interface IncomingAlert {
@@ -18,6 +19,8 @@ interface IncomingAlert {
     aiFirstAid: string | null;
     status: string;
     requiredSpecialty: string | null;
+    latitude?: string | number | null;
+    longitude?: string | number | null;
     pet: {
       name: string;
       breed?: string | null;
@@ -56,6 +59,11 @@ export function IncomingEmergencies() {
     }
   };
 
+  const openRoute = (lat?: string | number | null, lng?: string | number | null) => {
+    if (lat == null || lng == null) return appAlert('Sin ubicación', 'Esta urgencia no tiene ubicación registrada.');
+    Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`).catch(() => {});
+  };
+
   const accept = useMutation({
     mutationFn: (alertId: string) => api(`/me/emergencies/alerts/${alertId}/accept`, { method: 'POST' }),
     onSuccess: () => void q.refetch(),
@@ -74,7 +82,6 @@ export function IncomingEmergencies() {
         const tc = triageColor[level] ?? colors.amber;
         const mine = e.status === 'ACCEPTED'; // en mi lista + aceptada = la acepté yo
         const km = a.distanceKm != null ? `${Number(a.distanceKm).toFixed(1)} km` : null;
-        const phone = e.pet.owner.phone;
         return (
           <View key={a.id} style={[styles.card, { borderColor: tc }]}>
             <View style={styles.top}>
@@ -93,26 +100,22 @@ export function IncomingEmergencies() {
               <View style={styles.acceptedBox}>
                 <Text style={styles.acceptedTitle}>✅ Aceptada · contacto del dueño</Text>
                 <Text style={styles.ownerName}>{e.pet.owner.fullName}</Text>
-                <Pressable
-                  style={[styles.videoBtn, calling && { opacity: 0.6 }]}
-                  disabled={calling}
-                  onPress={() => startVideoCall(e.pet.owner.id)}
-                >
-                  <Text style={styles.videoTxt}>{calling ? 'Llamando…' : '📹 Iniciar videollamada'}</Text>
-                </Pressable>
                 {e.pet.allergies.length > 0 && (
                   <Text style={styles.med}>Alergias: {e.pet.allergies.map((x) => x.substance).join(', ')}</Text>
                 )}
                 {e.pet.conditions.length > 0 && (
                   <Text style={styles.med}>Condiciones: {e.pet.conditions.map((x) => x.name).join(', ')}</Text>
                 )}
-                {phone ? (
-                  <Pressable style={styles.callBtn} onPress={() => Linking.openURL(`tel:${phone}`)}>
-                    <Text style={styles.callTxt}>📞 Llamar al dueño ({phone})</Text>
+                <View style={styles.actionRow}>
+                  <Pressable style={[styles.actionBtn, styles.video, calling && { opacity: 0.6 }]} disabled={calling} onPress={() => startVideoCall(e.pet.owner.id)}>
+                    <TabIcon name="video" color={colors.white} size={18} />
+                    <Text style={styles.actionTxt}>{calling ? 'Llamando…' : 'Videollamada'}</Text>
                   </Pressable>
-                ) : (
-                  <Text style={styles.med}>El dueño no tiene teléfono registrado.</Text>
-                )}
+                  <Pressable style={[styles.actionBtn, styles.route]} onPress={() => openRoute(e.latitude, e.longitude)}>
+                    <TabIcon name="navigation" color={colors.white} size={18} />
+                    <Text style={styles.actionTxt}>Ver ruta</Text>
+                  </Pressable>
+                </View>
               </View>
             ) : (
               <Pressable
@@ -149,8 +152,9 @@ const styles = StyleSheet.create({
   acceptedTitle: { fontSize: 14, fontWeight: '800', color: colors.green },
   ownerName: { fontSize: 16, fontWeight: '800', color: colors.text },
   med: { fontSize: 13, color: colors.muted },
-  callBtn: { backgroundColor: colors.green, borderRadius: radius.md, paddingVertical: 12, alignItems: 'center', marginTop: 6 },
-  callTxt: { color: colors.white, fontWeight: '800', fontSize: 15 },
-  videoBtn: { backgroundColor: colors.brand, borderRadius: radius.md, paddingVertical: 12, alignItems: 'center', marginTop: 6 },
-  videoTxt: { color: colors.white, fontWeight: '800', fontSize: 15 },
+  actionRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  actionBtn: { flex: 1, flexDirection: 'row', gap: 6, borderRadius: radius.md, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
+  video: { backgroundColor: colors.brand },
+  route: { backgroundColor: colors.green },
+  actionTxt: { color: colors.white, fontWeight: '800', fontSize: 14 },
 });
