@@ -46,6 +46,8 @@ const PATHS = {
   clock: 'M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z',
   warning: 'M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z',
   bank: 'M11.5 1L2 6v2h19V6l-9.5-5zM4 10v7H2v2h20v-2h-2v-7h-2v7h-3v-7h-2v7H9v-7H7v7H4v-7H4z',
+  document:
+    'M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z',
 } as const;
 
 export type IconName = keyof typeof PATHS;

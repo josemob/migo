@@ -5,6 +5,7 @@ import { appAlert } from '../lib/dialog';
 import { capturePhotoAsDataUri, pickPhotoAsDataUri, pickDocumentAsDataUri } from '../lib/photo';
 import { Button } from './ui';
 import { SpecialtyPicker } from './SpecialtyPicker';
+import { TabIcon } from './TabIcon';
 import { colors, radius } from '../theme';
 
 interface DocItem { type: string; label: string; url: string }
@@ -82,9 +83,18 @@ export function SpecialtyRequestModal({
             </View>
 
             <View style={styles.addRow}>
-              <Pressable style={styles.addBtn} onPress={async () => add(await capturePhotoAsDataUri({ aspect: [16, 10] }), 'Foto')}><Text style={styles.addTxt}>📷 Foto</Text></Pressable>
-              <Pressable style={styles.addBtn} onPress={async () => add(await pickPhotoAsDataUri([16, 10]), 'Imagen')}><Text style={styles.addTxt}>🖼 Galería</Text></Pressable>
-              <Pressable style={styles.addBtn} onPress={addPdf}><Text style={styles.addTxt}>📄 Archivo</Text></Pressable>
+              <Pressable style={styles.addBtn} onPress={async () => add(await capturePhotoAsDataUri({ aspect: [16, 10] }), 'Foto')}>
+                <TabIcon name="camera" color={colors.brandDark} size={18} />
+                <Text style={styles.addTxt}>Foto</Text>
+              </Pressable>
+              <Pressable style={styles.addBtn} onPress={async () => add(await pickPhotoAsDataUri([16, 10]), 'Imagen')}>
+                <TabIcon name="image" color={colors.brandDark} size={18} />
+                <Text style={styles.addTxt}>Galería</Text>
+              </Pressable>
+              <Pressable style={styles.addBtn} onPress={addPdf}>
+                <TabIcon name="file" color={colors.brandDark} size={18} />
+                <Text style={styles.addTxt}>Archivo</Text>
+              </Pressable>
             </View>
 
             {docs.length > 0 && (
@@ -123,7 +133,7 @@ const styles = StyleSheet.create({
   chipTxt: { fontSize: 14, color: colors.text },
   chipTxtOn: { color: colors.white, fontWeight: '700' },
   addRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  addBtn: { flex: 1, backgroundColor: colors.brandLight, borderRadius: radius.md, paddingVertical: 12, alignItems: 'center' },
+  addBtn: { flex: 1, flexDirection: 'row', gap: 6, backgroundColor: colors.brandLight, borderRadius: radius.md, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
   addTxt: { color: colors.brandDark, fontWeight: '700', fontSize: 13 },
   docList: { marginTop: 12, gap: 8 },
   docRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, backgroundColor: colors.white, borderRadius: radius.md, padding: 12, borderWidth: 1, borderColor: colors.border },

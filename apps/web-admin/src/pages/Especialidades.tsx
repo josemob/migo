@@ -86,7 +86,7 @@ export default function Especialidades() {
                         </a>
                       ) : (
                         <a href={d.url} target="_blank" rel="noreferrer" className="flex h-24 w-28 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-slate-300 bg-slate-50 text-slate-500 hover:bg-slate-100">
-                          <span className="text-2xl">📄</span>
+                          <Icon name="document" className="h-7 w-7" />
                           <span className="text-[10px]">Ver documento</span>
                         </a>
                       )}
