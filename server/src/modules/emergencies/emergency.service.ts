@@ -64,20 +64,14 @@ async function findEligibleIndependentVets(
 
 /**
  * Refinamiento en SEGUNDO PLANO (no bloquea la respuesta al dueño): corre el triaje con IA
- * (Gemini con timeout → heurística), enriquece la urgencia (gravedad, resumen, primeros
- * auxilios, especialidad) y rutea a los vets INDEPENDIENTES por especialidad + radio.
+ * (Gemini con timeout → heurística) y ENRIQUECE la urgencia (gravedad, resumen, primeros
+ * auxilios, especialidad). NO re-rutea: clínicas y vets ya fueron alertados por ubicación.
  */
-async function refineTriageAndRouteVets(
-  emergencyId: string,
-  triageInput: Parameters<typeof runTriage>[0],
-  origin: { lat: number; lng: number },
-  petName: string,
-  symptoms: string,
-) {
+async function refineTriage(emergencyId: string, triageInput: Parameters<typeof runTriage>[0]) {
   const triage = await runTriage(triageInput);
 
   // Enriquecer el triaje SOLO si la urgencia sigue en curso (no aceptada/cancelada)
-  await prisma.emergency.updateMany({
+  const updated = await prisma.emergency.updateMany({
     where: { id: emergencyId, status: { in: ['TRIAGING', 'BROADCASTING'] } },
     data: {
       triageLevel: triage.triageLevel,
@@ -86,43 +80,12 @@ async function refineTriageAndRouteVets(
       requiredSpecialty: triage.requiredSpecialty,
     },
   });
-
-  // Rutear a vets independientes por especialidad + radio
-  const nearbyVets = await findEligibleIndependentVets(origin, triage.requiredSpecialty);
-  if (nearbyVets.length) {
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    await prisma.emergencyAlert.createMany({
-      data: nearbyVets.map((v) => ({
-        emergencyId,
-        vetProfileId: v.id,
-        distanceKm: Number(v.km.toFixed(2)),
-        etaMinutes: v.eta,
-        expiresAt,
-      })),
-      skipDuplicates: true,
-    });
-    try {
-      const critical = triage.triageLevel === 'RED';
-      const title = critical ? '🚨 Emergencia crítica cerca' : '🚑 Nueva emergencia cerca';
-      const body = `${petName}: ${symptoms}`.replace(/\s+/g, ' ').trim().slice(0, 140);
-      await Promise.all(
-        nearbyVets.map((v) => sendPush(v.userId, { title, body, data: { type: 'emergency', emergencyId, triageLevel: triage.triageLevel } })),
-      );
-    } catch (e) {
-      console.error('[emergency] push a vets independientes falló', e);
-    }
-  }
+  if (updated.count === 0) return; // ya aceptada/cancelada: no refrescar
 
   // Refrescar los paneles de clínica con el triaje enriquecido (SSE)
   const clinicAlerts = await prisma.emergencyAlert.findMany({ where: { emergencyId, clinicId: { not: null } }, select: { clinicId: true } });
   const clinicIds = [...new Set(clinicAlerts.map((a) => a.clinicId).filter((c): c is string => !!c))];
   for (const clinicId of clinicIds) bus.emit(EMERGENCY_UPDATE, { clinicId, emergencyId });
-
-  // Si nadie quedó alertado (ni clínicas ni vets), expira la urgencia
-  const total = await prisma.emergencyAlert.count({ where: { emergencyId } });
-  if (total === 0) {
-    await prisma.emergency.updateMany({ where: { id: emergencyId, status: { in: ['TRIAGING', 'BROADCASTING'] } }, data: { status: 'EXPIRED' } });
-  }
 }
 
 /**
@@ -236,7 +199,12 @@ export const emergencyService = {
       .sort((a, b) => a.km - b.km)
       .slice(0, MAX_CLINICS);
 
-    // 4) DIFUNDIR YA a las clínicas (con el triaje rápido); la respuesta al dueño no espera a la IA
+    // 3.b) Vets INDEPENDIENTES elegibles — también AL INSTANTE (por ubicación/radio). La
+    // especialidad de la heurística es null → todos los cercanos; la IA async solo enriquece.
+    const nearbyVets = await findEligibleIndependentVets(origin, quick.requiredSpecialty);
+    const hasTargets = nearby.length > 0 || nearbyVets.length > 0;
+
+    // 4) DIFUNDIR YA a clínicas y vets (triaje rápido); la respuesta al dueño no espera a la IA
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     const [updated] = await prisma.$transaction([
       prisma.emergency.update({
@@ -245,17 +213,26 @@ export const emergencyService = {
           triageLevel: quick.triageLevel,
           aiSummary: quick.aiSummary,
           aiFirstAid: quick.aiFirstAid,
-          status: 'BROADCASTING',
+          status: hasTargets ? 'BROADCASTING' : 'EXPIRED',
         },
       }),
       prisma.emergencyAlert.createMany({
-        data: nearby.map((c) => ({
-          emergencyId: emergency.id,
-          clinicId: c.clinicId,
-          distanceKm: Number(c.km.toFixed(2)),
-          etaMinutes: c.eta,
-          expiresAt,
-        })),
+        data: [
+          ...nearby.map((c) => ({
+            emergencyId: emergency.id,
+            clinicId: c.clinicId,
+            distanceKm: Number(c.km.toFixed(2)),
+            etaMinutes: c.eta,
+            expiresAt,
+          })),
+          ...nearbyVets.map((v) => ({
+            emergencyId: emergency.id,
+            vetProfileId: v.id,
+            distanceKm: Number(v.km.toFixed(2)),
+            etaMinutes: v.eta,
+            expiresAt,
+          })),
+        ],
       }),
     ]);
 
@@ -277,12 +254,25 @@ export const emergencyService = {
       console.error('[emergency] push a clínicas falló', e);
     }
 
-    // 5) Triaje IA + ruteo a vets INDEPENDIENTES en SEGUNDO PLANO (no bloquea la respuesta)
-    void refineTriageAndRouteVets(emergency.id, triageInput, origin, pet.name, input.symptoms).catch((e) =>
-      console.error('[emergency] refinamiento async falló', e),
-    );
+    // Push a los vets INDEPENDIENTES ruteados (inmediato)
+    try {
+      if (nearbyVets.length) {
+        const critical = quick.triageLevel === 'RED';
+        const title = critical ? '🚨 Emergencia crítica cerca' : '🚑 Nueva emergencia cerca';
+        const body = `${pet.name}: ${input.symptoms}`.replace(/\s+/g, ' ').trim().slice(0, 140);
+        await Promise.all(
+          nearbyVets.map((v) => sendPush(v.userId, { title, body, data: { type: 'emergency', emergencyId: emergency.id, triageLevel: quick.triageLevel } })),
+        );
+      }
+    } catch (e) {
+      console.error('[emergency] push a vets falló', e);
+    }
 
-    return { emergency: updated, triage: quick, broadcastedTo: nearby.length };
+    // 5) Triaje IA en SEGUNDO PLANO: solo ENRIQUECE gravedad/resumen/especialidad (no bloquea,
+    // no re-rutea: los destinatarios ya fueron alertados por ubicación).
+    void refineTriage(emergency.id, triageInput).catch((e) => console.error('[emergency] refinamiento async falló', e));
+
+    return { emergency: updated, triage: quick, broadcastedTo: nearby.length, broadcastedToVets: nearbyVets.length };
   },
 
   async listForOwner(ownerId: string) {
