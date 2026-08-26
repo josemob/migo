@@ -112,9 +112,10 @@ function MainApp({ onBackToIndependent }: { onBackToIndependent?: () => void }) 
   );
 }
 
-/** Vet independiente: alterna entre su panel propio y el dashboard principal. */
+/** Vet independiente: aterriza SIEMPRE en el dashboard; su panel propio (perfil,
+ *  especialidades, teleconsultas, emergencias) se abre desde Perfil. */
 function IndependentRoot({ onJoinedClinic }: { onJoinedClinic: () => void }) {
-  const [dashboard, setDashboard] = useState(false);
+  const [dashboard, setDashboard] = useState(true);
   if (dashboard) return <MainApp onBackToIndependent={() => setDashboard(false)} />;
   return (
     <IndependentVideoProvider>

@@ -6,6 +6,7 @@ import { useGoogleSignIn } from '../lib/google';
 import { hasBiometricSession } from '../lib/biometric';
 import { Button } from '../components/ui';
 import { TabIcon } from '../components/TabIcon';
+import { MigoLogo } from '../components/MigoLogo';
 import { colors, radius, type } from '../theme';
 
 export default function LoginScreen({ navigation }: any) {
@@ -50,7 +51,7 @@ export default function LoginScreen({ navigation }: any) {
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView style={styles.center} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.logoWrap}>
-          <Text style={styles.logo}>Migo</Text>
+          <MigoLogo width={132} />
           <View style={styles.badge}><Text style={styles.badgeText}>VET</Text></View>
         </View>
         <Text style={styles.subtitle}>Panel del personal de clínica</Text>

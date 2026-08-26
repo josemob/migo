@@ -33,7 +33,7 @@ export default function ProfileScreen() {
           )}
         </View>
         {backToIndependent && (
-          <Button title="← Volver a mi panel independiente" onPress={backToIndependent} />
+          <Button title="Mi panel de vet independiente" onPress={backToIndependent} />
         )}
         <BiometricToggle />
         <Button title="Cambiar contraseña" variant="outline" onPress={() => setPwOpen(true)} />
