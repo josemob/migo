@@ -7,6 +7,7 @@ import { useAuth } from '../lib/auth';
 import { appAlert } from '../lib/dialog';
 import { biometricSupported, enableBiometric, disableBiometric, isBiometricEnabled } from '../lib/biometric';
 import { Button } from '../components/ui';
+import { ChangePasswordModal } from '../components/ChangePasswordModal';
 import { TabIcon } from '../components/TabIcon';
 import { BackButton } from '../components/BackButton';
 import { cardShadow, colors, radius } from '../theme';
@@ -30,6 +31,7 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
   // para que la construcción no quede solapada por la barra del sistema.
   const bottomPad = insets.bottom + 34;
   const [bio, setBio] = useState(false);
+  const [pwOpen, setPwOpen] = useState(false);
   useEffect(() => { isBiometricEnabled().then(setBio); }, []);
 
   const toggleBiometric = async (next: boolean) => {
@@ -86,7 +88,7 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
     {
       title: 'Seguridad',
       rows: [
-        { icon: 'lock', title: 'Contraseña y acceso', sub: 'Actualiza tus credenciales de seguridad.', onPress: soon },
+        { icon: 'lock', title: 'Contraseña y acceso', sub: 'Actualiza tus credenciales de seguridad.', onPress: () => setPwOpen(true) },
         { icon: 'fingerprint', title: 'Acceso rápido con Biometría', sub: 'Activa el reconocimiento facial o dactilar.', toggle: true },
       ],
     },
@@ -150,6 +152,7 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
           <Button title="Eliminar Cuenta" onPress={confirmDelete} variant="dangerOutline" />
         </View>
       </ScrollView>
+      <ChangePasswordModal visible={pwOpen} onClose={() => setPwOpen(false)} />
     </SafeAreaView>
   );
 }

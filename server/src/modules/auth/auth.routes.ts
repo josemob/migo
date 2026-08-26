@@ -78,6 +78,17 @@ router.get(
   }),
 );
 
+// Cambio de contraseña estando logueado (contraseña actual → nueva)
+router.post(
+  '/change-password',
+  authenticate,
+  validate({ body: z.object({ currentPassword: z.string().min(1), newPassword: z.string().min(8, 'Mínimo 8 caracteres') }) }),
+  asyncHandler(async (req, res) => {
+    await authService.changePassword(req.user!.id, req.body.currentPassword, req.body.newPassword);
+    res.json({ ok: true });
+  }),
+);
+
 // Recuperación de contraseña por código enviado al correo
 router.post(
   '/forgot-password',

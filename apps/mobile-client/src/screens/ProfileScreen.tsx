@@ -10,6 +10,7 @@ import { biometricSupported, enableBiometric, disableBiometric, isBiometricEnabl
 import { editField } from '../lib/editField';
 import { pickPhotoAsDataUri } from '../lib/photo';
 import { Button } from '../components/ui';
+import { ChangePasswordModal } from '../components/ChangePasswordModal';
 import { TabIcon } from '../components/TabIcon';
 import { BackButton } from '../components/BackButton';
 import { cardShadow, colors, radius } from '../theme';
@@ -28,6 +29,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
   const insets = useSafeAreaInsets();
   const [faceId, setFaceId] = useState(false);
   const [push, setPush] = useState(true);
+  const [pwOpen, setPwOpen] = useState(false);
 
   useEffect(() => { isBiometricEnabled().then(setFaceId); }, []);
 
@@ -142,7 +144,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
         {/* Seguridad */}
         <View style={[styles.card, { marginTop: 24 }]}>
           <Text style={styles.cardTitle}>Seguridad</Text>
-          <Row icon="lock" label="Contraseña" onPress={soon} />
+          <Row icon="lock" label="Contraseña" onPress={() => setPwOpen(true)} />
           <Row icon="fingerprint" label="Iniciar sesión con huella / rostro" toggle value={faceId} onToggle={toggleBiometric} border />
         </View>
 
@@ -158,6 +160,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
           {__DEV__ && <Button title="🔄 Reiniciar (dev)" onPress={devReset} variant="outline" />}
         </View>
       </ScrollView>
+      <ChangePasswordModal visible={pwOpen} onClose={() => setPwOpen(false)} />
     </SafeAreaView>
   );
 }

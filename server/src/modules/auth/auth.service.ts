@@ -104,6 +104,18 @@ export const authService = {
     ]);
   },
 
+  // Cambia la contraseña estando logueado (contraseña actual + nueva).
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, passwordHash: true } });
+    if (!user) throw ApiError.notFound('Usuario no encontrado');
+    if (!(await verifyPassword(currentPassword, user.passwordHash))) {
+      throw ApiError.badRequest('La contraseña actual no es correcta');
+    }
+    const passwordHash = await hashPassword(newPassword);
+    await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+    // No revocamos la sesión actual: el usuario sigue dentro tras cambiarla.
+  },
+
   /**
    * Inicia sesión (o registra) con un ID token de Google.
    * Verifica el token contra el endpoint público de Google y valida que el
