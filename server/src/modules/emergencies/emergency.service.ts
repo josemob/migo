@@ -11,7 +11,7 @@ const MAX_INDEPENDENT_VETS = 10;
 // Especialidades que siempre califican para cualquier urgencia (generalistas).
 const GENERALIST_SPECIALTIES = ['Medicina general', 'Emergencias y cuidados intensivos'];
 // Una urgencia que nadie aceptó se cierra sola pasados estos minutos.
-const UNATTENDED_TIMEOUT_MIN = 20;
+const UNATTENDED_TIMEOUT_MIN = 10;
 
 // Datos del dueño + mascota que ve el profesional al recibir una urgencia.
 const vetEmergencyInclude = {
@@ -309,9 +309,11 @@ export const emergencyService = {
     });
     if (!emergency) throw ApiError.notFound('Urgencia no encontrada');
 
-    const CANCELLABLE = ['TRIAGING', 'BROADCASTING', 'ACCEPTED', 'EN_ROUTE'];
+    // Solo cancelable mientras se busca. Una vez aceptada (ACCEPTED/EN_ROUTE) ya
+    // hay un profesional en camino: el dueño no puede cancelarla.
+    const CANCELLABLE = ['TRIAGING', 'BROADCASTING'];
     if (!CANCELLABLE.includes(emergency.status)) {
-      throw ApiError.badRequest('Esta urgencia ya no se puede cancelar');
+      throw ApiError.badRequest('Esta urgencia ya fue aceptada y no se puede cancelar');
     }
 
     const updated = await prisma.$transaction(async (tx) => {

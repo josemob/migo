@@ -136,7 +136,7 @@ router.get(
   '/active',
   withClinicContext,
   asyncHandler(async (req, res) => {
-    await expireStaleEmergencies().catch(() => {}); // descarta las vencidas (>20 min sin aceptar)
+    await expireStaleEmergencies().catch(() => {}); // descarta las vencidas (>10 min sin aceptar)
     const alerts = await prisma.emergencyAlert.findMany({
       where: {
         clinicId: req.clinicId!,

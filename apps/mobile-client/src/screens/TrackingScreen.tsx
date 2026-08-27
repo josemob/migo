@@ -5,7 +5,9 @@ import { appAlert } from '../lib/dialog';
 import { Badge, Button, Card, Loading, Muted, Screen } from '../components/ui';
 import { colors, radius, triageColor, triageLabel } from '../theme';
 
-const CANCELLABLE = ['TRIAGING', 'BROADCASTING', 'ACCEPTED', 'EN_ROUTE'];
+// Solo se puede cancelar MIENTRAS se busca. Una vez que una clínica/vet acepta
+// (ACCEPTED/EN_ROUTE), la opción de cancelar desaparece.
+const CANCELLABLE = ['TRIAGING', 'BROADCASTING'];
 
 interface Track {
   id: string;

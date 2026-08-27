@@ -8,7 +8,7 @@ const server = app.listen(env.PORT, () => {
   console.log(`🐾 Migo API escuchando en http://localhost:${env.PORT} (${env.NODE_ENV})`);
 });
 
-// Barrido periódico: cierra las urgencias que nadie aceptó pasados 20 min.
+// Barrido periódico: cierra las urgencias que nadie aceptó pasados 10 min.
 // Corre cada minuto aunque no haya nadie consultando (autoridad del auto-cierre).
 const emergencySweep = setInterval(() => {
   expireStaleEmergencies()
