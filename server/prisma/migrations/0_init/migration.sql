@@ -226,6 +226,8 @@ CREATE TABLE "PlatformConfig" (
     "commissionRate" DECIMAL(4,3) NOT NULL DEFAULT 0.08,
     "bcvRate" DECIMAL(12,2) NOT NULL DEFAULT 36.5,
     "paymentGateway" TEXT NOT NULL DEFAULT 'Stripe + Pago Móvil Local (C2P)',
+    "clientBannerEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "clientBannerImage" TEXT,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "PlatformConfig_pkey" PRIMARY KEY ("id")

@@ -411,6 +411,10 @@ model PlatformConfig {
   commissionRate Decimal  @default(0.08) @db.Decimal(4, 3)
   bcvRate        Decimal  @default(36.5) @db.Decimal(12, 2)
   paymentGateway String   @default("Stripe + Pago Móvil Local (C2P)")
+  // Banner patrocinado del dashboard del cliente (arte 300x100). Se controla desde
+  // el Super Admin; a futuro lo reemplaza Google AdSense.
+  clientBannerEnabled Boolean @default(false)
+  clientBannerImage   String? // data URI (base64) del arte 300x100
   updatedAt      DateTime @updatedAt
 }
 

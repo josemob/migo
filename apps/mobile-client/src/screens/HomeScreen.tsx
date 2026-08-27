@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRef, useState } from 'react';
 import {
   Dimensions,
   Image,
@@ -11,7 +10,6 @@ import {
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { appAlert } from '../lib/dialog';
-import { pickPhotoAsDataUri } from '../lib/photo';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
@@ -98,18 +96,14 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const { user } = useAuth();
   const [page, setPage] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
-  const [banner, setBanner] = useState<string | null>(null);
 
-  useEffect(() => {
-    AsyncStorage.getItem('migo_banner').then(setBanner);
-  }, []);
-
-  const changeBanner = async () => {
-    const uri = await pickPhotoAsDataUri([16, 5]); // recorte ancho para banner
-    if (!uri) return;
-    setBanner(uri);
-    AsyncStorage.setItem('migo_banner', uri);
-  };
+  // Banner patrocinado: lo controla el Super Admin (encender/apagar + arte 300x100).
+  const bannerQ = useQuery({
+    queryKey: ['home-banner'],
+    queryFn: () => api<{ enabled: boolean; image: string | null }>('/me/banner'),
+    staleTime: 5 * 60 * 1000,
+  });
+  const banner = bannerQ.data?.enabled ? bannerQ.data.image : null;
 
   const pets = useQuery({ queryKey: ['pets'], queryFn: () => api<{ data: Pet[] }>('/me/pets') });
   const emergencies = useQuery({
@@ -280,23 +274,13 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           </View>
         </View>
 
-        {/* Banner publicitario (slot fijo de 62px) — reemplazable */}
-        <View style={styles.bannerWrap}>
-          <Pressable style={styles.banner} onPress={() => appAlert('Publicidad', 'Espacio para banner de patrocinador.')}>
-            {banner ? (
-              <Image source={{ uri: banner }} style={styles.bannerImg} resizeMode="cover" />
-            ) : (
-              <>
-                <Text style={styles.bannerBrand}>BARK BITES</Text>
-                <Text style={styles.bannerSub}>Natural & Delicious</Text>
-                <Text style={styles.bannerCta}>Comprar →</Text>
-              </>
-            )}
-          </Pressable>
-          <Pressable style={styles.bannerEdit} onPress={changeBanner}>
-            <TabIcon name="edit" color={colors.white} size={13} />
-          </Pressable>
-        </View>
+        {/* Banner patrocinado (arte 300x100, control desde Super Admin). Si está
+            apagado o sin arte, no ocupa espacio. */}
+        {banner ? (
+          <View style={styles.bannerWrap}>
+            <Image source={{ uri: banner }} style={styles.banner} resizeMode="cover" />
+          </View>
+        ) : null}
 
         {/* Atajos */}
         <Text style={styles.shortcutsTitle}>Atajos</Text>
@@ -387,14 +371,9 @@ const styles = StyleSheet.create({
   urgBtn: { backgroundColor: colors.accent, height: control.medium.height, borderRadius: control.medium.radius, alignItems: 'center', justifyContent: 'center' },
   urgBtnText: { ...type.h4, color: colors.text },
 
-  // Banner ad slot: altura fija de 62px, reemplazable
-  bannerWrap: { position: 'relative', marginHorizontal: 20, marginTop: 18 },
-  banner: { height: 62, flexDirection: 'row', alignItems: 'center', backgroundColor: '#C97B3C', borderRadius: radius.md, paddingHorizontal: 16, overflow: 'hidden' },
-  bannerImg: { position: 'absolute', width: '100%', height: '100%' },
-  bannerEdit: { position: 'absolute', top: -8, right: -8, width: 28, height: 28, borderRadius: 14, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.white },
-  bannerBrand: { color: colors.white, fontSize: 18, fontWeight: '900', letterSpacing: 0.5 },
-  bannerSub: { color: '#FFE9D2', fontSize: 12, marginLeft: 8, flex: 1 },
-  bannerCta: { color: colors.white, fontSize: 13, fontWeight: '800' },
+  // Banner patrocinado: proporción 300x100 (3:1), centrado, con border radius.
+  bannerWrap: { marginHorizontal: 20, marginTop: 18, alignItems: 'center' },
+  banner: { width: '100%', maxWidth: 300, aspectRatio: 3, borderRadius: radius.md, overflow: 'hidden', backgroundColor: '#EEEEEE' },
 
   shortcutsTitle: { fontSize: 20, fontWeight: '800', color: colors.text, marginHorizontal: 20, marginTop: 22, marginBottom: 12 },
   // Card de atajo (Figma node 112-80): padding 8/8/8/14 · gap 12 · radio 16

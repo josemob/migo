@@ -515,8 +515,33 @@ router.get(
         bcvRate: Number(cfg.bcvRate),
         paymentGateway: cfg.paymentGateway,
       },
+      banner: { enabled: cfg.clientBannerEnabled, image: cfg.clientBannerImage },
       admins: admins.map((a) => ({ id: a.id, fullName: a.fullName, email: a.email, status: a.status, lastAccess: a.updatedAt })),
     });
+  }),
+);
+
+// PATCH /admin/config/banner -> enciende/apaga el banner del dashboard cliente y
+// sube el arte (data URI 300x100). Enviar image:null para quitarlo.
+router.patch(
+  '/config/banner',
+  validate({
+    body: z.object({
+      enabled: z.boolean().optional(),
+      image: z.string().max(2_000_000).nullable().optional(),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    await getConfig();
+    const { enabled, image } = req.body as { enabled?: boolean; image?: string | null };
+    const cfg = await prisma.platformConfig.update({
+      where: { id: 'singleton' },
+      data: {
+        ...(enabled !== undefined ? { clientBannerEnabled: enabled } : {}),
+        ...(image !== undefined ? { clientBannerImage: image } : {}),
+      },
+    });
+    res.json({ enabled: cfg.clientBannerEnabled, image: cfg.clientBannerImage });
   }),
 );
 

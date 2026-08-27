@@ -19,6 +19,20 @@ router.use(authenticate);
 
 const SPECIES = ['DOG', 'CAT', 'BIRD', 'RABBIT', 'REPTILE', 'RODENT', 'OTHER'] as const;
 
+// GET /me/banner -> banner patrocinado del dashboard (controlado desde Super Admin).
+// Devuelve la imagen solo si está encendido; si no, enabled:false y sin arte.
+router.get(
+  '/banner',
+  asyncHandler(async (_req, res) => {
+    const cfg = await prisma.platformConfig.findUnique({
+      where: { id: 'singleton' },
+      select: { clientBannerEnabled: true, clientBannerImage: true },
+    });
+    const enabled = !!(cfg?.clientBannerEnabled && cfg.clientBannerImage);
+    res.json({ enabled, image: enabled ? cfg!.clientBannerImage : null });
+  }),
+);
+
 // PATCH /me -> actualizar el perfil del dueño (nombre, teléfono, foto de perfil)
 router.patch(
   '/',
