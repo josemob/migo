@@ -522,7 +522,7 @@ router.get(
 );
 
 // PATCH /admin/config/banner -> enciende/apaga el banner del dashboard cliente y
-// sube el arte (data URI 300x100). Enviar image:null para quitarlo.
+// sube el arte (data URI 300x50). Enviar image:null para quitarlo.
 router.patch(
   '/config/banner',
   validate({

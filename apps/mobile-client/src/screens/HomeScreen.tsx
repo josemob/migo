@@ -371,9 +371,9 @@ const styles = StyleSheet.create({
   urgBtn: { backgroundColor: colors.accent, height: control.medium.height, borderRadius: control.medium.radius, alignItems: 'center', justifyContent: 'center' },
   urgBtnText: { ...type.h4, color: colors.text },
 
-  // Banner patrocinado: ancho completo, proporción 3:1 (como 300x100), con border radius.
+  // Banner patrocinado: ancho completo, proporción 6:1 (como 300x50), con border radius.
   bannerWrap: { marginHorizontal: 20, marginTop: 18 },
-  banner: { width: '100%', aspectRatio: 3, borderRadius: radius.md, overflow: 'hidden', backgroundColor: '#EEEEEE' },
+  banner: { width: '100%', aspectRatio: 6, borderRadius: radius.md, overflow: 'hidden', backgroundColor: '#EEEEEE' },
 
   shortcutsTitle: { fontSize: 20, fontWeight: '800', color: colors.text, marginHorizontal: 20, marginTop: 22, marginBottom: 12 },
   // Card de atajo (Figma node 112-80): padding 8/8/8/14 · gap 12 · radio 16

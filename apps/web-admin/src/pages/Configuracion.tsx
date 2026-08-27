@@ -45,7 +45,7 @@ export default function Configuracion() {
   // Lee el archivo elegido como data URI (base64) para guardarlo en el banner.
   const onPickBanner = (file: File | undefined) => {
     if (!file) return;
-    if (file.size > 1_500_000) { alert('La imagen es muy pesada (máx. ~1.5 MB). Usa un arte 300x100 optimizado.'); return; }
+    if (file.size > 1_500_000) { alert('La imagen es muy pesada (máx. ~1.5 MB). Usa un arte 300x50 optimizado.'); return; }
     const reader = new FileReader();
     reader.onload = () => setBannerImg(typeof reader.result === 'string' ? reader.result : null);
     reader.readAsDataURL(file);
@@ -92,7 +92,7 @@ export default function Configuracion() {
 
           <Card className="mt-6">
             <SectionTitle><TitleIcon name="image">Banner del Dashboard (App Cliente)</TitleIcon></SectionTitle>
-            <p className="mb-4 text-sm text-slate-500">Pieza patrocinada 300×100 que se muestra en el inicio de la app del cliente. Enciende o apaga el espacio y sube el arte. (A futuro se controlará con Google AdSense.)</p>
+            <p className="mb-4 text-sm text-slate-500">Pieza patrocinada 300×50 que se muestra en el inicio de la app del cliente. Enciende o apaga el espacio y sube el arte. (A futuro se controlará con Google AdSense.)</p>
 
             <label className="flex cursor-pointer items-center gap-3">
               <input type="checkbox" checked={bannerOn} onChange={(e) => setBannerOn(e.target.checked)} className="h-5 w-5 accent-migo-purple" />
@@ -101,8 +101,8 @@ export default function Configuracion() {
 
             <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end">
               <div>
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">Vista previa (300×100)</span>
-                <div className="flex h-[100px] w-[300px] items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">Vista previa (300×50)</span>
+                <div className="flex h-[50px] w-[300px] items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
                   {bannerImg ? (
                     <img src={bannerImg} alt="Banner" className="h-full w-full object-cover" />
                   ) : (
