@@ -10,15 +10,58 @@ export interface ChatTurn {
 interface TriageRule { name: string; keywords: string[]; responseTemplate: string; severity: string }
 interface KnowledgeEntry { title: string; category: string; severity: string; description: string }
 
+export interface AiPetContext {
+  name?: string | null;
+  species?: string | null;
+  breed?: string | null;
+  sex?: string | null;
+  birthDate?: string | Date | null;
+  weightKg?: number | string | null;
+  isSterilized?: boolean | null;
+  allergies?: string[];
+  conditions?: string[];
+  specialCondition?: string | null;
+}
+
 interface AiChatInput {
   messages: ChatTurn[];
-  pet?: { name?: string | null; species?: string | null; breed?: string | null } | null;
+  pet?: AiPetContext | null;
   ownerName?: string | null;
 }
 
 const SPECIES_ES: Record<string, string> = {
   DOG: 'perro', CAT: 'gato', BIRD: 'ave', RABBIT: 'conejo', REPTILE: 'reptil', RODENT: 'roedor', OTHER: 'mascota',
 };
+
+// Edad legible desde la fecha de nacimiento ("2 años", "8 meses").
+function ageFromBirth(birthDate?: string | Date | null): string | null {
+  if (!birthDate) return null;
+  const d = new Date(birthDate);
+  if (isNaN(d.getTime())) return null;
+  const now = new Date();
+  let years = now.getFullYear() - d.getFullYear();
+  const mDiff = now.getMonth() - d.getMonth();
+  if (mDiff < 0 || (mDiff === 0 && now.getDate() < d.getDate())) years--;
+  if (years >= 1) return `${years} ${years === 1 ? 'año' : 'años'}`;
+  const months = Math.max(0, years * 12 + mDiff + (now.getDate() < d.getDate() ? -1 : 0));
+  return `${months} ${months === 1 ? 'mes' : 'meses'}`;
+}
+
+// Ficha compacta de la mascota seleccionada para personalizar la conversación.
+function buildPetDesc(p?: AiPetContext | null): string {
+  if (!p?.name) return '';
+  const sp = p.species ? SPECIES_ES[p.species] ?? 'mascota' : null;
+  const sexEs = p.sex === 'MALE' ? 'macho' : p.sex === 'FEMALE' ? 'hembra' : null;
+  const age = ageFromBirth(p.birthDate);
+  const paren = [sp, p.breed, sexEs, age].filter(Boolean).join(', ');
+  const bits: string[] = [`Ayudas al dueño con su mascota ${p.name}${paren ? ` (${paren})` : ''}.`];
+  if (p.weightKg) bits.push(`Peso aproximado: ${Number(p.weightKg)} kg.`);
+  if (p.isSterilized) bits.push('Está esterilizada/o.');
+  if (p.allergies?.length) bits.push(`⚠️ Alergias conocidas: ${p.allergies.join(', ')} — tenlas MUY presentes antes de sugerir alimentos, remedios o productos.`);
+  if (p.conditions?.length) bits.push(`Condiciones crónicas/preexistencias: ${p.conditions.join(', ')}.`);
+  if (p.specialCondition) bits.push(`Condición especial: ${p.specialCondition}.`);
+  return ' ' + bits.join(' ');
+}
 
 // Acción sugerida que la app renderiza como botón bajo la respuesta de Migo IA
 export interface ChatSuggestion {
@@ -103,9 +146,9 @@ function computeSuggestions(userText: string, replyText: string, rules: TriageRu
 // ─── Gemini ───────────────────────────────────────────────
 async function geminiChat(input: AiChatInput, rules: TriageRule[] = [], knowledge: KnowledgeEntry[] = []): Promise<string> {
   const p = input.pet;
-  const petDesc = p?.name
-    ? ` Ayudas con la mascota ${p.name}${p.species ? ` (${SPECIES_ES[p.species] ?? 'mascota'}${p.breed ? `, ${p.breed}` : ''})` : ''}.`
-    : '';
+  const petDesc = buildPetDesc(p);
+  const petName = p?.name || 'tu mascota';
+  const ownerName = input.ownerName || 'el dueño';
 
   // Contenido curado desde el Super Admin (Migo AI & Contenido)
   const kbSection = knowledge.length
@@ -119,45 +162,61 @@ async function geminiChat(input: AiChatInput, rules: TriageRule[] = [], knowledg
         .join('\n')}`
     : '';
 
-  const system = `Eres "Migo IA", la asistente veterinaria de la app Migo (Venezuela).${petDesc} Te diriges a ${input.ownerName || 'el dueño'} por su nombre cuando sea natural.
-Responde SIEMPRE en español, cálida, empática y clara, en 2 a 4 frases. Ofrece orientación general y primeros auxilios prácticos, pero NUNCA des un diagnóstico definitivo ni recetes medicamentos específicos con dosis. Recomienda evaluación profesional cuando corresponda.
-Si detectas señales de urgencia (dificultad para respirar, convulsiones, sangrado abundante, intoxicación, trauma grave, inconsciencia), dilo con claridad y sugiere activar la "Alerta de emergencia" en Migo o acudir de inmediato a una clínica. Usa emojis con moderación.${kbSection}${rulesSection}`;
+  const system = `Eres "Migo IA", la asistente veterinaria conversacional de la app Migo (Venezuela).${petDesc}
+Hablas con ${ownerName}. Sé cálida, cercana y natural, como una veterinaria de confianza que atiende por chat. Llámalo por su nombre cuando sea natural y refiérete a la mascota como ${petName}.
+
+CONVERSACIÓN FLUIDA: no respondas de forma robótica ni con un formato fijo. Reconoce lo que te cuentan, haz preguntas de seguimiento para entender mejor el caso (desde cuándo ocurre, apetito, ánimo, si bebe agua, cambios de comportamiento) y da orientación práctica y PERSONALIZADA usando los datos de ${petName} (edad, raza, peso, alergias y condiciones) cuando aporten. Mantén el hilo de lo que ya se habló.
+
+ALCANCE: ayudas con TODO lo relacionado a ${petName} — síntomas y salud, alimentación, comportamiento, higiene, cuidados, prevención, esquema de vacunas y bienestar. Si ${ownerName} pregunta algo ajeno a la mascota, redirígelo con amabilidad (ej. "Estoy aquí para cuidar de ${petName} 🐾, cuéntame cómo está").
+
+CUÁNDO ORIENTAR HACIA UNA ACCIÓN DE MIGO (hazlo de forma natural dentro de tu respuesta, solo cuando el caso lo amerite; no en cada mensaje):
+- Señales de URGENCIA (dificultad para respirar, convulsiones, sangrado abundante, intoxicación/envenenamiento, golpe o trauma grave, inconsciencia, vómito o diarrea con sangre, decaimiento severo): dilo con claridad, da primeros auxilios breves y pide ACTIVAR la "Alerta de emergencia" en Migo o acudir de inmediato a una clínica.
+- Estética / pelaje enredado o sucio / baño / corte de uñas: sugiere buscar PELUQUERÍAS cercanas en Migo.
+- Síntomas o chequeos que ameritan evaluación (sin ser urgencia): sugiere AGENDAR una consulta.
+
+REGLAS: responde SIEMPRE en español; ofrece orientación general y primeros auxilios, pero NUNCA des un diagnóstico definitivo ni receta con dosis exactas de medicamentos; recomienda evaluación profesional cuando corresponda. Extensión natural (por lo general 2 a 5 frases; puedes extenderte si el caso lo requiere). Emojis con moderación.${kbSection}${rulesSection}`;
 
   const contents = input.messages
     .slice(-12)
     .map((m) => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.text }] }));
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent?key=${env.GEMINI_API_KEY}`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20000);
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: system }] },
-        contents,
-        // Presupuesto alto: los modelos flash nuevos gastan tokens en "pensamiento";
-        // con poco margen la respuesta visible se corta (finishReason MAX_TOKENS).
-        generationConfig: { temperature: 0.6, maxOutputTokens: 1200 },
-      }),
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timer);
+  const body = JSON.stringify({
+    system_instruction: { parts: [{ text: system }] },
+    contents,
+    // Presupuesto alto: los modelos flash nuevos gastan tokens en "pensamiento";
+    // con poco margen la respuesta visible se corta (finishReason MAX_TOKENS).
+    generationConfig: { temperature: 0.7, maxOutputTokens: 1200 },
+  });
+
+  // Reintenta ante saturación de Google (503) o rate-limit (429), que son
+  // transitorios: sin esto, cada pico tumbaba el chat al fallback genérico.
+  let lastStatus = 0;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 900 * attempt));
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    let res: Response;
+    try {
+      res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+    if (res.status === 503 || res.status === 429) { lastStatus = res.status; continue; } // transitorio → reintenta
+    if (!res.ok) throw new Error(`Gemini HTTP ${res.status}`);
+    const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+    const text = (data.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? '').join('').trim();
+    if (!text) throw new Error('Gemini sin texto');
+    return text;
   }
-  if (!res.ok) throw new Error(`Gemini HTTP ${res.status}`);
-  const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-  const text = (data.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? '').join('').trim();
-  if (!text) throw new Error('Gemini sin texto');
-  return text;
+  throw new Error(`Gemini HTTP ${lastStatus} (saturado tras reintentos)`);
 }
 
 // ─── Fallback heurístico (sin API key) ────────────────────
 function fallbackReply(input: AiChatInput): string {
   const last = [...input.messages].reverse().find((m) => m.role === 'user')?.text.toLowerCase() ?? '';
   const has = (arr: string[]) => arr.some((k) => last.includes(k));
+  const petName = input.pet?.name || 'tu mascota';
 
   if (has(['no respira', 'respirac', 'ahog', 'convuls', 'sangr', 'hemorrag', 'veneno', 'intoxic', 'atropell', 'inconsc', 'colaps'])) {
     return '⚠️ Esto puede ser una urgencia. Mantén a tu mascota calmada y en un lugar seguro, y activa la *Alerta de emergencia* en Migo o acude de inmediato a la clínica más cercana. Puedo guiarte mientras tanto. 🐾';
@@ -175,7 +234,7 @@ function fallbackReply(input: AiChatInput): string {
     return 'Los problemas de piel y parásitos externos son comunes. Revisa si hay enrojecimiento o pulgas/garrapatas y evita que se lastime rascándose. Una consulta de estética o dermatológica ayuda a resolverlo. 🧴';
   }
   if (has(['hola', 'buenas', 'ayuda']) || last.length < 4) {
-    return '¡Hola! 👋 Soy Migo IA. Cuéntame qué síntomas notas en tu mascota (desde cuándo, si come y bebe, su ánimo) y con gusto te oriento.';
+    return `¡Hola! 👋 Soy Migo IA. Cuéntame cómo está ${petName}: qué notas, desde cuándo, si come y bebe y cómo está su ánimo, y con gusto te oriento.`;
   }
-  return 'Gracias por contarme. Para orientarte mejor, descríbeme los síntomas: desde cuándo ocurren, si tu mascota come y bebe, y cómo está su ánimo. Ante cualquier señal grave, recuerda que puedes activar la *Alerta de emergencia* en Migo. 🐾';
+  return `Gracias por contarme. Para orientarte mejor con ${petName}, descríbeme los síntomas: desde cuándo ocurren, si come y bebe, y cómo está su ánimo. Ante cualquier señal grave, recuerda que puedes activar la *Alerta de emergencia* en Migo. 🐾`;
 }

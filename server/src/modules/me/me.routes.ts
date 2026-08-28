@@ -559,10 +559,28 @@ router.post(
     const [me, pet] = await Promise.all([
       prisma.user.findUnique({ where: { id: req.user!.id }, select: { fullName: true } }),
       petId
-        ? prisma.pet.findFirst({ where: { id: petId, ownerId: req.user!.id }, select: { name: true, species: true, breed: true } })
+        ? prisma.pet.findFirst({
+            where: { id: petId, ownerId: req.user!.id },
+            select: {
+              name: true, species: true, breed: true, sex: true, birthDate: true,
+              weightKg: true, isSterilized: true, specialCondition: true,
+              allergies: { select: { substance: true } },
+              conditions: { where: { isActive: true }, select: { name: true } },
+            },
+          })
         : Promise.resolve(null),
     ]);
-    const reply = await migoAiReply({ messages, pet, ownerName: me?.fullName?.split(' ')[0] });
+    // Ficha enriquecida de la mascota seleccionada para una conversación personalizada.
+    const petCtx = pet
+      ? {
+          name: pet.name, species: pet.species, breed: pet.breed, sex: pet.sex,
+          birthDate: pet.birthDate, weightKg: pet.weightKg ? Number(pet.weightKg) : null,
+          isSterilized: pet.isSterilized, specialCondition: pet.specialCondition,
+          allergies: pet.allergies.map((a) => a.substance),
+          conditions: pet.conditions.map((c) => c.name),
+        }
+      : null;
+    const reply = await migoAiReply({ messages, pet: petCtx, ownerName: me?.fullName?.split(' ')[0] });
     res.json(reply);
   }),
 );
