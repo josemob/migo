@@ -35,6 +35,7 @@ import PatientDetailScreen from './src/screens/PatientDetailScreen';
 import NewConsultScreen from './src/screens/NewConsultScreen';
 import ReportScreen from './src/screens/ReportScreen';
 import ChatThreadScreen from './src/screens/ChatThreadScreen';
+import PlanScreen from './src/screens/PlanScreen';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
 const Tab = createBottomTabNavigator();
@@ -105,6 +106,7 @@ function MainApp({ onBackToIndependent }: { onBackToIndependent?: () => void }) 
             <Stack.Screen name="NewConsult" component={NewConsultScreen} options={{ presentation: 'modal' }} />
             <Stack.Screen name="Report" component={ReportScreen} />
             <Stack.Screen name="ChatThread" component={ChatThreadScreen} />
+            <Stack.Screen name="Plan" component={PlanScreen} />
           </Stack.Navigator>
         </NavigationContainer>
       </IndependentBackContext.Provider>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../lib/auth';
 import { useIndependentBack } from '../lib/independentMode';
 import { Button } from '../components/ui';
@@ -11,8 +12,10 @@ import { cardShadow, colors, radius } from '../theme';
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const backToIndependent = useIndependentBack();
+  const navigation = useNavigation<any>();
   const [pwOpen, setPwOpen] = useState(false);
   const s = user?.staffProfile;
+  const isIndependent = !s; // el vet independiente no es staff de clínica
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={{ padding: 20, gap: 18 }}>
@@ -34,6 +37,9 @@ export default function ProfileScreen() {
         </View>
         {backToIndependent && (
           <Button title="Mi panel de vet independiente" onPress={backToIndependent} />
+        )}
+        {isIndependent && (
+          <Button title="Mi plan" onPress={() => navigation.navigate('Plan')} />
         )}
         <BiometricToggle />
         <Button title="Cambiar contraseña" variant="outline" onPress={() => setPwOpen(true)} />

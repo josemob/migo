@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { Card, PageHeader, SectionTitle, Spinner, ErrorNote } from '../components/ui';
 import { Icon } from '../components/Icon';
+import { PlanSection } from '../components/PlanSection';
 
 interface Hour {
   dayOfWeek: number;
@@ -189,6 +190,8 @@ export default function Configuracion() {
           </div>
         }
       />
+
+      <PlanSection />
 
       {isLoading && <Spinner className="mx-auto mt-10" />}
       {error && <ErrorNote error={error} />}
