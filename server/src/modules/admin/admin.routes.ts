@@ -8,6 +8,7 @@ import { authenticate, requireRole } from '../../middleware/auth';
 import { ApiError } from '../../utils/ApiError';
 import { sendPush, sendBulkPush } from '../push/push.service';
 import { distanceKm } from '../../lib/geo';
+import { listPlans, serializePlan, syncClinicCommission } from '../plans/plan.service';
 
 const router = Router();
 router.use(authenticate, requireRole('SUPER_ADMIN'));
@@ -684,6 +685,80 @@ router.post(
     res.json({ id: reqRow.id, status: approve ? 'APPROVED' : 'REJECTED' });
   }),
 );
+
+// ─────────────────────────────────────────────────────────────
+//  CATÁLOGO DE PLANES (configurable) + ASIGNACIÓN
+// ─────────────────────────────────────────────────────────────
+const planBody = z.object({
+  audience: z.enum(['VET', 'CLINIC']),
+  code: z.string().min(2).max(40).regex(/^[a-z0-9_]+$/, 'solo minúsculas, números y _'),
+  name: z.string().min(1).max(60),
+  priceUsd: z.number().min(0),
+  commissionRate: z.number().min(0).max(1),
+  billingPeriod: z.enum(['MONTHLY', 'ANNUAL']).default('MONTHLY'),
+  maxPatients: z.number().int().min(0).nullable().optional(),
+  maxSpecialists: z.number().int().min(0).nullable().optional(),
+  features: z.record(z.any()).nullable().optional(),
+  highlight: z.string().max(30).nullable().optional(),
+  sortOrder: z.number().int().default(0),
+  isActive: z.boolean().default(true),
+  isDefault: z.boolean().default(false),
+});
+
+// GET /admin/plans -> catálogo completo (ambas audiencias)
+router.get('/plans', asyncHandler(async (_req, res) => {
+  res.json({ data: await listPlans() });
+}));
+
+// POST /admin/plans -> crear plan
+router.post('/plans', validate({ body: planBody }), asyncHandler(async (req, res) => {
+  const exists = await prisma.plan.findUnique({ where: { code: req.body.code } });
+  if (exists) throw ApiError.conflict('Ya existe un plan con ese código.');
+  const plan = await prisma.plan.create({ data: req.body });
+  res.status(201).json(serializePlan(plan));
+}));
+
+// PATCH /admin/plans/:id -> editar precio/comisión/límites/features/estado
+router.patch('/plans/:id',
+  validate({ params: z.object({ id: z.string().uuid() }), body: planBody.partial().omit({ code: true }) }),
+  asyncHandler(async (req, res) => {
+    const plan = await prisma.plan.update({ where: { id: req.params.id }, data: req.body });
+    // Si cambió la comisión de un plan de clínica, re-sincroniza a las clínicas que lo tienen activo.
+    if (plan.audience === 'CLINIC' && req.body.commissionRate !== undefined) {
+      const clinics = await prisma.clinic.findMany({ where: { planId: plan.id }, select: { id: true } });
+      for (const c of clinics) await syncClinicCommission(c.id, plan.id);
+    }
+    res.json(serializePlan(plan));
+  }));
+
+// DELETE /admin/plans/:id -> eliminar (no permitido si es el plan base)
+router.delete('/plans/:id',
+  validate({ params: z.object({ id: z.string().uuid() }) }),
+  asyncHandler(async (req, res) => {
+    const plan = await prisma.plan.findUnique({ where: { id: req.params.id } });
+    if (!plan) throw ApiError.notFound('Plan no encontrado');
+    if (plan.isDefault) throw ApiError.badRequest('No se puede eliminar el plan base. Marca otro como base primero.');
+    await prisma.plan.delete({ where: { id: plan.id } });
+    res.status(204).end();
+  }));
+
+// POST /admin/plans/assign -> el Super Admin asigna el plan EFECTIVO a un vet o clínica
+router.post('/plans/assign',
+  validate({ body: z.object({ target: z.enum(['vet', 'clinic']), id: z.string().uuid(), planId: z.string().uuid() }) }),
+  asyncHandler(async (req, res) => {
+    const { target, id, planId } = req.body as { target: 'vet' | 'clinic'; id: string; planId: string };
+    const plan = await prisma.plan.findUnique({ where: { id: planId } });
+    if (!plan) throw ApiError.notFound('Plan no encontrado');
+    if (target === 'vet') {
+      if (plan.audience !== 'VET') throw ApiError.badRequest('Ese plan no es para profesionales.');
+      await prisma.vetSubscription.update({ where: { userId: id }, data: { planId: plan.id, pendingPlanId: null } });
+    } else {
+      if (plan.audience !== 'CLINIC') throw ApiError.badRequest('Ese plan no es para establecimientos.');
+      await prisma.clinic.update({ where: { id }, data: { planId: plan.id, pendingPlanId: null } });
+      await syncClinicCommission(id, plan.id);
+    }
+    res.json({ ok: true, planId: plan.id, name: plan.name });
+  }));
 
 // ─────────────────────────────────────────────────────────────
 //  MARKETING (push masivo + push a comercios por radio de km)

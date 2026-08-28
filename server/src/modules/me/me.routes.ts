@@ -12,12 +12,38 @@ import { createStreamCredentials, streamConfigured, ensureChatChannel, createInd
 import { registerPushToken, removePushToken } from '../push/push.service';
 import { issueReceipt, receiptNumber } from '../receipts/receipt.service';
 import { emergencyService } from '../emergencies/emergency.service';
+import { listPlans, selectPlanForVet, defaultPlan } from '../plans/plan.service';
 import { hashPassword, verifyPassword } from '../../utils/password';
 
 const router = Router();
 router.use(authenticate);
 
 const SPECIES = ['DOG', 'CAT', 'BIRD', 'RABBIT', 'REPTILE', 'RODENT', 'OTHER'] as const;
+
+// GET /me/plan -> plan del profesional independiente: actual (efectivo), pendiente de
+// pago y catálogo disponible. El vet elige su plan desde su app (sin cobro aún).
+router.get('/plan', asyncHandler(async (req, res) => {
+  const sub = await prisma.vetSubscription.findUnique({ where: { userId: req.user!.id } });
+  if (!sub) throw ApiError.forbidden('Solo un profesional con perfil puede ver planes.');
+  const available = await listPlans('VET');
+  const fallback = await defaultPlan('VET');
+  const currentId = sub.planId ?? fallback?.id ?? null;
+  const current = available.find((p) => p.id === currentId) ?? null;
+  const pending = sub.pendingPlanId ? available.find((p) => p.id === sub.pendingPlanId) ?? null : null;
+  res.json({ current, pending, available });
+}));
+
+// POST /me/plan/select -> el vet elige un plan. Gratis => se aplica; de pago => queda
+// pendiente de pago (pendingPlanId) hasta que exista la pasarela.
+router.post('/plan/select',
+  validate({ body: z.object({ planId: z.string().uuid() }) }),
+  asyncHandler(async (req, res) => {
+    const sub = await prisma.vetSubscription.findUnique({ where: { userId: req.user!.id }, select: { id: true } });
+    if (!sub) throw ApiError.forbidden('Solo un profesional con perfil puede elegir plan.');
+    const r = await selectPlanForVet(req.user!.id, req.body.planId);
+    if (!r.ok) throw ApiError.badRequest(r.reason);
+    res.json({ ok: true, applied: r.applied });
+  }));
 
 // GET /me/banner -> banner patrocinado del dashboard (controlado desde Super Admin).
 // Devuelve la imagen solo si está encendido; si no, enabled:false y sin arte.

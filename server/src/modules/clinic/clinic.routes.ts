@@ -8,9 +8,30 @@ import { withClinicContext } from '../../middleware/clinicContext';
 import { ApiError } from '../../utils/ApiError';
 import { randomUUID } from 'node:crypto';
 import { createStreamCredentials, streamConfigured, clinicStreamUserId, createRingingCall } from '../stream/stream.service';
+import { listPlans, defaultPlan, selectPlanForClinic } from '../plans/plan.service';
 
 const router = Router();
 router.use(authenticate, withClinicContext);
+
+// GET /clinic/plan -> plan del establecimiento: efectivo, pendiente de pago y catálogo.
+router.get('/plan', asyncHandler(async (req, res) => {
+  const clinic = await prisma.clinic.findUnique({ where: { id: req.clinicId! }, select: { planId: true, pendingPlanId: true } });
+  const available = await listPlans('CLINIC');
+  const fallback = await defaultPlan('CLINIC');
+  const currentId = clinic?.planId ?? fallback?.id ?? null;
+  const current = available.find((p) => p.id === currentId) ?? null;
+  const pending = clinic?.pendingPlanId ? available.find((p) => p.id === clinic.pendingPlanId) ?? null : null;
+  res.json({ current, pending, available });
+}));
+
+// POST /clinic/plan/select -> la clínica elige plan. Gratis => aplica; de pago => pendiente.
+router.post('/plan/select',
+  validate({ body: z.object({ planId: z.string().uuid() }) }),
+  asyncHandler(async (req, res) => {
+    const r = await selectPlanForClinic(req.clinicId!, req.body.planId);
+    if (!r.ok) throw ApiError.badRequest(r.reason);
+    res.json({ ok: true, applied: r.applied });
+  }));
 
 // GET /clinic -> perfil de la sucursal + comercio + horarios + cuenta de liquidación
 router.get(

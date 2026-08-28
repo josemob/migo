@@ -83,6 +83,9 @@ CREATE TYPE "KycStatus" AS ENUM ('PENDING', 'UNDER_REVIEW', 'APPROVED', 'REJECTE
 CREATE TYPE "InvitationStatus" AS ENUM ('PENDING', 'ACCEPTED', 'REJECTED', 'CANCELLED');
 
 -- CreateEnum
+CREATE TYPE "PlanAudience" AS ENUM ('VET', 'CLINIC');
+
+-- CreateEnum
 CREATE TYPE "VetPlanStatus" AS ENUM ('ACTIVE', 'PAST_DUE', 'CANCELLED', 'EXPIRED');
 
 -- CreateEnum
@@ -231,6 +234,28 @@ CREATE TABLE "PlatformConfig" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "PlatformConfig_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Plan" (
+    "id" TEXT NOT NULL,
+    "audience" "PlanAudience" NOT NULL,
+    "code" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "priceUsd" DECIMAL(10,2) NOT NULL DEFAULT 0,
+    "commissionRate" DECIMAL(4,3) NOT NULL,
+    "billingPeriod" TEXT NOT NULL DEFAULT 'MONTHLY',
+    "maxPatients" INTEGER,
+    "maxSpecialists" INTEGER,
+    "features" JSONB,
+    "highlight" TEXT,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "isDefault" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Plan_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -385,6 +410,8 @@ CREATE TABLE "Clinic" (
     "radarPriority" INTEGER NOT NULL DEFAULT 0,
     "bookingCommissionRate" DECIMAL(4,3),
     "billingCycle" "BillingCycle" NOT NULL DEFAULT 'MONTHLY',
+    "planId" TEXT,
+    "pendingPlanId" TEXT,
     "radarSuspended" BOOLEAN NOT NULL DEFAULT false,
     "suspendedAt" TIMESTAMP(3),
     "manuallyUnavailable" BOOLEAN NOT NULL DEFAULT false,
@@ -495,6 +522,8 @@ CREATE TABLE "VetSubscription" (
     "status" "VetPlanStatus" NOT NULL DEFAULT 'ACTIVE',
     "startedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "expiresAt" TIMESTAMP(3),
+    "planId" TEXT,
+    "pendingPlanId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -845,6 +874,12 @@ CREATE UNIQUE INDEX "StaffKyc_userId_key" ON "StaffKyc"("userId");
 
 -- CreateIndex
 CREATE INDEX "StaffKyc_status_idx" ON "StaffKyc"("status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Plan_code_key" ON "Plan"("code");
+
+-- CreateIndex
+CREATE INDEX "Plan_audience_isActive_idx" ON "Plan"("audience", "isActive");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Pet_microchip_key" ON "Pet"("microchip");

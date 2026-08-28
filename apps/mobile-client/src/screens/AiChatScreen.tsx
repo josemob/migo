@@ -78,7 +78,11 @@ export default function AiChatScreen({ navigation }: { navigation: any }) {
         <View style={{ width: 40 }} />
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={8}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
+      >
         <ScrollView ref={scroller} contentContainerStyle={{ padding: 16, gap: 12 }} onContentSizeChange={toEnd} showsVerticalScrollIndicator={false}>
           <View style={styles.dayChip}><Text style={styles.dayChipText}>HOY</Text></View>
           {messages.map((m, i) => (
