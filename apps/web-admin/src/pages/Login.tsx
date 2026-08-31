@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../lib/auth';
+import { MigoLogo } from '../components/MigoLogo';
 
 export default function Login() {
   const { login } = useAuth();
@@ -25,11 +26,8 @@ export default function Login() {
     <div className="flex h-screen items-center justify-center bg-brand-900 p-4">
       <form onSubmit={submit} className="w-full max-w-sm rounded-card bg-white p-8 shadow-card">
         <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#F26B3A] font-heading text-xl font-black text-white">M</div>
-          <div>
-            <div className="font-heading text-lg font-extrabold text-migo-heading">MIGO</div>
-            <span className="text-[11px] font-bold uppercase tracking-wide text-green-600">Sistema Operativo</span>
-          </div>
+          <MigoLogo height={34} />
+          <span className="text-[11px] font-bold uppercase tracking-wide text-green-600">Sistema Operativo</span>
         </div>
         <h1 className="mb-1 font-heading text-xl font-extrabold text-slate-900">Panel Super Admin</h1>
         <p className="mb-6 text-sm text-slate-500">Ingresa con tus credenciales de operaciones Migo.</p>

@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { Icon, type IconName } from './Icon';
+import { MigoLogo } from './MigoLogo';
 
 const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
   { to: '/', label: 'General & Métricas', icon: 'dashboard', end: true },
@@ -40,14 +41,11 @@ export function AdminLayout({ children }: { children: ReactNode }) {
         {/* Logo + toggle */}
         <div className={`flex items-center px-4 py-5 ${collapsed ? 'justify-center' : 'justify-between'}`}>
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#F26B3A] font-heading text-xl font-black text-white">M</div>
+            <MigoLogo variant="dark" height={collapsed ? 22 : 28} />
             {!collapsed && (
-              <div>
-                <div className="font-heading text-lg font-extrabold leading-none">MIGO</div>
-                <span className="mt-1 inline-block rounded bg-green-400/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-green-300">
-                  Sistema Operativo
-                </span>
-              </div>
+              <span className="inline-block rounded bg-green-400/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-green-300">
+                Sistema Operativo
+              </span>
             )}
           </div>
           {!collapsed && (

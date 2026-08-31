@@ -4,6 +4,7 @@ import { useAuth, isClinicAdmin } from '../lib/auth';
 import { useEmergencyStream } from '../lib/useEmergencyStream';
 import { playAlarm } from '../lib/alarm';
 import { Icon, type IconName } from './Icon';
+import { MigoLogo } from './MigoLogo';
 
 const NAV: {
   section: string;
@@ -63,12 +64,10 @@ export function Layout({ children }: { children: ReactNode }) {
         {/* Logo + toggle */}
         <div className={`flex items-center px-4 py-6 ${collapsed ? 'justify-center' : 'justify-between'}`}>
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-500 text-white">
-              <Icon name="paw" className="h-6 w-6" />
-            </div>
+            <MigoLogo variant="dark" height={collapsed ? 22 : 26} />
             {!collapsed && (
               <div>
-                <div className="text-lg font-bold leading-tight">{orgName}</div>
+                <div className="text-sm font-bold leading-tight">{orgName}</div>
                 <div className="text-xs text-sidebar-muted">Sucursal: {clinicName}</div>
               </div>
             )}
