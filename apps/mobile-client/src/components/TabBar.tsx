@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { MigoTabIcon } from './MigoTabIcon';
+import { useStream } from '../lib/stream';
 import { colors } from '../theme';
 
 const ICONS: Record<string, string> = {
@@ -14,6 +15,7 @@ const INACTIVE = '#C7C7C7';
 
 export function TabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const { unread } = useStream();
   // El botón central "Alerta" ES la pestaña en el índice 2
   const left = state.routes.slice(0, 2);
   const alerta = state.routes[2];
@@ -34,7 +36,10 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
           }
         }}
       >
-        <MigoTabIcon name={ICONS[route.name] ?? 'home'} color={color} size={24} />
+        <View>
+          <MigoTabIcon name={ICONS[route.name] ?? 'home'} color={color} size={24} />
+          {route.name === 'Chats' && unread > 0 && <View style={styles.dot} />}
+        </View>
         <Text style={[styles.label, { color }]}>{route.name}</Text>
       </Pressable>
     );
@@ -70,6 +75,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   tab: { flex: 1, alignItems: 'center', gap: 12 },
+  dot: { position: 'absolute', top: -2, right: -4, width: 11, height: 11, borderRadius: 6, backgroundColor: colors.red, borderWidth: 2, borderColor: colors.white },
   label: { fontSize: 11, fontWeight: '600' },
   centerSlot: { flex: 1, alignItems: 'center', gap: 12 },
   alertIconSpace: { width: 24, height: 24 },

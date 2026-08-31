@@ -18,8 +18,9 @@ interface Cred { apiKey: string; token: string; userId: string }
 interface StreamCtx {
   chatClient: StreamChat | null;
   ready: boolean;
+  unread: number; // total de mensajes sin leer (para el punto rojo del tab)
 }
-const Ctx = createContext<StreamCtx>({ chatClient: null, ready: false });
+const Ctx = createContext<StreamCtx>({ chatClient: null, ready: false, unread: 0 });
 export const useStream = () => useContext(Ctx);
 
 // Fuerza fondo blanco en los chats (message list + composer)
@@ -37,7 +38,18 @@ export function StreamProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [chatClient, setChatClient] = useState<StreamChat | null>(null);
   const [videoClient, setVideoClient] = useState<StreamVideoClient | null>(null);
+  const [unread, setUnread] = useState(0);
   const connecting = useRef(false);
+
+  // Escucha el contador global de no leídos para el punto rojo del tab de Chats.
+  useEffect(() => {
+    if (!chatClient?.userID) return;
+    setUnread((chatClient.user as { total_unread_count?: number } | undefined)?.total_unread_count ?? 0);
+    const sub = chatClient.on((e) => {
+      if (typeof e.total_unread_count === 'number') setUnread(e.total_unread_count);
+    });
+    return () => sub.unsubscribe();
+  }, [chatClient]);
 
   useEffect(() => {
     if (!user || connecting.current) return;
@@ -72,14 +84,14 @@ export function StreamProvider({ children }: { children: ReactNode }) {
 
   // Aún sin conectar: renderiza los hijos (las pantallas de chat muestran su propia carga)
   if (!chatClient || !videoClient) {
-    return <Ctx.Provider value={{ chatClient, ready: false }}>{children}</Ctx.Provider>;
+    return <Ctx.Provider value={{ chatClient, ready: false, unread }}>{children}</Ctx.Provider>;
   }
 
   return (
     <OverlayProvider value={{ style: CHAT_THEME }}>
       <Chat client={chatClient} style={CHAT_THEME}>
         <StreamVideo client={videoClient}>
-          <Ctx.Provider value={{ chatClient, ready: true }}>
+          <Ctx.Provider value={{ chatClient, ready: true, unread }}>
             {children}
             <IncomingCallOverlay />
           </Ctx.Provider>

@@ -18,6 +18,7 @@ import meRoutes from './modules/me/me.routes';
 import directoryRoutes from './modules/clinics/directory.routes';
 import adminRoutes from './modules/admin/admin.routes';
 import staffKycRoutes from './modules/staffKyc/staffKyc.routes';
+import streamWebhookRoutes from './modules/webhooks/stream.webhook.routes';
 
 export const app = express();
 
@@ -28,7 +29,11 @@ app.use(
     credentials: true,
   }),
 );
-app.use(express.json({ limit: '2mb' }));
+// Captura el cuerpo crudo (para verificar la firma HMAC del webhook de Stream).
+app.use(express.json({
+  limit: '2mb',
+  verify: (req, _res, buf) => { (req as unknown as { rawBody?: Buffer }).rawBody = buf; },
+}));
 if (!env.isProd) app.use(morgan('dev'));
 
 // Health check (Cloud Run)
@@ -52,6 +57,8 @@ api.use('/clinics', directoryRoutes);
 api.use('/admin', adminRoutes);
 // Onboarding/KYC del personal de clínica (app Vet)
 api.use('/staff-kyc', staffKycRoutes);
+// Webhooks entrantes (Stream Chat -> push de nuevos mensajes)
+api.use('/webhooks', streamWebhookRoutes);
 app.use('/api/v1', api);
 
 app.use(notFoundHandler);

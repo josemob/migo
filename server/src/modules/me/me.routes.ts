@@ -9,7 +9,7 @@ import { ApiError } from '../../utils/ApiError';
 import { migoAiReply } from '../chat/aiChat.service';
 import { extractChatSummary } from '../chat/chatSummary.service';
 import { createStreamCredentials, streamConfigured, ensureChatChannel, createIndependentRingingCall } from '../stream/stream.service';
-import { registerPushToken, removePushToken } from '../push/push.service';
+import { registerPushToken, removePushToken, sendPush } from '../push/push.service';
 import { issueReceipt, receiptNumber } from '../receipts/receipt.service';
 import { emergencyService } from '../emergencies/emergency.service';
 import { listPlans, selectPlanForVet, defaultPlan } from '../plans/plan.service';
@@ -472,6 +472,22 @@ router.post(
         amountUsd: priceUsd,
         source: 'APP',
       }).catch(() => {});
+    }
+
+    // Notifica por push al equipo de la clínica (responsables de atender la cita).
+    try {
+      const staff = await prisma.clinicStaff.findMany({ where: { clinicId, isActive: true }, select: { userId: true } });
+      const targets = [...new Set(staff.map((s) => s.userId))];
+      if (targets.length) {
+        const fecha = new Intl.DateTimeFormat('es-VE', {
+          weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'America/Caracas',
+        }).format(scheduledAt);
+        const title = '🗓️ Nueva cita agendada';
+        const body = `${appt.pet.name} · ${derivedReason ?? 'Consulta'} · ${fecha}`;
+        await Promise.all(targets.map((userId) => sendPush(userId, { title, body, data: { type: 'appointment', appointmentId: appt.id } })));
+      }
+    } catch (e) {
+      console.error('[appointments] push a la clínica falló', e);
     }
 
     res.status(201).json(appt);

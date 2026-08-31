@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { MigoTabIcon } from './MigoTabIcon';
+import { useStream } from '../lib/stream';
 import { colors } from '../theme';
 
 const ICONS: Record<string, string> = {
@@ -14,6 +15,7 @@ const INACTIVE = '#C7C7C7';
 
 export function VetTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const { unread } = useStream();
   // El botón central "Alerta" es la pestaña en el índice 2
   const left = state.routes.slice(0, 2);
   const alerta = state.routes[2];
@@ -31,7 +33,10 @@ export function VetTabBar({ state, navigation }: BottomTabBarProps) {
           if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
         }}
       >
-        <MigoTabIcon name={ICONS[route.name] ?? 'home'} color={color} size={24} />
+        <View>
+          <MigoTabIcon name={ICONS[route.name] ?? 'home'} color={color} size={24} />
+          {route.name === 'Chats' && unread > 0 && <View style={styles.dot} />}
+        </View>
         <Text style={[styles.label, { color }]}>{route.name}</Text>
       </Pressable>
     );
@@ -56,6 +61,7 @@ export function VetTabBar({ state, navigation }: BottomTabBarProps) {
 const styles = StyleSheet.create({
   wrap: { flexDirection: 'row', backgroundColor: colors.white, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F0ECF3', alignItems: 'flex-start' },
   tab: { flex: 1, alignItems: 'center', gap: 6 },
+  dot: { position: 'absolute', top: -2, right: -4, width: 11, height: 11, borderRadius: 6, backgroundColor: colors.red, borderWidth: 2, borderColor: colors.white },
   label: { fontSize: 11, fontWeight: '600' },
   centerSlot: { flex: 1, alignItems: 'center' },
   alertBtn: {
