@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  Keyboard, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
+import { appAlert } from '../lib/dialog';
 import { useAuth } from '../lib/auth';
 import { BackButton } from '../components/BackButton';
+import { TabIcon } from '../components/TabIcon';
 import { cardShadow, colors, radius } from '../theme';
 
 interface Suggestion { action: 'emergency' | 'grooming' | 'consult'; label: string }
@@ -25,8 +27,45 @@ export default function AiChatScreen({ navigation }: { navigation: any }) {
   ]);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  const [kbVisible, setKbVisible] = useState(false);
   const scroller = useRef<ScrollView>(null);
   const toEnd = () => setTimeout(() => scroller.current?.scrollToEnd({ animated: true }), 60);
+
+  // El teclado ya cubre el área segura inferior: al abrirse, quitamos ese padding
+  // extra para que el input quede pegado al teclado (sin franja de espacio).
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKbVisible(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKbVisible(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
+
+  // Comparte la consulta (transcripción) por WhatsApp o el chat de Migo.
+  const buildTranscript = () => {
+    const lines = messages
+      .filter((m) => m.text?.trim())
+      .map((m) => `${m.role === 'user' ? '🧑 Tú' : '🐾 Migo IA'}: ${m.text}`);
+    return `🩺 Consulta con Migo IA${pet ? ` sobre ${pet.name}` : ''}\n\n${lines.join('\n\n')}\n\n— Enviado desde Migo`;
+  };
+  const shareConsult = () => {
+    if (!messages.some((m) => m.role === 'user')) {
+      return appAlert('Nada que compartir', 'Escribe al menos un mensaje para poder compartir la consulta.');
+    }
+    const body = buildTranscript();
+    appAlert('Compartir consulta', '¿Dónde quieres compartir esta consulta?', [
+      {
+        text: 'WhatsApp',
+        onPress: () => {
+          const url = `whatsapp://send?text=${encodeURIComponent(body)}`;
+          Linking.openURL(url).catch(() =>
+            Linking.openURL(`https://wa.me/?text=${encodeURIComponent(body)}`).catch(() =>
+              appAlert('WhatsApp no disponible', 'No pudimos abrir WhatsApp en este dispositivo.')),
+          );
+        },
+      },
+      { text: 'Chat de Migo', onPress: () => navigation.navigate('Tabs', { screen: 'Chats', params: { shareText: body } }) },
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
+  };
 
   // Al finalizar la interacción (salir del chat), extrae y almacena el resumen estructurado
   const stateRef = useRef({ messages, petId: pet?.id });
@@ -75,7 +114,9 @@ export default function AiChatScreen({ navigation }: { navigation: any }) {
       <View style={styles.topbar}>
         <BackButton onPress={() => navigation.goBack()} />
         <Text style={styles.topTitle}>Migo IA</Text>
-        <View style={{ width: 40 }} />
+        <Pressable style={styles.shareBtn} onPress={shareConsult} hitSlop={8}>
+          <TabIcon name="share" color={colors.brand} size={20} />
+        </Pressable>
       </View>
 
       <KeyboardAvoidingView
@@ -122,7 +163,7 @@ export default function AiChatScreen({ navigation }: { navigation: any }) {
         </ScrollView>
 
         {/* Barra de entrada */}
-        <View style={[styles.inputBar, { paddingTop: 10, paddingBottom: insets.bottom + 10 }]}>
+        <View style={[styles.inputBar, { paddingTop: 10, paddingBottom: kbVisible ? 10 : insets.bottom + 10 }]}>
           <TextInput
             style={styles.input}
             placeholder="Escribe un mensaje para Migo IA…"
@@ -147,6 +188,7 @@ const styles = StyleSheet.create({
   back: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', boxShadow: cardShadow },
   backArrow: { fontSize: 30, color: colors.brand, marginTop: -4, fontWeight: '700' },
   topTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '800', color: colors.text },
+  shareBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
 
   dayChip: { alignSelf: 'center', backgroundColor: '#E9E7EE', borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 5, marginBottom: 4 },
   dayChipText: { fontSize: 12, fontWeight: '800', color: colors.muted, letterSpacing: 0.5 },

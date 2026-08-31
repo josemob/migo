@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Channel as StreamChannel } from 'stream-chat';
 import { useStream } from '../lib/stream';
+import { appAlert } from '../lib/dialog';
 import { Card, Muted, Screen } from '../components/ui';
 import { TabIcon } from '../components/TabIcon';
 import { colors, radius } from '../theme';
@@ -16,10 +17,27 @@ const ago = (d?: Date | null) => {
   return `${Math.floor(h / 24)} d`;
 };
 
-export default function ChatsScreen({ navigation }: { navigation: any }) {
+export default function ChatsScreen({ navigation, route }: { navigation: any; route?: any }) {
   const { chatClient, ready } = useStream();
   const [channels, setChannels] = useState<StreamChannel[]>([]);
   const [loading, setLoading] = useState(true);
+  // Modo "compartir": llega una consulta de Migo IA para enviar a una clínica.
+  const shareText: string | undefined = route?.params?.shareText;
+
+  // Abre la conversación con la clínica; en modo compartir, primero envía la consulta.
+  const openChannel = async (ch: StreamChannel, clinicId?: string, clinicName?: string) => {
+    if (shareText) {
+      try {
+        await ch.sendMessage({ text: shareText });
+        navigation.setParams({ shareText: undefined });
+        appAlert('Consulta compartida', `Tu consulta de Migo IA se envió a ${clinicName ?? 'la clínica'}.`);
+      } catch {
+        appAlert('No se pudo compartir', 'Intenta de nuevo en un momento.');
+        return;
+      }
+    }
+    navigation.navigate('ClinicChat', { clinicId, clinicName });
+  };
 
   useEffect(() => {
     if (!ready || !chatClient?.userID) return;
@@ -45,19 +63,28 @@ export default function ChatsScreen({ navigation }: { navigation: any }) {
     <Screen>
       <Text style={styles.title}>Chats</Text>
 
-      {/* Migo IA */}
-      <Pressable onPress={() => navigation.navigate('AiChat')}>
-        <Card style={styles.migoCard}>
-          <View style={[styles.icon, { backgroundColor: colors.brand }]}>
-            <TabIcon name="medical" color={colors.white} size={24} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.cardTitle}>Migo IA</Text>
-            <Muted>Asistente veterinario · orientación al instante</Muted>
-          </View>
-          <Text style={styles.chevron}>›</Text>
-        </Card>
-      </Pressable>
+      {shareText ? (
+        <View style={styles.shareBanner}>
+          <Text style={styles.shareBannerText}>📤 Elige una clínica para compartir tu consulta de Migo IA.</Text>
+          <Pressable onPress={() => navigation.setParams({ shareText: undefined })}>
+            <Text style={styles.shareCancel}>Cancelar</Text>
+          </Pressable>
+        </View>
+      ) : (
+        /* Migo IA */
+        <Pressable onPress={() => navigation.navigate('AiChat')}>
+          <Card style={styles.migoCard}>
+            <View style={[styles.icon, { backgroundColor: colors.brand }]}>
+              <TabIcon name="medical" color={colors.white} size={24} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardTitle}>Migo IA</Text>
+              <Muted>Asistente veterinario · orientación al instante</Muted>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </Card>
+        </Pressable>
+      )}
 
       <Text style={styles.section}>Conversaciones con clínicas</Text>
       {!ready || loading ? (
@@ -79,7 +106,7 @@ export default function ChatsScreen({ navigation }: { navigation: any }) {
             return (
               <Pressable
                 key={ch.cid}
-                onPress={() => navigation.navigate('ClinicChat', { clinicId: data?.migo_clinic_id, clinicName: data?.name })}
+                onPress={() => openChannel(ch, data?.migo_clinic_id, data?.name)}
               >
                 <Card style={styles.row}>
                   {data?.image ? (
@@ -118,6 +145,9 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
   chevron: { fontSize: 26, color: colors.muted },
   section: { fontSize: 16, fontWeight: '700', color: colors.text, marginTop: 8 },
+  shareBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, backgroundColor: colors.brandLight, borderRadius: radius.lg, paddingHorizontal: 14, paddingVertical: 12 },
+  shareBannerText: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.brand },
+  shareCancel: { fontSize: 13, fontWeight: '800', color: colors.muted },
   empty: { alignItems: 'center', gap: 10, paddingVertical: 36, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed' },
   link: { color: colors.brand, fontWeight: '700', marginTop: 2 },
 
