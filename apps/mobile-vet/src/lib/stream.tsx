@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Modal, View } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StreamChat } from 'stream-chat';
 import { Chat, OverlayProvider } from 'stream-chat-expo';
 import {
@@ -123,20 +123,20 @@ function AutoHangup() {
 
 function IncomingCallOverlay() {
   const calls = useCalls();
+  const insets = useSafeAreaInsets();
   const call = calls[0];
   if (!call) return null;
+  // Piso fijo: dentro del Modal el inset suele venir en 0, así garantizamos que los
+  // controles de la llamada queden por encima de la barra de navegación de Android.
+  const padBottom = Math.max(insets.bottom, 44);
   return (
     <Modal animationType="slide" transparent={false} statusBarTranslucent>
-      {/* SafeAreaProvider propio: dentro de un Modal, el del root no aplica, así los
-          controles de Stream calculan bien el margen sobre la barra de navegación. */}
-      <SafeAreaProvider>
-        <View style={{ flex: 1, backgroundColor: colors.brandDeep }}>
-          <StreamCall call={call}>
-            <AutoHangup />
-            <RingingCallContent />
-          </StreamCall>
-        </View>
-      </SafeAreaProvider>
+      <View style={{ flex: 1, backgroundColor: colors.brandDeep, paddingTop: Math.max(insets.top, 8), paddingBottom: padBottom }}>
+        <StreamCall call={call}>
+          <AutoHangup />
+          <RingingCallContent />
+        </StreamCall>
+      </View>
     </Modal>
   );
 }

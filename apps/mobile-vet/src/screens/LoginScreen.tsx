@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../lib/auth';
 import { useGoogleSignIn } from '../lib/google';
@@ -9,10 +10,15 @@ import { TabIcon } from '../components/TabIcon';
 import { MigoLogo } from '../components/MigoLogo';
 import { colors, radius, type } from '../theme';
 
+// Íconos de ojo (flat) para mostrar/ocultar la contraseña.
+const EYE = 'M12 5c-5 0-9.3 3.1-11 7.5C2.7 16.9 7 20 12 20s9.3-3.1 11-7.5C21.3 8.1 17 5 12 5zm0 12.5a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z';
+const EYE_OFF = 'M12 7a5 5 0 0 1 5 5c0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.44-4.75C21.27 8.11 17 5 12 5c-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46A11.8 11.8 0 0 0 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zm5.53 5.53 1.55 1.55c-.05.21-.08.43-.08.65a3 3 0 0 0 3 3c.22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53a5 5 0 0 1-5-5c0-.79.2-1.53.53-2.2z';
+
 export default function LoginScreen({ navigation }: any) {
   const { login, loginWithBiometric } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [bioAvailable, setBioAvailable] = useState(false);
@@ -67,14 +73,24 @@ export default function LoginScreen({ navigation }: any) {
           value={email}
           onChangeText={setEmail}
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Contraseña"
-          placeholderTextColor={colors.muted}
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
+        <View style={styles.pwRow}>
+          <TextInput
+            style={styles.pwInput}
+            placeholder="Contraseña"
+            placeholderTextColor={colors.muted}
+            secureTextEntry={!showPw}
+            value={password}
+            onChangeText={setPassword}
+          />
+          <Pressable
+            style={styles.eyeBtn}
+            onPress={() => setShowPw((v) => !v)}
+            hitSlop={10}
+            accessibilityLabel={showPw ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+          >
+            <Svg width={22} height={22} viewBox="0 0 24 24"><Path d={showPw ? EYE_OFF : EYE} fill={colors.muted} /></Svg>
+          </Pressable>
+        </View>
         <View style={[styles.loginRow, { marginTop: 8 }]}>
           <View style={{ flex: 1 }}>
             <Button title={busy ? 'Ingresando…' : 'Iniciar sesión'} onPress={submit} loading={busy} />
@@ -120,6 +136,9 @@ const styles = StyleSheet.create({
   badgeText: { color: colors.white, fontWeight: '900', fontSize: 13, letterSpacing: 1 },
   subtitle: { textAlign: 'center', color: colors.muted, fontSize: 15, marginBottom: 18 },
   input: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: colors.text },
+  pwRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 16 },
+  pwInput: { flex: 1, paddingVertical: 14, fontSize: 16, color: colors.text },
+  eyeBtn: { paddingVertical: 8, paddingLeft: 10 },
   errorBox: { backgroundColor: '#FDECEC', borderRadius: radius.md, padding: 12, borderWidth: 1, borderColor: '#F8CBCB' },
   errorText: { ...type.bodySmall, color: colors.red },
   loginRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
