@@ -1,10 +1,20 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
+import { appAlert } from '../lib/dialog';
 import { BackButton } from '../components/BackButton';
 import { Button, Loading } from '../components/ui';
 import { cardShadow, colors, radius } from '../theme';
+
+const BOOSTERS: { label: string; months: number | null }[] = [
+  { label: 'Sin refuerzo', months: null },
+  { label: '1 mes', months: 1 },
+  { label: '3 meses', months: 3 },
+  { label: '6 meses', months: 6 },
+  { label: '1 año', months: 12 },
+];
 
 interface Ficha {
   id: string;
@@ -32,7 +42,36 @@ const fmt = (iso: string) => new Date(iso).toLocaleDateString('es-VE', { day: '2
 export default function PatientDetailScreen({ navigation, route }: any) {
   const { petId } = route.params;
   const insets = useSafeAreaInsets();
+  const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ['patient', petId], queryFn: () => api<Ficha>(`/patients/${petId}`) });
+
+  // Formulario "Registrar vacuna"
+  const [vaxOpen, setVaxOpen] = useState(false);
+  const [vaxName, setVaxName] = useState('');
+  const [vaxLot, setVaxLot] = useState('');
+  const [boosterMonths, setBoosterMonths] = useState<number | null>(12);
+
+  const addVax = useMutation({
+    mutationFn: () => {
+      const now = new Date();
+      let nextDueAt: string | undefined;
+      if (boosterMonths != null) {
+        const due = new Date(now);
+        due.setMonth(due.getMonth() + boosterMonths);
+        nextDueAt = due.toISOString();
+      }
+      return api(`/patients/${petId}/vaccinations`, {
+        method: 'POST',
+        body: { vaccineName: vaxName.trim(), lotNumber: vaxLot.trim() || undefined, appliedAt: now.toISOString(), nextDueAt },
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['patient', petId] });
+      setVaxOpen(false); setVaxName(''); setVaxLot(''); setBoosterMonths(12);
+      appAlert('Vacuna registrada', 'Se agregó a la cartilla de la mascota.');
+    },
+    onError: (e) => appAlert('No se pudo registrar', e instanceof Error ? e.message : 'Intenta de nuevo.'),
+  });
 
   if (isLoading || !data) {
     return (
@@ -86,18 +125,24 @@ export default function PatientDetailScreen({ navigation, route }: any) {
         </View>
 
         {/* Vacunas */}
-        {data.vaccinations.length > 0 && (
-          <>
-            <Text style={styles.section}>Esquema de vacunación</Text>
-            {data.vaccinations.slice(0, 4).map((v, i) => (
-              <View key={i} style={styles.vaxRow}>
+        <View style={styles.sectionRow}>
+          <Text style={styles.section}>Cartilla de vacunación</Text>
+          <Pressable onPress={() => setVaxOpen(true)} hitSlop={8}><Text style={styles.addLink}>+ Registrar vacuna</Text></Pressable>
+        </View>
+        {data.vaccinations.length === 0 ? (
+          <Text style={styles.emptyTxt}>Sin vacunas registradas. Toca “Registrar vacuna”.</Text>
+        ) : (
+          data.vaccinations.map((v, i) => (
+            <View key={i} style={styles.vaxRow}>
+              <View style={{ flex: 1 }}>
                 <Text style={styles.vaxName}>{v.vaccineName}</Text>
-                <View style={[styles.pill, { backgroundColor: upToDate(v.nextDueAt) ? '#DFF3E6' : '#FDECEC' }]}>
-                  <Text style={[styles.pillTxt, { color: upToDate(v.nextDueAt) ? colors.green : colors.red }]}>{upToDate(v.nextDueAt) ? 'Al día' : 'Vencida'}</Text>
-                </View>
+                {v.nextDueAt && <Text style={styles.vaxDue}>Próxima: {fmt(v.nextDueAt)}</Text>}
               </View>
-            ))}
-          </>
+              <View style={[styles.pill, { backgroundColor: upToDate(v.nextDueAt) ? '#DFF3E6' : '#FDECEC' }]}>
+                <Text style={[styles.pillTxt, { color: upToDate(v.nextDueAt) ? colors.green : colors.red }]}>{upToDate(v.nextDueAt) ? 'Al día' : 'Vencida'}</Text>
+              </View>
+            </View>
+          ))
         )}
 
         {/* Historial */}
@@ -122,6 +167,39 @@ export default function PatientDetailScreen({ navigation, route }: any) {
       <View style={[styles.cta, { paddingBottom: insets.bottom + 20 }]}>
         <Button title="+ Iniciar Nueva Consulta" onPress={() => navigation.navigate('NewConsult', { petId: data.id, name: data.name, allergies: data.allergies.map((a) => a.substance), weightKg: data.weightKg })} />
       </View>
+
+      {/* Modal registrar vacuna */}
+      <Modal visible={vaxOpen} animationType="slide" transparent onRequestClose={() => setVaxOpen(false)}>
+        <View style={styles.mBackdrop}>
+          <View style={[styles.mSheet, { paddingBottom: insets.bottom + 20 }]}>
+            <View style={styles.mHandle} />
+            <Text style={styles.mTitle}>Registrar vacuna</Text>
+
+            <Text style={styles.mLabel}>Vacuna</Text>
+            <TextInput style={styles.mInput} placeholder="Ej. Séxtuple, Rabia, Triple felina…" placeholderTextColor={colors.muted} value={vaxName} onChangeText={setVaxName} />
+
+            <Text style={styles.mLabel}>Lote (opcional)</Text>
+            <TextInput style={styles.mInput} placeholder="Ej. AB-12345" placeholderTextColor={colors.muted} value={vaxLot} onChangeText={setVaxLot} />
+
+            <Text style={styles.mLabel}>Próxima dosis (refuerzo)</Text>
+            <View style={styles.chipsRow}>
+              {BOOSTERS.map((b) => (
+                <Pressable key={b.label} style={[styles.chip, boosterMonths === b.months && styles.chipOn]} onPress={() => setBoosterMonths(b.months)}>
+                  <Text style={[styles.chipTxt, boosterMonths === b.months && styles.chipTxtOn]}>{b.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={styles.mHint}>Se registra como aplicada hoy. La próxima dosis se le recordará al dueño.</Text>
+
+            <View style={styles.mActions}>
+              <Pressable style={[styles.mBtn, styles.mCancel]} onPress={() => setVaxOpen(false)}><Text style={styles.mCancelTxt}>Cancelar</Text></Pressable>
+              <Pressable style={[styles.mBtn, styles.mSave, (!vaxName.trim() || addVax.isPending) && { opacity: 0.5 }]} disabled={!vaxName.trim() || addVax.isPending} onPress={() => addVax.mutate()}>
+                <Text style={styles.mSaveTxt}>{addVax.isPending ? 'Guardando…' : 'Guardar'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -156,8 +234,30 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 16, fontWeight: '900', color: colors.text, marginTop: 3 },
 
   section: { fontSize: 17, fontWeight: '800', color: colors.text, marginTop: 22, marginBottom: 10 },
-  vaxRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.white, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8, boxShadow: cardShadow },
+  sectionRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+  addLink: { fontSize: 14, fontWeight: '800', color: colors.brand, marginBottom: 12 },
+  vaxRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.white, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8, boxShadow: cardShadow, gap: 8 },
   vaxName: { fontSize: 15, color: colors.text, fontWeight: '600' },
+  vaxDue: { fontSize: 12, color: colors.muted, marginTop: 2 },
+
+  mBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  mSheet: { backgroundColor: colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, gap: 8 },
+  mHandle: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: colors.border, marginBottom: 6 },
+  mTitle: { fontSize: 18, fontWeight: '900', color: colors.text, marginBottom: 6 },
+  mLabel: { fontSize: 13, fontWeight: '800', color: colors.text, marginTop: 6 },
+  mInput: { backgroundColor: colors.canvas, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: colors.text, borderWidth: 1, borderColor: colors.border },
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  chip: { borderRadius: radius.full, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.white },
+  chipOn: { borderColor: colors.brand, backgroundColor: colors.brandLight },
+  chipTxt: { fontSize: 13, fontWeight: '700', color: colors.muted },
+  chipTxtOn: { color: colors.brand },
+  mHint: { fontSize: 12, color: colors.muted, marginTop: 6 },
+  mActions: { flexDirection: 'row', gap: 12, marginTop: 14 },
+  mBtn: { flex: 1, borderRadius: radius.md, paddingVertical: 14, alignItems: 'center' },
+  mCancel: { backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.border },
+  mCancelTxt: { fontSize: 15, fontWeight: '800', color: colors.muted },
+  mSave: { backgroundColor: colors.brand },
+  mSaveTxt: { fontSize: 15, fontWeight: '800', color: colors.white },
   pill: { borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 4 },
   pillTxt: { fontSize: 12, fontWeight: '800' },
 
