@@ -68,22 +68,6 @@ export default function AlertScreen({ navigation }: { navigation: any }) {
     onError: (e) => appAlert('No se pudo iniciar la videollamada', e instanceof Error ? e.message : 'Intenta de nuevo.'),
   });
 
-  // Finaliza la consulta: marca la urgencia como atendida (genera el cargo CPL) y la
-  // saca de la guardia.
-  const finish = useMutation({
-    mutationFn: (emergencyId: string) => api(`/emergencies/${emergencyId}/attended`, { method: 'POST', body: {} }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['vet-active-emergencies'] });
-      appAlert('Consulta finalizada', 'La urgencia quedó marcada como atendida.');
-    },
-    onError: (e) => appAlert('No se pudo finalizar', e instanceof Error ? e.message : 'Intenta de nuevo.'),
-  });
-  const confirmFinish = (emergencyId: string) =>
-    appAlert('Finalizar consulta', '¿Marcar esta urgencia como atendida? Se cerrará y ya no aparecerá en tu guardia.', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Finalizar', onPress: () => finish.mutate(emergencyId) },
-    ]);
-
   const openChat = async (ownerId: string, clientName: string) => {
     if (!chatClient?.userID) return appAlert('Chat no disponible', 'Conectando el chat… reintenta en unos segundos.');
     try {
@@ -143,8 +127,8 @@ export default function AlertScreen({ navigation }: { navigation: any }) {
                         <Text style={styles.actionTxt}>{videoCall.isPending ? 'Llamando…' : 'Videollamada'}</Text>
                       </Pressable>
                     </View>
-                    <Pressable style={[styles.finishBtn, finish.isPending && { opacity: 0.6 }]} disabled={finish.isPending} onPress={() => confirmFinish(e.id)}>
-                      <Text style={styles.finishTxt}>{finish.isPending ? 'Finalizando…' : '✓ Finalizar consulta'}</Text>
+                    <Pressable style={styles.finishBtn} onPress={() => navigation.navigate('Attend', { emergencyId: e.id, petName: e.pet.name, ownerName: e.pet.owner.fullName })}>
+                      <Text style={styles.finishTxt}>Atender consulta</Text>
                     </Pressable>
                   </View>
                 ) : (

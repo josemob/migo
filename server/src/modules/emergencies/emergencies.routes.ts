@@ -217,13 +217,34 @@ router.post(
   }),
 );
 
-// POST /emergencies/:id/attended -> lead efectivo: genera el cargo CPL a la clínica
+// POST /emergencies/:id/attended -> lead efectivo: genera el cargo CPL a la clínica.
+// Opcionalmente registra la ATENCIÓN médica (diagnóstico, tratamiento y receta) en el
+// expediente de la mascota: crea un MedicalRecord + las Prescriptions asociadas.
 router.post(
   '/:id/attended',
   withClinicContext,
   validate({
     params: z.object({ id: z.string().uuid() }),
-    body: z.object({ hospitalized: z.boolean().optional() }),
+    body: z.object({
+      hospitalized: z.boolean().optional(),
+      diagnosis: z.string().max(4000).optional(),
+      treatment: z.string().max(4000).optional(),
+      notes: z.string().max(4000).optional(),
+      weightKg: z.number().positive().max(500).optional(),
+      temperature: z.number().min(20).max(50).optional(),
+      prescriptions: z
+        .array(
+          z.object({
+            drug: z.string().min(1).max(200),
+            dose: z.string().max(100).optional(),
+            frequency: z.string().max(100).optional(),
+            durationDays: z.number().int().min(1).max(365).optional(),
+            instructions: z.string().max(500).optional(),
+          }),
+        )
+        .max(20)
+        .optional(),
+    }),
   }),
   asyncHandler(async (req, res) => {
     const emergency = await prisma.emergency.findFirst({
@@ -233,24 +254,52 @@ router.post(
     if (!emergency) throw ApiError.notFound('Urgencia no encontrada o no aceptada por tu sucursal');
     if (emergency.ledgerEntry) throw ApiError.conflict('Esta urgencia ya generó su cargo CPL');
 
+    const b = req.body as {
+      hospitalized?: boolean; diagnosis?: string; treatment?: string; notes?: string;
+      weightKg?: number; temperature?: number;
+      prescriptions?: { drug: string; dose?: string; frequency?: string; durationDays?: number; instructions?: string }[];
+    };
+    const meds = (b.prescriptions ?? []).filter((p) => p.drug?.trim());
+    const hasClinical = !!(b.diagnosis || b.treatment || b.notes || b.weightKg != null || b.temperature != null || meds.length);
+
     const result = await prisma.$transaction(async (tx) => {
       const updated = await tx.emergency.update({
         where: { id: emergency.id },
-        data: {
-          status: req.body.hospitalized ? 'HOSPITALIZED' : 'ATTENDED',
-          attendedAt: new Date(),
-        },
+        data: { status: b.hospitalized ? 'HOSPITALIZED' : 'ATTENDED', attendedAt: new Date() },
       });
       const ledger = await tx.ledgerEntry.create({
-        data: {
-          type: 'CPL',
-          status: 'PENDING',
-          clinicId: req.clinicId!,
-          emergencyId: emergency.id,
-          grossUsd: 0,
-          migoFeeUsd: env.CPL_FEE_USD,
-        },
+        data: { type: 'CPL', status: 'PENDING', clinicId: req.clinicId!, emergencyId: emergency.id, grossUsd: 0, migoFeeUsd: env.CPL_FEE_USD },
       });
+      if (hasClinical) {
+        const record = await tx.medicalRecord.create({
+          data: {
+            petId: emergency.petId,
+            clinicId: req.clinicId!,
+            vetId: req.staffId ?? null,
+            reason: 'Atención de emergencia',
+            symptoms: emergency.symptoms ?? null,
+            diagnosis: b.diagnosis ?? null,
+            treatment: b.treatment ?? null,
+            notes: b.notes ?? null,
+            weightKg: b.weightKg ?? null,
+            temperature: b.temperature ?? null,
+          },
+        });
+        if (meds.length) {
+          await tx.prescription.createMany({
+            data: meds.map((p) => ({
+              petId: emergency.petId,
+              recordId: record.id,
+              drug: p.drug.trim(),
+              dose: p.dose ?? null,
+              frequency: p.frequency ?? null,
+              durationDays: p.durationDays ?? null,
+              instructions: p.instructions ?? null,
+              prescribedById: req.staffId ?? null,
+            })),
+          });
+        }
+      }
       return { emergency: updated, ledger };
     });
     res.status(201).json(result);
