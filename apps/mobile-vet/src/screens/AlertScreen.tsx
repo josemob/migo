@@ -34,7 +34,7 @@ interface ActiveAlert {
 
 export default function AlertScreen({ navigation }: { navigation: any }) {
   const qc = useQueryClient();
-  const { chatClient } = useStream();
+  const { chatClient, videoClient, streamUserId } = useStream();
   const q = useQuery({
     queryKey: ['vet-active-emergencies'],
     queryFn: () => api<{ data: ActiveAlert[] }>('/emergencies/active'),
@@ -47,14 +47,40 @@ export default function AlertScreen({ navigation }: { navigation: any }) {
     onError: (e) => appAlert('No se pudo aceptar', e instanceof Error ? e.message : 'Puede que otra clínica ya la haya tomado.'),
   });
 
+  // La llamada se ANILLA DESDE EL CLIENTE (patrón recomendado por Stream): así el
+  // dispositivo que llama entra al ciclo de vida de "saliente" correctamente y no se
+  // queda atascado en "preparing call" (crear la sala en el servidor no lo hacía).
   const videoCall = useMutation({
     mutationFn: async (ownerId: string) => {
       const ok = await requestCallPermissions();
       if (!ok) throw new Error('Activa cámara y micrófono para hacer videollamadas.');
-      return api('/clinic/teleconsults', { method: 'POST', body: { ownerId, video: true } });
+      if (!videoClient || !streamUserId) throw new Error('El video aún se está conectando. Reintenta en unos segundos.');
+      const callId = `migo-${streamUserId}-${ownerId}-${Date.now()}`.replace(/[^a-zA-Z0-9_-]/g, '');
+      const call = videoClient.call('default', callId);
+      await call.getOrCreate({
+        ring: true,
+        data: { members: [{ user_id: streamUserId }, { user_id: ownerId }], custom: { video: true } },
+      });
+      return call.cid;
     },
     onError: (e) => appAlert('No se pudo iniciar la videollamada', e instanceof Error ? e.message : 'Intenta de nuevo.'),
   });
+
+  // Finaliza la consulta: marca la urgencia como atendida (genera el cargo CPL) y la
+  // saca de la guardia.
+  const finish = useMutation({
+    mutationFn: (emergencyId: string) => api(`/emergencies/${emergencyId}/attended`, { method: 'POST', body: {} }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['vet-active-emergencies'] });
+      appAlert('Consulta finalizada', 'La urgencia quedó marcada como atendida.');
+    },
+    onError: (e) => appAlert('No se pudo finalizar', e instanceof Error ? e.message : 'Intenta de nuevo.'),
+  });
+  const confirmFinish = (emergencyId: string) =>
+    appAlert('Finalizar consulta', '¿Marcar esta urgencia como atendida? Se cerrará y ya no aparecerá en tu guardia.', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Finalizar', onPress: () => finish.mutate(emergencyId) },
+    ]);
 
   const openChat = async (ownerId: string, clientName: string) => {
     if (!chatClient?.userID) return appAlert('Chat no disponible', 'Conectando el chat… reintenta en unos segundos.');
@@ -115,6 +141,9 @@ export default function AlertScreen({ navigation }: { navigation: any }) {
                         <Text style={styles.actionTxt}>{videoCall.isPending ? 'Llamando…' : 'Videollamada'}</Text>
                       </Pressable>
                     </View>
+                    <Pressable style={[styles.finishBtn, finish.isPending && { opacity: 0.6 }]} disabled={finish.isPending} onPress={() => confirmFinish(e.id)}>
+                      <Text style={styles.finishTxt}>{finish.isPending ? 'Finalizando…' : '✓ Finalizar consulta'}</Text>
+                    </Pressable>
                   </View>
                 ) : (
                   <Pressable style={[styles.acceptBtn, accept.isPending && { opacity: 0.6 }]} disabled={accept.isPending} onPress={() => accept.mutate(a.id)}>
@@ -159,4 +188,6 @@ const styles = StyleSheet.create({
   chat: { backgroundColor: colors.brandDark },
   video: { backgroundColor: colors.brand },
   actionTxt: { color: colors.white, fontWeight: '800', fontSize: 14 },
+  finishBtn: { marginTop: 8, borderRadius: radius.md, paddingVertical: 12, alignItems: 'center', borderWidth: 1.5, borderColor: colors.green, backgroundColor: '#EAF7EE' },
+  finishTxt: { color: colors.green, fontWeight: '800', fontSize: 14 },
 });

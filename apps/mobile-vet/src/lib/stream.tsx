@@ -17,10 +17,12 @@ interface Cred { apiKey: string; token: string; userId: string; clinicUserId?: s
 
 interface StreamCtx {
   chatClient: StreamChat | null;
+  videoClient: StreamVideoClient | null; // para anillar llamadas DESDE el cliente
+  streamUserId: string | null; // identidad Stream de la clínica (clinic_<id>)
   ready: boolean;
   unread: number; // total de mensajes sin leer (punto rojo del tab de Chats)
 }
-const Ctx = createContext<StreamCtx>({ chatClient: null, ready: false, unread: 0 });
+const Ctx = createContext<StreamCtx>({ chatClient: null, videoClient: null, streamUserId: null, ready: false, unread: 0 });
 export const useStream = () => useContext(Ctx);
 
 /**
@@ -32,6 +34,7 @@ export function StreamProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [chatClient, setChatClient] = useState<StreamChat | null>(null);
   const [videoClient, setVideoClient] = useState<StreamVideoClient | null>(null);
+  const [streamUserId, setStreamUserId] = useState<string | null>(null);
   const [unread, setUnread] = useState(0);
   const connecting = useRef(false);
 
@@ -61,6 +64,7 @@ export function StreamProvider({ children }: { children: ReactNode }) {
         vc = StreamVideoClient.getOrCreateInstance({ apiKey: cred.apiKey, user: streamUser, token: cred.token });
         setChatClient(cc);
         setVideoClient(vc);
+        setStreamUserId(cred.userId);
       } catch {
         // Stream no configurado / sin red: la app sigue funcionando sin chat en vivo
         connecting.current = false;
@@ -78,14 +82,14 @@ export function StreamProvider({ children }: { children: ReactNode }) {
 
   // Aún sin conectar: renderiza los hijos (las pantallas de chat muestran su propia carga)
   if (!chatClient || !videoClient) {
-    return <Ctx.Provider value={{ chatClient, ready: false, unread }}>{children}</Ctx.Provider>;
+    return <Ctx.Provider value={{ chatClient, videoClient, streamUserId, ready: false, unread }}>{children}</Ctx.Provider>;
   }
 
   return (
     <OverlayProvider>
       <Chat client={chatClient}>
         <StreamVideo client={videoClient}>
-          <Ctx.Provider value={{ chatClient, ready: true, unread }}>
+          <Ctx.Provider value={{ chatClient, videoClient, streamUserId, ready: true, unread }}>
             {children}
             <IncomingCallOverlay />
           </Ctx.Provider>
