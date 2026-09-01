@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Modal, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StreamChat } from 'stream-chat';
 import { Chat, OverlayProvider } from 'stream-chat-expo';
 import {
@@ -125,17 +125,20 @@ function AutoHangup() {
 
 function IncomingCallOverlay() {
   const calls = useCalls();
-  const insets = useSafeAreaInsets();
   const call = calls[0];
   if (!call) return null;
   return (
     <Modal animationType="slide" transparent={false} statusBarTranslucent>
-      <View style={{ flex: 1, backgroundColor: colors.brandDeep, paddingTop: insets.top, paddingBottom: insets.bottom }}>
-        <StreamCall call={call}>
-          <AutoHangup />
-          <RingingCallContent />
-        </StreamCall>
-      </View>
+      {/* SafeAreaProvider propio: dentro de un Modal el del root no aplica, así los
+          controles de Stream respetan el margen sobre la barra de navegación. */}
+      <SafeAreaProvider>
+        <View style={{ flex: 1, backgroundColor: colors.brandDeep }}>
+          <StreamCall call={call}>
+            <AutoHangup />
+            <RingingCallContent />
+          </StreamCall>
+        </View>
+      </SafeAreaProvider>
     </Modal>
   );
 }
