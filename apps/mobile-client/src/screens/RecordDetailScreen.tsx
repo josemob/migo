@@ -35,9 +35,11 @@ const longDate = (iso: string) => new Date(iso).toLocaleDateString('es-VE', { da
 
 function recordHtml(r: RecordDetail): string {
   const block = (t: string, v?: string | null) => (v ? `<div style="margin-bottom:12px"><div style="font-size:12px;color:#94A3B8;text-transform:uppercase;letter-spacing:.4px">${t}</div><div style="font-size:15px;color:#1E293B;margin-top:2px">${v}</div></div>` : '');
+  const chip = (t: string, v?: string | null) =>
+    v ? `<span style="display:inline-block;background:#F6F7F9;border-radius:6px;padding:4px 9px;margin:2px 5px 2px 0;font-size:13px"><span style="color:#94A3B8;text-transform:uppercase;font-size:10px;letter-spacing:.4px">${t}</span> <b>${v}</b></span>` : '';
   const rx = r.prescriptions.length
     ? `<div style="font-size:12px;color:#94A3B8;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Récipe</div>` +
-      r.prescriptions.map((p) => `<div style="border:1px solid #E2E8F0;border-radius:10px;padding:10px;margin-bottom:8px"><b>${p.drug}</b>${p.dose ? ` · ${p.dose}` : ''}${p.frequency ? ` · ${p.frequency}` : ''}${p.durationDays ? ` · ${p.durationDays} días` : ''}${p.instructions ? `<div style="color:#64748B;font-size:13px;margin-top:3px">${p.instructions}</div>` : ''}</div>`).join('')
+      r.prescriptions.map((p) => `<div style="border:1px solid #E2E8F0;border-radius:10px;padding:10px;margin-bottom:8px"><div style="font-weight:700;margin-bottom:4px">${p.drug}</div>${chip('Dosis', p.dose)}${chip('Frecuencia', p.frequency)}${chip('Duración', p.durationDays ? `${p.durationDays} días` : null)}${p.instructions ? `<div style="color:#64748B;font-size:13px;margin-top:5px">${p.instructions}</div>` : ''}</div>`).join('')
     : '';
   const sign = r.signedAt
     ? `<div style="margin-top:22px;border-top:1px solid #E2E8F0;padding-top:14px"><div style="font-size:13px;color:#2EA84F;font-weight:700">✓ Firmado digitalmente</div><div style="font-size:14px;color:#1E293B;margin-top:2px">${r.vetName ?? 'Médico veterinario'}${r.vetSpecialty ? ` · ${r.vetSpecialty}` : ''}${r.vetLicense ? ` · Colegiado #${r.vetLicense}` : ''}</div><div style="font-size:12px;color:#94A3B8">${longDate(r.signedAt)}${r.clinicName ? ` · ${r.clinicName}` : ''}</div></div>`
@@ -132,7 +134,13 @@ export default function RecordDetailScreen({ route, navigation }: { route: any; 
               {data.prescriptions.map((p, i) => (
                 <View key={i} style={styles.rx}>
                   <Text style={styles.rxDrug}>{p.drug}</Text>
-                  <Text style={styles.rxSub}>{[p.dose, p.frequency, p.durationDays ? `${p.durationDays} días` : null].filter(Boolean).join(' · ')}</Text>
+                  {(p.dose || p.frequency || p.durationDays) ? (
+                    <View style={styles.rxGrid}>
+                      {p.dose ? <View style={styles.rxField}><Text style={styles.rxLabel}>Dosis</Text><Text style={styles.rxVal}>{p.dose}</Text></View> : null}
+                      {p.frequency ? <View style={styles.rxField}><Text style={styles.rxLabel}>Frecuencia</Text><Text style={styles.rxVal}>{p.frequency}</Text></View> : null}
+                      {p.durationDays ? <View style={styles.rxField}><Text style={styles.rxLabel}>Duración</Text><Text style={styles.rxVal}>{p.durationDays} días</Text></View> : null}
+                    </View>
+                  ) : null}
                   {p.instructions ? <Text style={styles.rxNote}>{p.instructions}</Text> : null}
                 </View>
               ))}
@@ -173,8 +181,11 @@ const styles = StyleSheet.create({
   vitalL: { fontSize: 12, color: colors.muted, marginTop: 2 },
   rx: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 12, marginTop: 8 },
   rxDrug: { fontSize: 15, fontWeight: '800', color: colors.text },
-  rxSub: { fontSize: 13, color: colors.muted, marginTop: 2 },
-  rxNote: { fontSize: 13, color: colors.text, marginTop: 4 },
+  rxGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+  rxField: { backgroundColor: colors.canvas, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 6, minWidth: 76 },
+  rxLabel: { fontSize: 10, fontWeight: '800', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
+  rxVal: { fontSize: 14, fontWeight: '700', color: colors.text, marginTop: 1 },
+  rxNote: { fontSize: 13, color: colors.text, marginTop: 6 },
   pdfBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 6, backgroundColor: colors.brand, borderRadius: radius.md, paddingVertical: 13 },
   pdfBtnTxt: { color: colors.white, fontWeight: '800', fontSize: 15 },
 });
