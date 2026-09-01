@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Modal, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   StreamVideo,
   StreamVideoClient,
@@ -72,11 +73,12 @@ export function IndependentVideoProvider({ children }: { children: ReactNode }) 
 /** Cuando hay una llamada activa, la muestra a pantalla completa (aceptar/colgar nativos). */
 function CallOverlay() {
   const calls = useCalls();
+  const insets = useSafeAreaInsets();
   const call = calls[0];
   if (!call) return null;
   return (
     <Modal animationType="slide" transparent={false} statusBarTranslucent>
-      <View style={{ flex: 1, backgroundColor: colors.brandDeep }}>
+      <View style={{ flex: 1, backgroundColor: colors.brandDeep, paddingTop: insets.top, paddingBottom: insets.bottom }}>
         <StreamCall call={call}>
           <RingingCallContent />
         </StreamCall>
