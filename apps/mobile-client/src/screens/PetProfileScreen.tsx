@@ -159,7 +159,7 @@ export default function PetProfileScreen({ route, navigation }: { route: any; na
         <View style={styles.card}>
           <Action icon="file" label="Ver expediente médico" onPress={() => navigation.navigate('PetDetail', { id, name: data.name })} />
           <Action icon="calendar" label="Calendario de cuidados" onPress={soon} border />
-          <Action icon="syringe" label="Historial de vacunas" onPress={soon} border />
+          <Action icon="syringe" label="Cartilla de vacunación" onPress={() => navigation.navigate('VaccineCard', { id, name: data.name })} border />
         </View>
 
         <Pressable style={styles.delBtn} onPress={confirmDelete} disabled={del.isPending}>

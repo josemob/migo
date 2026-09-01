@@ -129,7 +129,7 @@ router.get(
       include: {
         allergies: true,
         conditions: { where: { isActive: true } },
-        vaccinations: { orderBy: { appliedAt: 'desc' } },
+        vaccinations: { orderBy: { appliedAt: 'desc' }, include: { clinic: { select: { name: true } } } },
         prescriptions: { orderBy: { createdAt: 'desc' }, take: 10 },
         records: {
           orderBy: { visitedAt: 'desc' },
