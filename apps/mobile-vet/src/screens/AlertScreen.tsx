@@ -55,7 +55,9 @@ export default function AlertScreen({ navigation }: { navigation: any }) {
       const ok = await requestCallPermissions();
       if (!ok) throw new Error('Activa cámara y micrófono para hacer videollamadas.');
       if (!videoClient || !streamUserId) throw new Error('El video aún se está conectando. Reintenta en unos segundos.');
-      const callId = `migo-${streamUserId}-${ownerId}-${Date.now()}`.replace(/[^a-zA-Z0-9_-]/g, '');
+      // El id de la sala debe ser <= 64 chars (Stream). Uno corto y único basta;
+      // los participantes van en `members`, no en el id.
+      const callId = `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
       const call = videoClient.call('default', callId);
       await call.getOrCreate({
         ring: true,
