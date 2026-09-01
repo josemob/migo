@@ -7,6 +7,8 @@ import {
   StreamCall,
   RingingCallContent,
   useCalls,
+  useCall,
+  useCallStateHooks,
 } from '@stream-io/video-react-native-sdk';
 import { api } from './api';
 import { useAuth } from './auth';
@@ -70,6 +72,19 @@ export function IndependentVideoProvider({ children }: { children: ReactNode }) 
   );
 }
 
+/** Cierra la llamada de este lado cuando el OTRO cuelga. */
+function AutoHangup() {
+  const call = useCall();
+  const { useRemoteParticipants } = useCallStateHooks();
+  const remote = useRemoteParticipants();
+  const hadRemote = useRef(false);
+  useEffect(() => {
+    if (remote.length > 0) hadRemote.current = true;
+    else if (hadRemote.current) call?.leave().catch(() => {});
+  }, [remote.length, call]);
+  return null;
+}
+
 /** Cuando hay una llamada activa, la muestra a pantalla completa (aceptar/colgar nativos). */
 function CallOverlay() {
   const calls = useCalls();
@@ -80,6 +95,7 @@ function CallOverlay() {
     <Modal animationType="slide" transparent={false} statusBarTranslucent>
       <View style={{ flex: 1, backgroundColor: colors.brandDeep, paddingTop: insets.top, paddingBottom: insets.bottom }}>
         <StreamCall call={call}>
+          <AutoHangup />
           <RingingCallContent />
         </StreamCall>
       </View>

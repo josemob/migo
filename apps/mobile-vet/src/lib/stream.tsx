@@ -9,6 +9,8 @@ import {
   StreamCall,
   RingingCallContent,
   useCalls,
+  useCall,
+  useCallStateHooks,
 } from '@stream-io/video-react-native-sdk';
 import { api } from './api';
 import { useAuth } from './auth';
@@ -105,6 +107,20 @@ export function StreamProvider({ children }: { children: ReactNode }) {
  * de Video pobla useCalls() y aquí mostramos la pantalla de "Llamada entrante"
  * (aceptar/rechazar) que RingingCallContent maneja de forma nativa.
  */
+/** Cierra la llamada de este lado cuando el OTRO participante cuelga: si hubo un
+ *  remoto y luego se va, salimos (call.leave) y el overlay se cierra solo. */
+function AutoHangup() {
+  const call = useCall();
+  const { useRemoteParticipants } = useCallStateHooks();
+  const remote = useRemoteParticipants();
+  const hadRemote = useRef(false);
+  useEffect(() => {
+    if (remote.length > 0) hadRemote.current = true;
+    else if (hadRemote.current) call?.leave().catch(() => {});
+  }, [remote.length, call]);
+  return null;
+}
+
 function IncomingCallOverlay() {
   const calls = useCalls();
   const insets = useSafeAreaInsets();
@@ -114,6 +130,7 @@ function IncomingCallOverlay() {
     <Modal animationType="slide" transparent={false} statusBarTranslucent>
       <View style={{ flex: 1, backgroundColor: colors.brandDeep, paddingTop: insets.top, paddingBottom: insets.bottom }}>
         <StreamCall call={call}>
+          <AutoHangup />
           <RingingCallContent />
         </StreamCall>
       </View>
