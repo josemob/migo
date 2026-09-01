@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Modal, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StreamChat } from 'stream-chat';
@@ -35,11 +35,19 @@ export const useStream = () => useContext(Ctx);
  */
 export function StreamProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [chatClient, setChatClient] = useState<StreamChat | null>(null);
   const [videoClient, setVideoClient] = useState<StreamVideoClient | null>(null);
   const [streamUserId, setStreamUserId] = useState<string | null>(null);
   const [unread, setUnread] = useState(0);
   const connecting = useRef(false);
+
+  // Tema de Stream: los controles de llamada no respetan el área segura por defecto,
+  // así que les damos padding inferior = altura de la barra de navegación de Android.
+  const callTheme = useMemo<any>(
+    () => ({ callControls: { container: { paddingBottom: Math.max(insets.bottom, 24) + 12 } } }),
+    [insets.bottom],
+  );
 
   // Contador global de no leídos para el punto rojo del tab de Chats.
   useEffect(() => {
@@ -91,7 +99,7 @@ export function StreamProvider({ children }: { children: ReactNode }) {
   return (
     <OverlayProvider>
       <Chat client={chatClient}>
-        <StreamVideo client={videoClient}>
+        <StreamVideo client={videoClient} style={callTheme}>
           <Ctx.Provider value={{ chatClient, videoClient, streamUserId, ready: true, unread }}>
             {children}
             <IncomingCallOverlay />
@@ -123,15 +131,11 @@ function AutoHangup() {
 
 function IncomingCallOverlay() {
   const calls = useCalls();
-  const insets = useSafeAreaInsets();
   const call = calls[0];
   if (!call) return null;
-  // Piso fijo: dentro del Modal el inset suele venir en 0, así garantizamos que los
-  // controles de la llamada queden por encima de la barra de navegación de Android.
-  const padBottom = Math.max(insets.bottom, 44);
   return (
     <Modal animationType="slide" transparent={false} statusBarTranslucent>
-      <View style={{ flex: 1, backgroundColor: colors.brandDeep, paddingTop: Math.max(insets.top, 8), paddingBottom: padBottom }}>
+      <View style={{ flex: 1, backgroundColor: colors.brandDeep }}>
         <StreamCall call={call}>
           <AutoHangup />
           <RingingCallContent />

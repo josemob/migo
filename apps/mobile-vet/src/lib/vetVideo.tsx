@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Modal, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -27,9 +27,16 @@ export const useVetVideo = () => useContext(Ctx);
  */
 export function IndependentVideoProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [client, setClient] = useState<StreamVideoClient | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const connecting = useRef(false);
+
+  // Padding inferior a los controles de llamada (área segura / barra de navegación).
+  const callTheme = useMemo<any>(
+    () => ({ callControls: { container: { paddingBottom: Math.max(insets.bottom, 24) + 12 } } }),
+    [insets.bottom],
+  );
 
   useEffect(() => {
     if (!user || connecting.current) return;
@@ -63,7 +70,7 @@ export function IndependentVideoProvider({ children }: { children: ReactNode }) 
   }
 
   return (
-    <StreamVideo client={client}>
+    <StreamVideo client={client} style={callTheme}>
       <Ctx.Provider value={{ client, userId }}>
         {children}
         <CallOverlay />
@@ -88,13 +95,11 @@ function AutoHangup() {
 /** Cuando hay una llamada activa, la muestra a pantalla completa (aceptar/colgar nativos). */
 function CallOverlay() {
   const calls = useCalls();
-  const insets = useSafeAreaInsets();
   const call = calls[0];
   if (!call) return null;
-  const padBottom = Math.max(insets.bottom, 44);
   return (
     <Modal animationType="slide" transparent={false} statusBarTranslucent>
-      <View style={{ flex: 1, backgroundColor: colors.brandDeep, paddingTop: Math.max(insets.top, 8), paddingBottom: padBottom }}>
+      <View style={{ flex: 1, backgroundColor: colors.brandDeep }}>
         <StreamCall call={call}>
           <AutoHangup />
           <RingingCallContent />
