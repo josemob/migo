@@ -61,7 +61,7 @@ export default function MyRecordsScreen({ navigation }: { navigation: any }) {
             </View>
           ) : (
             recs.map((r) => (
-              <View key={r.id} style={styles.card}>
+              <Pressable key={r.id} style={styles.card} onPress={() => navigation.navigate('RecordDetail', { id: r.id })}>
                 <View style={styles.cardTop}>
                   <Text style={styles.pet}>{r.pet.name}</Text>
                   {r.signedAt ? (
@@ -80,7 +80,7 @@ export default function MyRecordsScreen({ navigation }: { navigation: any }) {
                     <Text style={styles.signTxt}>✍️ Firmar expediente</Text>
                   </Pressable>
                 )}
-              </View>
+              </Pressable>
             ))
           )}
         </ScrollView>

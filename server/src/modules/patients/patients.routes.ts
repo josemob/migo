@@ -198,6 +198,24 @@ router.get(
   }),
 );
 
+// GET /patients/records/:recordId -> detalle completo de un expediente
+router.get(
+  '/records/:recordId',
+  validate({ params: z.object({ recordId: z.string().uuid() }) }),
+  asyncHandler(async (req, res) => {
+    const rec = await prisma.medicalRecord.findFirst({
+      where: { id: req.params.recordId, clinicId: req.clinicId! },
+      include: {
+        pet: { select: { name: true, species: true, breed: true, owner: { select: { fullName: true } } } },
+        prescriptions: { orderBy: { createdAt: 'asc' } },
+        clinic: { select: { name: true } },
+      },
+    });
+    if (!rec) throw ApiError.notFound('Expediente no encontrado');
+    res.json(rec);
+  }),
+);
+
 // POST /patients/records/:recordId/sign -> firma un expediente ya creado
 router.post(
   '/records/:recordId/sign',
