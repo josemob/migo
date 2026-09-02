@@ -56,8 +56,6 @@ export default function PetProfileScreen({ route, navigation }: { route: any; na
     onError: (e) => appAlert('No se pudo eliminar', e instanceof Error ? e.message : 'Intenta de nuevo'),
   });
 
-  const soon = () => appAlert('Migo', 'Edición disponible próximamente.');
-
   const [photoOverride, setPhotoOverride] = useState<string | null>(null);
   const changePhoto = async () => {
     const uri = await pickPhotoAsDataUri();
@@ -158,7 +156,7 @@ export default function PetProfileScreen({ route, navigation }: { route: any; na
         <Text style={styles.section}>Acciones</Text>
         <View style={styles.card}>
           <Action icon="file" label="Ver expediente médico" onPress={() => navigation.navigate('PetDetail', { id, name: data.name })} />
-          <Action icon="calendar" label="Calendario de cuidados" onPress={soon} border />
+          <Action icon="calendar" label="Calendario de cuidados" onPress={() => navigation.navigate('Tabs', { screen: 'Citas' })} border />
           <Action icon="syringe" label="Cartilla de vacunación" onPress={() => navigation.navigate('VaccineCard', { id, name: data.name })} border />
         </View>
 
