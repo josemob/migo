@@ -210,7 +210,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         {appts.isLoading ? (
           <Loading />
         ) : list.length === 0 ? (
-          <View style={styles.empty}><Text style={styles.emptyIcon}>🗓️</Text><Text style={styles.emptyTxt}>No hay citas para hoy.</Text></View>
+          <View style={styles.empty}><TabIcon name="calendar" color="#C9BBD3" size={40} /><Text style={styles.emptyTxt}>No hay citas para hoy.</Text></View>
         ) : (
           list.map((a) => {
             const st = STATUS[a.status] ?? STATUS.PENDING;

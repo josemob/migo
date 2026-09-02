@@ -37,6 +37,7 @@ import ReportScreen from './src/screens/ReportScreen';
 import ChatThreadScreen from './src/screens/ChatThreadScreen';
 import PlanScreen from './src/screens/PlanScreen';
 import AttendScreen from './src/screens/AttendScreen';
+import MyRecordsScreen from './src/screens/MyRecordsScreen';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
 const Tab = createBottomTabNavigator();
@@ -109,6 +110,7 @@ function MainApp({ onBackToIndependent }: { onBackToIndependent?: () => void }) 
             <Stack.Screen name="ChatThread" component={ChatThreadScreen} />
             <Stack.Screen name="Plan" component={PlanScreen} />
             <Stack.Screen name="Attend" component={AttendScreen} />
+            <Stack.Screen name="MyRecords" component={MyRecordsScreen} />
           </Stack.Navigator>
         </NavigationContainer>
       </IndependentBackContext.Provider>

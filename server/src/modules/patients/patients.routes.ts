@@ -177,6 +177,58 @@ router.post(
   }),
 );
 
+// GET /patients/records/mine -> expedientes que ha emitido este veterinario
+router.get(
+  '/records/mine',
+  asyncHandler(async (req, res) => {
+    const data = await prisma.medicalRecord.findMany({
+      where: { clinicId: req.clinicId!, ...(req.staffId ? { vetId: req.staffId } : {}) },
+      orderBy: { visitedAt: 'desc' },
+      take: 100,
+      select: {
+        id: true,
+        visitedAt: true,
+        reason: true,
+        diagnosis: true,
+        signedAt: true,
+        pet: { select: { name: true, species: true } },
+      },
+    });
+    res.json({ data });
+  }),
+);
+
+// POST /patients/records/:recordId/sign -> firma un expediente ya creado
+router.post(
+  '/records/:recordId/sign',
+  validate({ params: z.object({ recordId: z.string().uuid() }) }),
+  asyncHandler(async (req, res) => {
+    const record = await prisma.medicalRecord.findFirst({
+      where: { id: req.params.recordId, clinicId: req.clinicId! },
+      select: { id: true, signedAt: true, vetId: true },
+    });
+    if (!record) throw ApiError.notFound('Expediente no encontrado');
+    if (record.signedAt) throw ApiError.conflict('Este expediente ya está firmado');
+    const staff = req.staffId
+      ? await prisma.clinicStaff.findUnique({
+          where: { id: req.staffId },
+          select: { collegiateNumber: true, specialty: true, user: { select: { fullName: true } } },
+        })
+      : null;
+    const updated = await prisma.medicalRecord.update({
+      where: { id: record.id },
+      data: {
+        signedAt: new Date(),
+        vetId: record.vetId ?? req.staffId ?? null,
+        signedByName: staff?.user?.fullName ?? null,
+        signedByLicense: staff?.collegiateNumber ?? null,
+        signedBySpecialty: staff?.specialty ?? null,
+      },
+    });
+    res.json({ id: updated.id, signedAt: updated.signedAt });
+  }),
+);
+
 // POST /patients/:petId/allergies
 router.post(
   '/:petId/allergies',
