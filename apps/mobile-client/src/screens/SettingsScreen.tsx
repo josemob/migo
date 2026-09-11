@@ -39,22 +39,27 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
   const [pwOpen, setPwOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
-  useEffect(() => { isBiometricEnabled().then(setBio); }, []);
+  useEffect(() => { isBiometricEnabled().then(setBio).catch(() => {}); }, []);
 
   const toggleBiometric = async (next: boolean) => {
-    if (next) {
-      if (!(await biometricSupported())) {
-        return appAlert('Biometría no disponible', 'Primero configura una huella o rostro en los ajustes de tu teléfono.');
+    try {
+      if (next) {
+        if (!(await biometricSupported())) {
+          return appAlert('Biometría no disponible', 'Primero configura una huella o rostro en los ajustes de tu teléfono.');
+        }
+        setBio(await enableBiometric(tokens.refresh));
+      } else {
+        await disableBiometric();
+        setBio(false);
       }
-      setBio(await enableBiometric(tokens.refresh));
-    } else {
-      await disableBiometric();
-      setBio(false);
+    } catch (e) {
+      // Sin esto, un fallo del keystore era un rechazo sin manejar y el switch quedaba desincronizado.
+      appAlert('No se pudo cambiar la biometría', e instanceof Error ? e.message : 'Intenta de nuevo.');
     }
   };
 
   const pets = useQuery({ queryKey: ['pets'], queryFn: () => api<{ data: Pet[] }>('/me/pets') });
-  const petNames = pets.data?.data.map((p) => p.name).join(', ') || 'Sin mascotas aún';
+  const petNames = (pets.data?.data ?? []).map((p) => p.name).join(', ') || 'Sin mascotas aún';
 
   const soon = () => appAlert('Migo', 'Función disponible próximamente.');
 

@@ -34,6 +34,7 @@ interface Ficha {
 const ageText = (iso?: string) => {
   if (!iso) return '—';
   const b = new Date(iso);
+  if (Number.isNaN(b.getTime())) return '—';
   const now = new Date();
   let months = (now.getFullYear() - b.getFullYear()) * 12 + (now.getMonth() - b.getMonth());
   const years = Math.floor(months / 12);
@@ -42,10 +43,10 @@ const ageText = (iso?: string) => {
 };
 
 export default function PetProfileScreen({ route, navigation }: { route: any; navigation: any }) {
-  const { id } = route.params;
+  const { id } = route.params ?? {};
   const qc = useQueryClient();
   const insets = useSafeAreaInsets();
-  const { data, isLoading } = useQuery({ queryKey: ['pet', id], queryFn: () => api<Ficha>(`/me/pets/${id}`) });
+  const { data, isLoading, isError, error, refetch } = useQuery({ queryKey: ['pet', id], queryFn: () => api<Ficha>(`/me/pets/${id}`) });
 
   const del = useMutation({
     mutationFn: () => api(`/me/pets/${id}`, { method: 'DELETE' }),
@@ -80,12 +81,38 @@ export default function PetProfileScreen({ route, navigation }: { route: any; na
   const editNum = (title: string, field: string, current?: string) =>
     editField({ title, value: current ?? '', numeric: true, onSave: (v) => patch({ [field]: v ? Number(v) : null }) });
 
-  if (isLoading || !data) return <Loading />;
+  if (isLoading) return <Loading />;
+  if (isError || !data) {
+    // Antes: spinner infinito sin salida cuando fallaba la carga.
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.header}>
+          <BackButton onPress={() => navigation.goBack()} />
+          <Text style={styles.headerTitle}>Perfil</Text>
+          <View style={{ width: 44 }} />
+        </View>
+        <View style={{ padding: 20, gap: 12 }}>
+          <Text style={styles.sub}>{error instanceof Error ? error.message : 'No pudimos cargar el perfil.'}</Text>
+          <Pressable style={[styles.delBtn, { borderColor: colors.brand }]} onPress={() => void refetch()}>
+            <Text style={[styles.delText, { color: colors.brand }]}>Reintentar</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
-  const vaxOk = data.vaccinations.every((v) => !v.nextDueAt || new Date(v.nextDueAt) > new Date());
-  const vet = data.frequentVet ?? data.records.find((r) => r.clinic)?.clinic?.name;
-  const allergiesStr = data.allergies.map((a) => a.substance).join(', ');
-  const birthISO = data.birthDate ? new Date(data.birthDate).toISOString().slice(0, 10) : '';
+  // El backend puede omitir relaciones vacías: normalizamos a [] antes de renderizar.
+  const vaccinations = data.vaccinations ?? [];
+  const allergies = data.allergies ?? [];
+  const records = data.records ?? [];
+  const vaxOk = vaccinations.every((v) => !v.nextDueAt || new Date(v.nextDueAt) > new Date());
+  const vet = data.frequentVet ?? records.find((r) => r.clinic)?.clinic?.name;
+  const allergiesStr = allergies.map((a) => a.substance).join(', ');
+  // Fecha válida -> "AAAA-MM-DD"; inválida/ausente -> ''. Antes `toISOString()` lanzaba
+  // RangeError con una fecha mal guardada y la pantalla no abría.
+  const birth = data.birthDate ? new Date(data.birthDate) : null;
+  const birthValid = !!birth && !Number.isNaN(birth.getTime());
+  const birthISO = birthValid && birth ? birth.toISOString().slice(0, 10) : '';
 
   const confirmDelete = () =>
     appAlert(`Eliminar perfil de ${data.name}`, 'Se borrará su perfil e historial. Esta acción es permanente.', [
@@ -136,7 +163,25 @@ export default function PetProfileScreen({ route, navigation }: { route: any; na
 
         <Text style={styles.section}>Detalles Básicos</Text>
         <View style={styles.card}>
-          <Field label="Fecha de Nacimiento" value={data.birthDate ? new Date(data.birthDate).toLocaleDateString('es-VE', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'} onEdit={() => editText('Fecha de Nacimiento (AAAA-MM-DD)', 'birthDate', birthISO)} />
+          <Field
+            label="Fecha de Nacimiento"
+            value={birthValid && birth ? birth.toLocaleDateString('es-VE', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
+            onEdit={() =>
+              editField({
+                title: 'Fecha de Nacimiento (AAAA-MM-DD)',
+                value: birthISO,
+                onSave: (v) => {
+                  const t = v.trim();
+                  if (!t) return patch({ birthDate: null });
+                  // Validamos antes de guardar: una fecha inválida rompía el perfil al abrirlo.
+                  if (!/^\d{4}-\d{2}-\d{2}$/.test(t) || Number.isNaN(new Date(t).getTime())) {
+                    throw new Error('Usa el formato AAAA-MM-DD, por ejemplo 2020-05-14.');
+                  }
+                  return patch({ birthDate: t });
+                },
+              })
+            }
+          />
           <Field label="Color de Pelaje" value={data.color ?? '—'} onEdit={() => editText('Color de Pelaje', 'color', data.color)} border />
           <Field label="Alias de Cariño" value={data.alias ?? '—'} onEdit={() => editText('Alias de Cariño', 'alias', data.alias)} border />
         </View>
@@ -146,7 +191,7 @@ export default function PetProfileScreen({ route, navigation }: { route: any; na
           <Field
             label="Alergias Conocidas"
             value={allergiesStr || 'Ninguna conocida'}
-            valueColor={data.allergies.length ? colors.red : undefined}
+            valueColor={allergies.length ? colors.red : undefined}
             onEdit={() => editField({ title: 'Alergias Conocidas', value: allergiesStr, multiline: true, onSave: (v) => patch({ allergiesText: v }) })}
           />
           <Field label="Condición Especial" value={data.specialCondition ?? '—'} onEdit={() => editText('Condición Especial', 'specialCondition', data.specialCondition, true)} border />

@@ -55,7 +55,9 @@ function weightLabel(w?: string | number | null): string | null {
 }
 
 function fmtCitaDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: '2-digit' });
 }
 
 // Iconos de los botones de servicio (SVG del design system)
@@ -109,7 +111,9 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const emergencies = useQuery({
     queryKey: ['my-emergencies'],
     queryFn: () => api<{ data: EmergencyMine[] }>('/emergencies/mine'),
-    refetchInterval: 8000,
+    // Home vive montada toda la sesión: consulta cada 8s solo con una urgencia activa;
+    // sin urgencia, baja a 1 minuto (y se pausa en segundo plano vía focusManager).
+    refetchInterval: (q) => (q.state.data?.data?.some((e) => ACTIVE.includes(e.status)) ? 8000 : 60000),
   });
   const pendingReview = useQuery({
     queryKey: ['pending-review'],
@@ -133,8 +137,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
   const firstName = user?.fullName?.split(' ')[0] ?? '';
   const avatarUrl = (user as { avatarUrl?: string } | null)?.avatarUrl;
-  const pet = pets.data?.data[0] ?? null;
-  const active = emergencies.data?.data.find((e) => ACTIVE.includes(e.status));
+  const pet = pets.data?.data?.[0] ?? null;
+  const active = emergencies.data?.data?.find((e) => ACTIVE.includes(e.status));
 
   const petChips = pet
     ? [

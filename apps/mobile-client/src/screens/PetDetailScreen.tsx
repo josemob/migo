@@ -13,33 +13,40 @@ interface Ficha {
   breed?: string;
   bloodType?: string;
   weightKg?: string;
-  allergies: { substance: string }[];
-  conditions: { name: string }[];
-  vaccinations: { vaccineName: string; nextDueAt?: string }[];
-  prescriptions: { drug: string; frequency?: string }[];
-  records: { id: string; visitedAt: string; reason?: string; signedAt?: string | null; clinic?: { name: string } }[];
+  allergies?: { substance: string }[];
+  conditions?: { name: string }[];
+  vaccinations?: { vaccineName: string; nextDueAt?: string }[];
+  prescriptions?: { drug: string; frequency?: string }[];
+  records?: { id: string; visitedAt: string; reason?: string; signedAt?: string | null; clinic?: { name: string } }[];
 }
 
 interface AiSummary {
   id: string;
   consultationReason: string;
-  symptoms: string[];
+  symptoms?: string[] | null;
   durationOfSymptoms?: string | null;
-  perceivedUrgency: 'CRITICA' | 'MODERADA' | 'BAJA';
+  perceivedUrgency?: string | null;
   recommendedAction: string;
   createdAt: string;
 }
 
-const URGENCY: Record<AiSummary['perceivedUrgency'], { label: string; color: string }> = {
+// Cualquier valor no mapeado (p. ej. "ALTA", null) cae al fallback en vez de tumbar la pantalla.
+const URGENCY: Record<string, { label: string; color: string }> = {
   CRITICA: { label: 'Crítica', color: colors.red },
   MODERADA: { label: 'Moderada', color: colors.amber },
   BAJA: { label: 'Baja', color: colors.green },
 };
+const URGENCY_FALLBACK = { label: 'Sin clasificar', color: colors.muted };
+
+const fmtDate = (iso?: string) => {
+  const d = iso ? new Date(iso) : null;
+  return d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString('es-VE') : '—';
+};
 
 export default function PetDetailScreen({ route, navigation }: { route: any; navigation: any }) {
-  const { id } = route.params;
+  const { id } = route.params ?? {};
   const [exporting, setExporting] = useState(false);
-  const { data, isLoading } = useQuery({ queryKey: ['pet', id], queryFn: () => api<Ficha>(`/me/pets/${id}`) });
+  const { data, isLoading, isError, error, refetch } = useQuery({ queryKey: ['pet', id], queryFn: () => api<Ficha>(`/me/pets/${id}`) });
   const ai = useQuery({ queryKey: ['pet-ai', id], queryFn: () => api<{ data: AiSummary[] }>(`/me/pets/${id}/chat-summaries`) });
 
   const exportPdf = async () => {
@@ -56,8 +63,30 @@ export default function PetDetailScreen({ route, navigation }: { route: any; nav
     }
   };
 
-  if (isLoading || !data) return <Loading />;
-  const upToDate = (d?: string) => !d || new Date(d) > new Date();
+  if (isLoading) return <Loading />;
+  if (isError || !data) {
+    return (
+      <Screen>
+        <Card>
+          <Text style={styles.section}>No pudimos cargar el expediente</Text>
+          <Muted>{error instanceof Error ? error.message : 'Revisa tu conexión e intenta de nuevo.'}</Muted>
+        </Card>
+        <Button title="Reintentar" onPress={() => void refetch()} />
+      </Screen>
+    );
+  }
+
+  // El backend puede omitir relaciones vacías: normalizamos a [] antes de renderizar.
+  const allergies = data.allergies ?? [];
+  const conditions = data.conditions ?? [];
+  const vaccinations = data.vaccinations ?? [];
+  const records = data.records ?? [];
+  const summaries = ai.data?.data ?? [];
+  const upToDate = (d?: string) => {
+    if (!d) return true;
+    const t = new Date(d).getTime();
+    return Number.isNaN(t) ? true : t > Date.now();
+  };
 
   return (
     <Screen>
@@ -67,21 +96,21 @@ export default function PetDetailScreen({ route, navigation }: { route: any; nav
         <Muted>{data.breed}{data.weightKg ? ` · ${data.weightKg} kg` : ''}{data.bloodType ? ` · ${data.bloodType}` : ''}</Muted>
       </Card>
 
-      {data.allergies.length > 0 && (
+      {allergies.length > 0 && (
         <Card>
           <Text style={styles.section}>Alergias conocidas</Text>
           <View style={styles.row}>
-            {data.allergies.map((a, i) => (
+            {allergies.map((a, i) => (
               <Badge key={i} text={a.substance} color={colors.red} />
             ))}
           </View>
         </Card>
       )}
 
-      {data.conditions.length > 0 && (
+      {conditions.length > 0 && (
         <Card>
           <Text style={styles.section}>Preexistencias</Text>
-          {data.conditions.map((c, i) => (
+          {conditions.map((c, i) => (
             <Text key={i} style={styles.item}>• {c.name}</Text>
           ))}
         </Card>
@@ -89,8 +118,8 @@ export default function PetDetailScreen({ route, navigation }: { route: any; nav
 
       <Card>
         <Text style={styles.section}>Esquema de vacunación</Text>
-        {data.vaccinations.length === 0 && <Muted>Sin vacunas registradas.</Muted>}
-        {data.vaccinations.map((v, i) => (
+        {vaccinations.length === 0 && <Muted>Sin vacunas registradas.</Muted>}
+        {vaccinations.map((v, i) => (
           <View key={i} style={styles.vaxRow}>
             <Text style={styles.item}>{v.vaccineName}</Text>
             <Badge text={upToDate(v.nextDueAt) ? 'Al día' : 'Vencida'} color={upToDate(v.nextDueAt) ? colors.green : colors.red} />
@@ -100,8 +129,8 @@ export default function PetDetailScreen({ route, navigation }: { route: any; nav
 
       <Card>
         <Text style={styles.section}>Historial de visitas</Text>
-        {data.records.length === 0 && <Muted>Sin visitas registradas.</Muted>}
-        {data.records.map((r) => (
+        {records.length === 0 && <Muted>Sin visitas registradas.</Muted>}
+        {records.map((r) => (
           <Pressable key={r.id} style={styles.visit} onPress={() => navigation.navigate('RecordDetail', { id: r.id })}>
             <View style={{ flex: 1 }}>
               <View style={styles.visitTop}>
@@ -109,7 +138,7 @@ export default function PetDetailScreen({ route, navigation }: { route: any; nav
                 {r.signedAt ? <Badge text="Firmado" color={colors.green} /> : null}
               </View>
               <Muted>
-                {new Date(r.visitedAt).toLocaleDateString('es-VE')} {r.clinic ? `· ${r.clinic.name}` : ''}
+                {fmtDate(r.visitedAt)} {r.clinic ? `· ${r.clinic.name}` : ''}
               </Muted>
             </View>
             <Text style={styles.chevron}>›</Text>
@@ -120,23 +149,29 @@ export default function PetDetailScreen({ route, navigation }: { route: any; nav
       {/* Consultas con Migo IA (resúmenes guardados del chat) */}
       <Card>
         <Text style={styles.section}>Consultas con Migo IA</Text>
-        {!ai.data?.data.length ? (
+        {ai.isError ? (
+          <Muted>No pudimos cargar las consultas con Migo IA.</Muted>
+        ) : summaries.length === 0 ? (
           <Muted>Aún no hay consultas con Migo IA. Cuéntale los síntomas de tu mascota en el chat y se guardarán aquí.</Muted>
         ) : (
-          ai.data.data.map((s) => (
-            <View key={s.id} style={styles.aiItem}>
-              <View style={styles.aiHead}>
-                <Text style={styles.aiReason} numberOfLines={2}>{s.consultationReason}</Text>
-                <Badge text={URGENCY[s.perceivedUrgency].label} color={URGENCY[s.perceivedUrgency].color} />
+          summaries.map((s) => {
+            const u = (s.perceivedUrgency && URGENCY[s.perceivedUrgency]) || URGENCY_FALLBACK;
+            const symptoms = s.symptoms ?? [];
+            return (
+              <View key={s.id} style={styles.aiItem}>
+                <View style={styles.aiHead}>
+                  <Text style={styles.aiReason} numberOfLines={2}>{s.consultationReason}</Text>
+                  <Badge text={u.label} color={u.color} />
+                </View>
+                <Muted>
+                  {fmtDate(s.createdAt)}
+                  {s.durationOfSymptoms ? ` · ${s.durationOfSymptoms}` : ''}
+                </Muted>
+                {symptoms.length > 0 && <Text style={styles.aiSymptoms}>🔎 {symptoms.join(', ')}</Text>}
+                <Text style={styles.aiAction}>💡 {s.recommendedAction}</Text>
               </View>
-              <Muted>
-                {new Date(s.createdAt).toLocaleDateString('es-VE')}
-                {s.durationOfSymptoms ? ` · ${s.durationOfSymptoms}` : ''}
-              </Muted>
-              {s.symptoms.length > 0 && <Text style={styles.aiSymptoms}>🔎 {s.symptoms.join(', ')}</Text>}
-              <Text style={styles.aiAction}>💡 {s.recommendedAction}</Text>
-            </View>
-          ))
+            );
+          })
         )}
       </Card>
 
@@ -152,10 +187,14 @@ export default function PetDetailScreen({ route, navigation }: { route: any; nav
 
 // PDF del expediente completo (resumen) para compartir/descargar.
 function expedienteHtml(d: Ficha): string {
+  const allergies = d.allergies ?? [];
+  const conditions = d.conditions ?? [];
+  const vaccinations = d.vaccinations ?? [];
+  const records = d.records ?? [];
   const sec = (t: string, inner: string) => `<div style="margin-top:16px"><div style="font-size:13px;font-weight:800;color:#8A2FA0;margin-bottom:6px">${t}</div>${inner}</div>`;
   const li = (t: string) => `<div style="font-size:14px;color:#1E293B;padding:3px 0">• ${t}</div>`;
-  const visits = d.records.length
-    ? d.records.map((r) => `<div style="font-size:14px;padding:4px 0;border-top:1px solid #EEE">${r.reason ?? 'Consulta'} <span style="color:#94A3B8">— ${new Date(r.visitedAt).toLocaleDateString('es-VE')}${r.clinic ? ` · ${r.clinic.name}` : ''}${r.signedAt ? ' · ✓ firmado' : ''}</span></div>`).join('')
+  const visits = records.length
+    ? records.map((r) => `<div style="font-size:14px;padding:4px 0;border-top:1px solid #EEE">${r.reason ?? 'Consulta'} <span style="color:#94A3B8">— ${fmtDate(r.visitedAt)}${r.clinic ? ` · ${r.clinic.name}` : ''}${r.signedAt ? ' · ✓ firmado' : ''}</span></div>`).join('')
     : '<div style="color:#94A3B8;font-size:14px">Sin visitas.</div>';
   return `<html><body style="font-family:Helvetica,Arial,sans-serif;color:#1E293B;margin:0;padding:32px">
     <div style="text-align:center;margin-bottom:14px">
@@ -164,9 +203,9 @@ function expedienteHtml(d: Ficha): string {
       <div style="color:#94A3B8;font-size:13px">${d.name}${d.breed ? ` · ${d.breed}` : ''}${d.weightKg ? ` · ${d.weightKg} kg` : ''}</div>
     </div>
     <div style="border:1px solid #E2E8F0;border-radius:14px;padding:20px">
-      ${d.allergies.length ? sec('Alergias', d.allergies.map((a) => li(a.substance)).join('')) : ''}
-      ${d.conditions.length ? sec('Preexistencias', d.conditions.map((c) => li(c.name)).join('')) : ''}
-      ${d.vaccinations.length ? sec('Vacunación', d.vaccinations.map((v) => li(v.vaccineName)).join('')) : ''}
+      ${allergies.length ? sec('Alergias', allergies.map((a) => li(a.substance)).join('')) : ''}
+      ${conditions.length ? sec('Preexistencias', conditions.map((c) => li(c.name)).join('')) : ''}
+      ${vaccinations.length ? sec('Vacunación', vaccinations.map((v) => li(v.vaccineName)).join('')) : ''}
       ${sec('Historial de visitas', visits)}
     </div>
     <p style="text-align:center;color:#94A3B8;font-size:12px;margin-top:16px">Generado por Migo. Resumen del expediente.</p>
@@ -188,4 +227,3 @@ const styles = StyleSheet.create({
   aiSymptoms: { fontSize: 14, color: colors.text, marginTop: 2 },
   aiAction: { fontSize: 14, color: colors.muted, marginTop: 2 },
 });
-

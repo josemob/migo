@@ -1,4 +1,4 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
@@ -18,12 +18,16 @@ interface Vax {
 interface Ficha { name: string; species: string; vaccinations: Vax[] }
 
 const DAY = 86_400_000;
-const fmt = (iso?: string | null) =>
-  iso ? new Date(iso).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+const fmt = (iso?: string | null) => {
+  const d = iso ? new Date(iso) : null;
+  return d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+};
 
 function statusOf(nextDueAt?: string | null) {
   if (!nextDueAt) return { label: 'Aplicada', color: colors.muted, bg: '#ECECEF' };
   const due = new Date(nextDueAt).getTime();
+  // Fecha inválida: no la damos por "Al día" en silencio (antes todas las comparaciones eran false).
+  if (Number.isNaN(due)) return { label: 'Revisar fecha', color: colors.amber, bg: '#FEF4E0' };
   const now = Date.now();
   if (due < now) return { label: 'Vencida', color: colors.red, bg: '#FDECEC' };
   if (due < now + 30 * DAY) return { label: 'Próxima', color: colors.amber, bg: '#FEF4E0' };
@@ -31,8 +35,8 @@ function statusOf(nextDueAt?: string | null) {
 }
 
 export default function VaccineCardScreen({ route, navigation }: { route: any; navigation: any }) {
-  const { id, name } = route.params as { id: string; name?: string };
-  const { data, isLoading } = useQuery({ queryKey: ['pet', id], queryFn: () => api<Ficha>(`/me/pets/${id}`) });
+  const { id, name } = (route.params ?? {}) as { id: string; name?: string };
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['pet', id], queryFn: () => api<Ficha>(`/me/pets/${id}`) });
 
   const vax = data?.vaccinations ?? [];
   const vencidas = vax.filter((v) => v.nextDueAt && new Date(v.nextDueAt).getTime() < Date.now()).length;
@@ -50,8 +54,16 @@ export default function VaccineCardScreen({ route, navigation }: { route: any; n
         <View style={{ width: 40 }} />
       </View>
 
-      {isLoading || !data ? (
+      {isLoading ? (
         <Loading />
+      ) : isError || !data ? (
+        // Antes: spinner infinito cuando fallaba la carga.
+        <View style={{ padding: 20, gap: 12 }}>
+          <Text style={{ fontSize: 15, color: colors.muted }}>No pudimos cargar la cartilla. Revisa tu conexión e intenta de nuevo.</Text>
+          <Pressable onPress={() => void refetch()}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.brand }}>Reintentar →</Text>
+          </Pressable>
+        </View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
           {/* Encabezado tipo carnet */}

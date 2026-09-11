@@ -41,20 +41,44 @@ const DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', '
 type TabKey = 'info' | 'services' | 'reviews';
 
 export default function ClinicDetailScreen({ navigation, route }: any) {
-  const { id, distanceKm } = route.params as { id: string; name?: string; distanceKm?: number | null };
+  const { id, distanceKm } = (route.params ?? {}) as { id: string; name?: string; distanceKm?: number | null };
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<TabKey>('services');
 
-  const { data: clinic, isLoading } = useQuery({
+  const { data: clinic, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['clinic', id],
     queryFn: () => api<ClinicDetail>(`/clinics/${id}`),
   });
 
-  if (isLoading || !clinic) return <Loading />;
+  if (isLoading) return <Loading />;
+  if (isError || !clinic) {
+    // Antes: spinner infinito sin salida cuando fallaba la carga.
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.topbar}>
+          <BackButton onPress={() => navigation.goBack()} />
+          <Text style={styles.topTitle} numberOfLines={1}>Veterinaria</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <View style={{ padding: 20, gap: 12 }}>
+          <Muted>{error instanceof Error ? error.message : 'No pudimos cargar esta clínica.'}</Muted>
+          <Pressable style={styles.agendar} onPress={() => void refetch()}>
+            <Text style={styles.agendarText}>Reintentar</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+  // El backend puede omitir relaciones vacías: normalizamos a [] antes de renderizar.
+  const hours = clinic.hours ?? [];
+  const services = clinic.services ?? [];
+  const reviews = clinic.reviews ?? [];
 
   const call = () =>
     clinic.phone
-      ? Linking.openURL(`tel:${clinic.phone.replace(/\s/g, '')}`)
+      ? Linking.openURL(`tel:${clinic.phone.replace(/\s/g, '')}`).catch(() =>
+          appAlert('No se pudo llamar', 'Este dispositivo no puede realizar llamadas.'),
+        )
       : appAlert('Sin teléfono', 'Esta clínica no tiene teléfono registrado.');
 
   const book = (svc: Service) =>
@@ -69,7 +93,9 @@ export default function ClinicDetailScreen({ navigation, route }: any) {
       clinic.latitude && clinic.longitude
         ? `${clinic.latitude},${clinic.longitude}`
         : encodeURIComponent(`${clinic.name} ${clinic.address ?? clinic.city ?? 'Caracas'}`);
-    Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${dest}`);
+    Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${dest}`).catch(() =>
+      appAlert('No se pudo abrir el mapa', 'Intenta de nuevo.'),
+    );
   };
 
   const openChat = () => navigation.navigate('ClinicChat', { clinicId: clinic.id, clinicName: clinic.name });
@@ -91,7 +117,7 @@ export default function ClinicDetailScreen({ navigation, route }: any) {
       <View style={styles.topbar}>
         <BackButton onPress={() => navigation.goBack()} />
         <Text style={styles.topTitle} numberOfLines={1}>Veterinaria</Text>
-        <Pressable style={styles.back} onPress={() => Share.share({ message: `Mira ${clinic.name} en Migo 🐾` })}>
+        <Pressable style={styles.back} onPress={() => Share.share({ message: `Mira ${clinic.name} en Migo 🐾` }).catch(() => {})}>
           <TabIcon name="share" color={colors.brand} size={18} />
         </Pressable>
       </View>
@@ -194,12 +220,12 @@ export default function ClinicDetailScreen({ navigation, route }: any) {
                 <TabIcon name="calendar" color={colors.brand} size={18} />
                 <Text style={styles.blockTitle}>Horario de Atención</Text>
               </View>
-              {clinic.hours.length === 0 ? (
+              {hours.length === 0 ? (
                 <Muted>Horario no disponible.</Muted>
               ) : (
-                clinic.hours.map((h) => (
+                hours.map((h) => (
                   <View key={h.id} style={styles.hourRow}>
-                    <Text style={styles.hourDay}>{DAYS[h.dayOfWeek]}</Text>
+                    <Text style={styles.hourDay}>{DAYS[h.dayOfWeek] ?? '—'}</Text>
                     <Text style={styles.hourVal}>{h.isOpen ? `${h.opensAt} - ${h.closesAt}` : 'Cerrado'}</Text>
                   </View>
                 ))
@@ -222,10 +248,10 @@ export default function ClinicDetailScreen({ navigation, route }: any) {
 
         {tab === 'services' && (
           <View style={{ gap: 10 }}>
-            {clinic.services.length === 0 ? (
+            {services.length === 0 ? (
               <Muted>Esta clínica aún no publica servicios.</Muted>
             ) : (
-              clinic.services.map((s) => {
+              services.map((s) => {
                 const m = categoryMeta(s.category);
                 return (
                   <View key={s.id} style={styles.svcRow}>
@@ -248,18 +274,22 @@ export default function ClinicDetailScreen({ navigation, route }: any) {
 
         {tab === 'reviews' && (
           <View style={{ gap: 12 }}>
-            {clinic.reviews.length === 0 ? (
+            {reviews.length === 0 ? (
               <Muted>Aún no hay opiniones.</Muted>
             ) : (
-              clinic.reviews.map((r, i) => (
-                <View key={i} style={styles.review}>
-                  <View style={styles.reviewHead}>
-                    <Text style={styles.reviewer}>{r.author?.fullName ?? 'Cliente Migo'}</Text>
-                    <Text style={styles.stars}>{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</Text>
+              reviews.map((r, i) => {
+                // Acotado a 0..5: `'☆'.repeat(5 - rating)` lanza RangeError si rating > 5 o no es número.
+                const stars = Math.max(0, Math.min(5, Math.round(Number(r.rating) || 0)));
+                return (
+                  <View key={i} style={styles.review}>
+                    <View style={styles.reviewHead}>
+                      <Text style={styles.reviewer}>{r.author?.fullName ?? 'Cliente Migo'}</Text>
+                      <Text style={styles.stars}>{'★'.repeat(stars)}{'☆'.repeat(5 - stars)}</Text>
+                    </View>
+                    {r.comment ? <Text style={styles.reviewText}>{r.comment}</Text> : null}
                   </View>
-                  {r.comment && <Text style={styles.reviewText}>{r.comment}</Text>}
-                </View>
-              ))
+                );
+              })
             )}
           </View>
         )}

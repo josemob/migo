@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { appAlert } from './dialog';
 import { cardShadow, colors, radius } from '../theme';
 
 interface EditOptions {
@@ -40,6 +41,9 @@ export function EditFieldHost() {
     try {
       await opts.onSave(text);
       close();
+    } catch (e) {
+      // Sin esto el rechazo quedaba sin manejar y el usuario no sabía que no se guardó.
+      appAlert('No se pudo guardar', e instanceof Error ? e.message : 'Intenta de nuevo.');
     } finally {
       setSaving(false);
     }

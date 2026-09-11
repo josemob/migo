@@ -16,13 +16,25 @@ export default function PetsScreen({ navigation }: { navigation: any }) {
   const pets = useQuery({ queryKey: ['pets'], queryFn: () => api<{ data: Pet[] }>('/me/pets') });
 
   if (pets.isLoading) return <Loading />;
+  if (pets.isError) {
+    // Antes: en error se ocultaban la lista Y el estado vacío (pantalla en blanco).
+    return (
+      <Screen>
+        <Text style={styles.title}>Mi Expediente</Text>
+        <Muted>No pudimos cargar tus mascotas. Revisa tu conexión e intenta de nuevo.</Muted>
+        <Pressable onPress={() => void pets.refetch()}>
+          <Muted>Reintentar →</Muted>
+        </Pressable>
+      </Screen>
+    );
+  }
 
   return (
     <Screen>
       <Text style={styles.title}>Mi Expediente</Text>
       <Muted>Las fichas médicas de tus mascotas.</Muted>
 
-      {pets.data?.data.map((p) => (
+      {(pets.data?.data ?? []).map((p) => (
         <Pressable key={p.id} onPress={() => navigation.navigate('PetDetail', { id: p.id, name: p.name })}>
           <Card style={styles.petCard}>
             <Text style={{ fontSize: 32 }}>{p.species === 'CAT' ? '🐈' : p.species === 'DOG' ? '🐕' : '🐾'}</Text>
@@ -35,7 +47,7 @@ export default function PetsScreen({ navigation }: { navigation: any }) {
         </Pressable>
       ))}
 
-      {pets.data?.data.length === 0 && (
+      {(pets.data?.data ?? []).length === 0 && (
         <View style={styles.empty}>
           <Text style={{ fontSize: 40 }}>🐾</Text>
           <Muted>Aún no tienes mascotas registradas.</Muted>

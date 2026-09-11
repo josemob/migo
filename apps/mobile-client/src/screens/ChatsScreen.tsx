@@ -21,11 +21,18 @@ export default function ChatsScreen({ navigation, route }: { navigation: any; ro
   const { chatClient, ready } = useStream();
   const [channels, setChannels] = useState<StreamChannel[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
   // Modo "compartir": llega una consulta de Migo IA para enviar a una clínica.
   const shareText: string | undefined = route?.params?.shareText;
 
   // Abre la conversación con la clínica; en modo compartir, primero envía la consulta.
   const openChannel = async (ch: StreamChannel, clinicId?: string, clinicName?: string) => {
+    if (!clinicId) {
+      // Sin clínica asociada, ClinicChat pediría /me/chats/undefined/... y quedaría en error.
+      appAlert('Chat no disponible', 'Esta conversación no tiene una clínica asociada.');
+      return;
+    }
     if (shareText) {
       try {
         await ch.sendMessage({ text: shareText });
@@ -49,7 +56,13 @@ export default function ChatsScreen({ navigation, route }: { navigation: any; ro
           { last_message_at: -1 },
           { watch: true, state: true },
         );
-        if (active) setChannels(chs);
+        if (active) {
+          setChannels(chs);
+          setError(null);
+        }
+      } catch (e) {
+        // Antes no había `catch`: rechazo sin manejar y la pantalla decía "no tienes chats".
+        if (active) setError(e instanceof Error ? e.message : 'No se pudieron cargar las conversaciones.');
       } finally {
         if (active) setLoading(false);
       }
@@ -57,7 +70,7 @@ export default function ChatsScreen({ navigation, route }: { navigation: any; ro
     return () => {
       active = false;
     };
-  }, [ready, chatClient]);
+  }, [ready, chatClient, reload]);
 
   return (
     <Screen>
@@ -89,6 +102,19 @@ export default function ChatsScreen({ navigation, route }: { navigation: any; ro
       <Text style={styles.section}>Conversaciones con clínicas</Text>
       {!ready || loading ? (
         <Muted>Cargando conversaciones…</Muted>
+      ) : error ? (
+        <View style={styles.empty}>
+          <Muted>{error}</Muted>
+          <Pressable
+            onPress={() => {
+              setLoading(true);
+              setError(null);
+              setReload((n) => n + 1);
+            }}
+          >
+            <Text style={styles.link}>Reintentar →</Text>
+          </Pressable>
+        </View>
       ) : channels.length === 0 ? (
         <View style={styles.empty}>
           <TabIcon name="chat" color="#C9BBD3" size={40} />

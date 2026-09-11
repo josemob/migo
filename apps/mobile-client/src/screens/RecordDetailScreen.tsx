@@ -66,10 +66,15 @@ function recordHtml(r: RecordDetail): string {
 }
 
 export default function RecordDetailScreen({ route, navigation }: { route: any; navigation: any }) {
-  const { id } = route.params;
+  const { id } = route.params ?? {};
   const insets = useSafeAreaInsets();
   const [busy, setBusy] = useState(false);
-  const { data, isLoading } = useQuery({ queryKey: ['record', id], queryFn: () => api<RecordDetail>(`/me/records/${id}`) });
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['record', id],
+    queryFn: () => api<RecordDetail>(`/me/records/${id}`),
+    // El backend puede omitir `prescriptions` vacío: normalizamos antes de renderizar/imprimir.
+    select: (r) => ({ ...r, prescriptions: r.prescriptions ?? [] }),
+  });
 
   const sharePdf = async () => {
     if (!data) return;
@@ -93,8 +98,16 @@ export default function RecordDetailScreen({ route, navigation }: { route: any; 
         <View style={{ width: 44 }} />
       </View>
 
-      {isLoading || !data ? (
+      {isLoading ? (
         <ActivityIndicator color={colors.brand} style={{ marginTop: 40 }} />
+      ) : isError || !data ? (
+        // Antes: spinner infinito cuando fallaba la carga.
+        <View style={{ padding: 20, gap: 12 }}>
+          <Text style={{ fontSize: 15, color: colors.muted }}>No pudimos cargar la consulta. Revisa tu conexión e intenta de nuevo.</Text>
+          <Pressable onPress={() => void refetch()}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.brand }}>Reintentar →</Text>
+          </Pressable>
+        </View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 34 }} showsVerticalScrollIndicator={false}>
           <View style={styles.card}>

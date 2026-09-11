@@ -39,7 +39,7 @@ const timeLabel = (d: Date) => {
 const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
 export default function CareCalendarScreen({ navigation }: { navigation: any }) {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['care-calendar'],
     queryFn: () => api<{ events: CareEvent[] }>('/me/care-calendar'),
   });
@@ -47,7 +47,8 @@ export default function CareCalendarScreen({ navigation }: { navigation: any }) 
   const now = new Date();
   const [cursor, setCursor] = useState({ y: now.getFullYear(), m: now.getMonth() });
 
-  const events = data?.events ?? [];
+  // Descarta eventos con fecha inválida: producían claves "NaN-NaN-NaN" y etiquetas rotas.
+  const events = (data?.events ?? []).filter((e) => !Number.isNaN(new Date(e.date).getTime()));
 
   // Mapa fecha -> tipo de evento para pintar los círculos del calendario
   const marks = useMemo(() => {
@@ -84,6 +85,20 @@ export default function CareCalendarScreen({ navigation }: { navigation: any }) 
   };
 
   if (isLoading) return <Loading />;
+  if (isError) {
+    // Antes: en error se mostraba "No tienes tareas próximas", como si las citas hubieran desaparecido.
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={{ padding: 20, gap: 12 }}>
+          <Text style={styles.headerTitle}>Calendario de Cuidados</Text>
+          <Text style={{ fontSize: 15, color: '#64748B' }}>No pudimos cargar tu calendario. Revisa tu conexión e intenta de nuevo.</Text>
+          <Pressable onPress={() => void refetch()}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#8A2FA0' }}>Reintentar →</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>

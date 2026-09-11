@@ -19,7 +19,7 @@ interface ServiceOffer {
 type PickKind = 'image' | 'camera' | 'video';
 
 export default function ClinicChatScreen({ navigation, route }: any) {
-  const { clinicId, clinicName } = route.params as { clinicId: string; clinicName?: string };
+  const { clinicId, clinicName } = (route.params ?? {}) as { clinicId?: string; clinicName?: string };
   const { chatClient, ready } = useStream();
   const insets = useSafeAreaInsets();
   const [channel, setChannel] = useState<StreamChannel | null>(null);
@@ -45,6 +45,10 @@ export default function ClinicChatScreen({ navigation, route }: any) {
 
   useEffect(() => {
     if (!ready || !chatClient) return;
+    if (!clinicId) {
+      setErr('Esta conversación no tiene una clínica asociada.');
+      return;
+    }
     let active = true;
     (async () => {
       try {

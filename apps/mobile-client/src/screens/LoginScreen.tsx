@@ -29,7 +29,11 @@ export default function LoginScreen() {
   const { signIn: googleSignIn, googleBusy, googleReady } = useGoogleSignIn(setError);
 
   // Muestra el botón de huella solo si hay una sesión biométrica guardada en este equipo.
-  useEffect(() => { hasBiometricSession().then(setBioAvailable); }, []);
+  useEffect(() => {
+    hasBiometricSession()
+      .then(setBioAvailable)
+      .catch(() => setBioAvailable(false));
+  }, []);
 
   const doBiometric = async () => {
     setError('');
@@ -38,7 +42,7 @@ export default function LoginScreen() {
       await loginWithBiometric();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo iniciar con biometría');
-      setBioAvailable(await hasBiometricSession());
+      setBioAvailable(await hasBiometricSession().catch(() => false));
     } finally {
       setBioBusy(false);
     }

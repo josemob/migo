@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { cardShadow, colors, radius, spacing } from '../theme';
@@ -24,6 +24,20 @@ export function PasswordInput({
   const [visible, setVisible] = useState(false);
   const [display, setDisplay] = useState('•'.repeat(real.length));
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Si el padre cambia `value` desde fuera (p. ej. lo vacía al cerrar y reabrir un modal),
+  // re-sincroniza la máscara. Antes quedaban puntos "fantasma" que se enviaban como contraseña.
+  useEffect(() => {
+    setDisplay((d) => (d.length === real.length ? d : '•'.repeat(real.length)));
+  }, [real]);
+
+  // Limpia el temporizador de revelado al desmontar (evita setState tras desmontar).
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
 
   const handleChange = (text: string) => {
     if (visible) {

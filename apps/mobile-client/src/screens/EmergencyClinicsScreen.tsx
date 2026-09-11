@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Location from 'expo-location';
+import { getPositionSafe } from '../lib/location';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { appAlert } from '../lib/dialog';
@@ -25,7 +25,11 @@ const FALLBACK = { lat: 10.4806, lng: -66.8564 };
 const ACTIVE_STATUSES = ['TRIAGING', 'BROADCASTING', 'ACCEPTED', 'EN_ROUTE'];
 const eta = (km?: number | null) => (km != null ? Math.max(1, Math.round((km / 25) * 60)) : null);
 const call = (phone?: string) =>
-  phone ? Linking.openURL(`tel:${phone.replace(/\s/g, '')}`) : appAlert('Sin teléfono', 'Esta clínica no tiene teléfono registrado.');
+  phone
+    ? Linking.openURL(`tel:${phone.replace(/\s/g, '')}`).catch(() =>
+        appAlert('No se pudo llamar', 'Este dispositivo no puede realizar llamadas.'),
+      )
+    : appAlert('Sin teléfono', 'Esta clínica no tiene teléfono registrado.');
 
 export default function EmergencyClinicsScreen({ navigation }: { navigation: any }) {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -38,22 +42,20 @@ export default function EmergencyClinicsScreen({ navigation }: { navigation: any
   const mine = useQuery({
     queryKey: ['my-emergencies'],
     queryFn: () => api<{ data: { id: string; status: string }[] }>('/emergencies/mine'),
-    refetchInterval: 8000,
+    // Cada 8s solo con una urgencia activa; sin urgencia, 1 minuto (pausado en background).
+    refetchInterval: (q) => (q.state.data?.data?.some((e) => ACTIVE_STATUSES.includes(e.status)) ? 8000 : 60000),
   });
-  const activeEmergency = mine.data?.data.find((e) => ACTIVE_STATUSES.includes(e.status)) ?? null;
+  const activeEmergency = mine.data?.data?.find((e) => ACTIVE_STATUSES.includes(e.status)) ?? null;
 
   useEffect(() => {
-    (async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status === 'granted') {
-          const pos = await Location.getCurrentPositionAsync({});
-          setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        } else setCoords(FALLBACK);
-      } catch {
-        setCoords(FALLBACK);
-      }
-    })();
+    // Con timeout (antes el GPS podía colgar la pantalla) y sin setState tras desmontar.
+    let alive = true;
+    getPositionSafe().then((p) => {
+      if (alive) setCoords(p ?? FALLBACK);
+    });
+    return () => {
+      alive = false;
+    };
   }, []);
 
   // Preselecciona la mascota si solo hay una
@@ -117,7 +119,9 @@ export default function EmergencyClinicsScreen({ navigation }: { navigation: any
         <Muted>Selecciona la mascota y describe qué ocurre. Migo AI hará el triaje y alertará a las clínicas cercanas.</Muted>
 
         <Text style={styles.section}>Mascota</Text>
-        {petList.length === 0 ? (
+        {pets.isError ? (
+          <Muted>No pudimos cargar tus mascotas. Revisa tu conexión e intenta de nuevo.</Muted>
+        ) : petList.length === 0 ? (
           <Muted>No tienes mascotas registradas.</Muted>
         ) : (
           <View style={{ gap: 8 }}>

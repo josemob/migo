@@ -12,7 +12,13 @@ export function NotificationPrefsModal({ visible, onClose }: { visible: boolean;
 
   useEffect(() => {
     if (!visible) return;
-    api<Prefs>('/me/notification-prefs').then(setPrefs).catch(() => {});
+    // `api` devuelve undefined en 204 y {} si el cuerpo no es JSON: sin este guard,
+    // setPrefs(undefined) hacía que `prefs.push` tumbara la pantalla de ajustes.
+    api<Prefs>('/me/notification-prefs')
+      .then((p) => {
+        if (p && typeof p === 'object') setPrefs((d) => ({ ...d, ...p }));
+      })
+      .catch(() => {});
   }, [visible]);
 
   const set = (key: keyof Prefs, val: boolean) => {

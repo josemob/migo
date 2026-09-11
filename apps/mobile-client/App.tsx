@@ -1,14 +1,16 @@
 import 'react-native-gesture-handler';
 import { useEffect, useState } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, focusManager, onlineManager, useQuery } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 
 import { OUTFIT_FONTS, enableOutfit } from './src/lib/fonts';
@@ -19,6 +21,7 @@ import { api } from './src/lib/api';
 import { DialogHost } from './src/lib/dialog';
 import { EditFieldHost } from './src/lib/editField';
 import { Loading } from './src/components/ui';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { TabBar } from './src/components/TabBar';
 import { colors } from './src/theme';
 
@@ -49,6 +52,21 @@ import VaccineCardScreen from './src/screens/VaccineCardScreen';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
 
+// React Query en RN no sabe por sí solo cuándo la app pasa a segundo plano ni si
+// hay red. Sin esto, los pollers (Seguimiento/Home/Alerta) siguen consultando en
+// background y las consultas fallan en cadena sin conexión.
+try {
+  focusManager.setEventListener((handleFocus) => {
+    const sub = AppState.addEventListener('change', (s: AppStateStatus) => handleFocus(s === 'active'));
+    return () => sub.remove();
+  });
+  onlineManager.setEventListener((setOnline) =>
+    NetInfo.addEventListener((state) => setOnline(!!state.isConnected && state.isInternetReachable !== false)),
+  );
+} catch (e) {
+  console.log('[query] managers no disponibles:', e instanceof Error ? e.message : e);
+}
+
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 const navigationRef = createNavigationContainerRef();
@@ -68,13 +86,27 @@ function Tabs() {
 function MainApp() {
   useEffect(() => {
     registerForPush();
+    // Navega a Citas cuando el usuario toca una notificación de cita. Si la navegación
+    // aún no está lista (arranque en frío), reintenta unas veces y luego desiste.
+    const goToCitas = (attempt = 0) => {
+      if (navigationRef.isReady()) {
+        (navigationRef as never as { navigate: (n: string, p: object) => void }).navigate('Tabs', { screen: 'Citas' });
+      } else if (attempt < 20) {
+        setTimeout(() => goToCitas(attempt + 1), 300);
+      }
+    };
+    const handle = (data?: { type?: string }) => {
+      if (data?.type === 'appointment') goToCitas();
+    };
     try {
-      const sub = Notifications.addNotificationResponseReceivedListener((resp) => {
-        const data = resp.notification.request.content.data as { type?: string };
-        if (data?.type === 'appointment' && navigationRef.isReady()) {
-          (navigationRef as never as { navigate: (n: string, p: object) => void }).navigate('Tabs', { screen: 'Citas' });
-        }
-      });
+      // Tap con la app abierta / en segundo plano
+      const sub = Notifications.addNotificationResponseReceivedListener((resp) =>
+        handle(resp.notification.request.content.data as { type?: string }),
+      );
+      // Tap que abrió la app desde cerrada (cold start)
+      Notifications.getLastNotificationResponseAsync()
+        .then((resp) => handle(resp?.notification.request.content.data as { type?: string } | undefined))
+        .catch(() => {});
       return () => sub.remove();
     } catch (e) {
       console.log('[push] listener no disponible:', e instanceof Error ? e.message : e);
@@ -119,18 +151,23 @@ function MainGate() {
   const pets = useQuery({ queryKey: ['pets'], queryFn: () => api<{ data: unknown[] }>('/me/pets') });
 
   useEffect(() => {
-    AsyncStorage.getItem('migo_pet_prompted').then((v) => setPrompted(v === '1'));
+    AsyncStorage.getItem('migo_pet_prompted')
+      .then((v) => setPrompted(v === '1'))
+      .catch(() => setPrompted(true)); // si el storage falla, no bloqueamos la app
   }, []);
 
   if (prompted === null || pets.isLoading) return <Loading />;
 
   const finish = () => {
-    AsyncStorage.setItem('migo_pet_prompted', '1');
+    AsyncStorage.setItem('migo_pet_prompted', '1').catch(() => {});
     setPrompted(true);
-    pets.refetch();
+    void pets.refetch();
   };
 
-  if (!prompted && (pets.data?.data.length ?? 0) === 0) {
+  // Solo ofrecemos registrar mascota cuando SABEMOS que no tiene ninguna
+  // (no ante un error de red, que antes mostraba el registro por equivocación).
+  const petCount = pets.data?.data?.length ?? null;
+  if (!prompted && !pets.isError && petCount === 0) {
     return <RegisterPetScreen onComplete={finish} onSkip={finish} />;
   }
   return (
@@ -145,13 +182,15 @@ function Root() {
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
 
   useEffect(() => {
-    AsyncStorage.getItem('migo_onboarded').then((v) => setOnboarded(v === '1'));
+    AsyncStorage.getItem('migo_onboarded')
+      .then((v) => setOnboarded(v === '1'))
+      .catch(() => setOnboarded(true)); // si el storage falla, no bloqueamos la app
   }, []);
 
   if (loading || onboarded === null) return <Loading />;
 
   const finishOnboarding = () => {
-    AsyncStorage.setItem('migo_onboarded', '1');
+    AsyncStorage.setItem('migo_onboarded', '1').catch(() => {});
     setOnboarded(true);
   };
 
@@ -162,9 +201,12 @@ function Root() {
 }
 
 export default function App() {
-  const [fontsLoaded] = useFonts(OUTFIT_FONTS);
+  const [fontsLoaded, fontError] = useFonts(OUTFIT_FONTS);
   // Activa Outfit global una vez cargadas las fuentes, antes de renderizar la app.
   if (fontsLoaded) enableOutfit();
+  // Si las fuentes no cargan, seguimos con la fuente del sistema en vez de
+  // quedarnos en "cargando" para siempre.
+  const ready = fontsLoaded || !!fontError;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -172,7 +214,7 @@ export default function App() {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <StatusBar style="dark" />
-            {fontsLoaded ? <Root /> : <Loading />}
+            <ErrorBoundary>{ready ? <Root /> : <Loading />}</ErrorBoundary>
             <DialogHost />
             <EditFieldHost />
           </AuthProvider>

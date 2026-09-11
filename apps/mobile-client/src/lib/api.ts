@@ -41,12 +41,12 @@ export const tokens = {
       [REFRESH_KEY, r],
     ]);
     // Mantiene el token del login biométrico al día cuando el refresh rota.
-    await syncBiometricToken(r);
+    await syncBiometricToken(r).catch(() => {});
   },
   async clear() {
     accessToken = null;
     refreshToken = null;
-    await AsyncStorage.multiRemove([ACCESS_KEY, REFRESH_KEY]);
+    await AsyncStorage.multiRemove([ACCESS_KEY, REFRESH_KEY]).catch(() => {});
   },
 };
 
@@ -56,17 +56,69 @@ export class ApiError extends Error {
   }
 }
 
-async function tryRefresh(): Promise<boolean> {
-  if (!refreshToken) return false;
-  const res = await fetch(`${BASE_URL}/auth/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refreshToken }),
-  });
-  if (!res.ok) return false;
-  const data = await res.json();
-  await tokens.set(data.accessToken, data.refreshToken);
-  return true;
+// --- Sesión expirada -------------------------------------------------------
+// Cuando el refresh token deja de servir, la UI tiene que volver al login aunque
+// la petición original haya salido desde cualquier pantalla. AuthProvider se
+// suscribe aquí y limpia el usuario.
+type Listener = () => void;
+const unauthorizedListeners = new Set<Listener>();
+
+export function onUnauthorized(cb: Listener): () => void {
+  unauthorizedListeners.add(cb);
+  return () => {
+    unauthorizedListeners.delete(cb);
+  };
+}
+
+function emitUnauthorized() {
+  for (const cb of unauthorizedListeners) {
+    try {
+      cb();
+    } catch {
+      /* noop */
+    }
+  }
+}
+
+// --- Refresh de token ------------------------------------------------------
+// 'ok'      -> tokens renovados, reintentar la petición
+// 'invalid' -> el refresh token ya no sirve: cerrar sesión
+// 'error'   -> no se pudo contactar al servidor: NO cerrar sesión (red caída)
+type RefreshResult = 'ok' | 'invalid' | 'error';
+
+// Una sola renovación en vuelo: si varias peticiones reciben 401 al mismo tiempo
+// comparten el mismo refresh. Sin esto, la segunda usaría un refresh token ya
+// rotado (inválido) y cerraría la sesión sin motivo.
+let refreshing: Promise<RefreshResult> | null = null;
+
+function tryRefresh(): Promise<RefreshResult> {
+  if (!refreshToken) return Promise.resolve('invalid');
+  if (refreshing) return refreshing;
+
+  refreshing = (async (): Promise<RefreshResult> => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    try {
+      const res = await fetch(`${BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+        signal: controller.signal,
+      });
+      if (res.status === 401 || res.status === 403) return 'invalid';
+      if (!res.ok) return 'error';
+      const data = (await res.json().catch(() => null)) as { accessToken?: string; refreshToken?: string } | null;
+      if (!data?.accessToken || !data?.refreshToken) return 'error';
+      await tokens.set(data.accessToken, data.refreshToken);
+      return 'ok';
+    } catch {
+      return 'error';
+    } finally {
+      clearTimeout(timer);
+      refreshing = null;
+    }
+  })();
+  return refreshing;
 }
 
 interface Options {
@@ -102,8 +154,12 @@ export async function api<T = unknown>(path: string, opts: Options = {}): Promis
   clearTimeout(timer);
 
   if (res.status === 401 && auth && !opts._retried) {
-    if (await tryRefresh()) return api<T>(path, { ...opts, _retried: true });
-    await tokens.clear();
+    const result = await tryRefresh();
+    if (result === 'ok') return api<T>(path, { ...opts, _retried: true });
+    if (result === 'invalid') {
+      await tokens.clear();
+      emitUnauthorized();
+    }
   }
 
   if (res.status === 204) return undefined as T;

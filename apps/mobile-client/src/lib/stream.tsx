@@ -50,8 +50,6 @@ export function StreamProvider({ children }: { children: ReactNode }) {
     () => ({ callControls: { container: { paddingBottom: Math.max(insets.bottom, 24) + 12 } } }),
     [insets.bottom],
   );
-  const connecting = useRef(false);
-
   // Escucha el contador global de no leídos para el punto rojo del tab de Chats.
   useEffect(() => {
     if (!chatClient?.userID) return;
@@ -62,36 +60,50 @@ export function StreamProvider({ children }: { children: ReactNode }) {
     return () => sub.unsubscribe();
   }, [chatClient]);
 
+  // Reconecta solo cuando cambia el USUARIO (id), no cuando cambia el objeto `user`
+  // (p. ej. al actualizar la foto de perfil): antes eso tumbaba chat y video.
+  const userId = user?.id;
   useEffect(() => {
-    if (!user || connecting.current) return;
-    connecting.current = true;
+    if (!userId) return;
+    let cancelled = false;
     let cc: StreamChat | null = null;
     let vc: StreamVideoClient | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
-    (async () => {
+    // El SDK llama al provider al (re)conectar: sobrevive a la expiración del token.
+    const tokenProvider = async () => (await api<Cred>('/me/stream-token')).token;
+
+    const connect = async (attempt: number) => {
       try {
         const cred = await api<Cred>('/me/stream-token');
-        const streamUser = { id: cred.userId, name: user.fullName ?? undefined };
+        if (cancelled) return;
+        const streamUser = { id: cred.userId, name: user?.fullName ?? undefined };
         cc = StreamChat.getInstance(cred.apiKey);
-        if (!cc.userID) await cc.connectUser(streamUser, cred.token);
-        vc = StreamVideoClient.getOrCreateInstance({ apiKey: cred.apiKey, user: streamUser, token: cred.token });
+        if (!cc.userID) await cc.connectUser(streamUser, tokenProvider);
+        if (cancelled) return; // el cleanup ya desconecta `cc`
+        vc = StreamVideoClient.getOrCreateInstance({ apiKey: cred.apiKey, user: streamUser, tokenProvider });
+        if (cancelled) return;
         setChatClient(cc);
         setVideoClient(vc);
       } catch (e) {
-        // Stream no configurado / sin red: la app sigue funcionando sin chat en vivo
+        // Stream no configurado / sin red: la app sigue funcionando sin chat en vivo.
+        // Reintenta unas veces con espera creciente (5s, 10s, 15s).
         console.error('[stream] connect failed:', e instanceof Error ? e.message : e);
-        connecting.current = false;
+        if (!cancelled && attempt < 3) retryTimer = setTimeout(() => void connect(attempt + 1), 5000 * (attempt + 1));
       }
-    })();
+    };
+    void connect(0);
 
     return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
       cc?.disconnectUser().catch(() => {});
       vc?.disconnectUser().catch(() => {});
       setChatClient(null);
       setVideoClient(null);
-      connecting.current = false;
     };
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   // Aún sin conectar: renderiza los hijos (las pantallas de chat muestran su propia carga)
   if (!chatClient || !videoClient) {

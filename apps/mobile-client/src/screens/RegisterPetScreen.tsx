@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { appAlert } from '../lib/dialog';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as ImagePicker from 'expo-image-picker';
+import { pickPhotoAsDataUri } from '../lib/photo';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { BREEDS, breedImage } from '../lib/breeds';
@@ -56,11 +56,11 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
     [breedSearch],
   );
 
+  // Misma ruta que el perfil: pide permiso, redimensiona y devuelve un data URI listo
+  // para el backend. Nunca lanza (los errores se muestran con appAlert).
   const pickPhoto = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return appAlert('Permiso', 'Necesitamos acceso a tus fotos.');
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [1, 1], quality: 0.6 });
-    if (!res.canceled) setPhoto(res.assets[0].uri);
+    const uri = await pickPhotoAsDataUri();
+    if (uri) setPhoto(uri);
   };
 
   const save = async () => {
@@ -79,6 +79,8 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
           weightKg: weight && Number(weight) > 0 ? Number(weight) : undefined,
           alias: alias || undefined,
           size: size || undefined,
+          // Antes la foto elegida se mostraba pero nunca se enviaba.
+          photoUrl: photo || undefined,
         },
       });
       if (allergy.trim()) {

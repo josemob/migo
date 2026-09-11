@@ -22,9 +22,12 @@ interface Receipt {
   petName?: string | null;
 }
 
-const money = (n: number) => `$${n.toFixed(2)}`;
-const longDate = (iso: string) =>
-  new Date(iso).toLocaleDateString('es-VE', { day: '2-digit', month: 'long', year: 'numeric' });
+// El backend serializa los decimales como string: `Number(n) || 0` evita "toFixed is not a function".
+const money = (n: number | string) => `$${(Number(n) || 0).toFixed(2)}`;
+const longDate = (iso: string) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('es-VE', { day: '2-digit', month: 'long', year: 'numeric' });
+};
 
 // HTML del recibo para generar el PDF (marca Migo).
 function receiptHtml(r: Receipt): string {
@@ -89,6 +92,14 @@ export default function ReceiptsScreen({ navigation }: { navigation: any }) {
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 34 }} showsVerticalScrollIndicator={false}>
         {receipts.isLoading ? (
           <ActivityIndicator color={colors.brand} style={{ marginTop: 40 }} />
+        ) : receipts.isError ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyIcon}>⚠️</Text>
+            <Text style={styles.emptyTxt}>No pudimos cargar tus recibos. Revisa tu conexión e intenta de nuevo.</Text>
+            <Pressable style={styles.pdfBtn} onPress={() => void receipts.refetch()}>
+              <Text style={styles.pdfBtnTxt}>Reintentar</Text>
+            </Pressable>
+          </View>
         ) : list.length === 0 ? (
           <View style={styles.empty}>
             <Text style={styles.emptyIcon}>🧾</Text>

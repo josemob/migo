@@ -8,6 +8,8 @@ import { colors, radius, triageColor, triageLabel } from '../theme';
 // Solo se puede cancelar MIENTRAS se busca. Una vez que una clínica/vet acepta
 // (ACCEPTED/EN_ROUTE), la opción de cancelar desaparece.
 const CANCELLABLE = ['TRIAGING', 'BROADCASTING'];
+// Estados finales: ya no tiene sentido seguir consultando cada 5s.
+const TERMINAL = ['ATTENDED', 'HOSPITALIZED', 'EXPIRED', 'CANCELLED'];
 
 interface Track {
   id: string;
@@ -35,10 +37,11 @@ const statusText: Record<string, string> = {
 export default function TrackingScreen({ route, navigation }: { route: any; navigation: any }) {
   const { id } = route.params;
   const qc = useQueryClient();
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['track', id],
     queryFn: () => api<Track>(`/emergencies/${id}/track`),
-    refetchInterval: 5000,
+    // Polling mientras la urgencia sigue viva; se detiene al llegar a un estado final.
+    refetchInterval: (q) => (q.state.data && TERMINAL.includes(q.state.data.status) ? false : 5000),
   });
 
   const cancel = useMutation({
@@ -56,10 +59,23 @@ export default function TrackingScreen({ route, navigation }: { route: any; navi
       { text: 'Sí, cancelar', style: 'destructive', onPress: () => cancel.mutate() },
     ]);
 
-  if (isLoading || !data) return <Loading />;
+  if (isLoading) return <Loading />;
+  if (isError || !data) {
+    return (
+      <Screen>
+        <Card>
+          <Text style={styles.cardTitle}>No pudimos cargar el seguimiento</Text>
+          <Muted>{error instanceof Error ? error.message : 'Revisa tu conexión e intenta de nuevo.'}</Muted>
+        </Card>
+        <Button title="Reintentar" onPress={() => void refetch()} />
+        <Button title="Volver al inicio" onPress={() => navigation.popToTop()} variant="outline" />
+      </Screen>
+    );
+  }
 
   const accepted = data.acceptedClinic;
-  const nearest = data.alerts.slice().sort((a, b) => (a.distanceKm ?? 99) - (b.distanceKm ?? 99))[0];
+  const alerts = data.alerts ?? [];
+  const nearest = alerts.slice().sort((a, b) => (a.distanceKm ?? 99) - (b.distanceKm ?? 99))[0];
 
   return (
     <Screen>
@@ -74,7 +90,7 @@ export default function TrackingScreen({ route, navigation }: { route: any; navi
       <Card>
         <Text style={styles.status}>{statusText[data.status] ?? data.status}</Text>
         <Muted>
-          {data.pet.name} {data.pet.breed ? `· ${data.pet.breed}` : ''}
+          {data.pet?.name ?? 'Tu mascota'} {data.pet?.breed ? `· ${data.pet.breed}` : ''}
         </Muted>
       </Card>
 
@@ -107,8 +123,8 @@ export default function TrackingScreen({ route, navigation }: { route: any; navi
       ) : (
         <Card>
           <Text style={styles.body}>
-            {data.alerts.length > 0
-              ? `Alertamos a ${data.alerts.length} clínica(s) cercana(s). Esperando confirmación…`
+            {alerts.length > 0
+              ? `Alertamos a ${alerts.length} clínica(s) cercana(s). Esperando confirmación…`
               : 'Buscando clínicas disponibles…'}
           </Text>
         </Card>

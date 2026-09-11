@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Dimensions, Image, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Map as MapLibreMap, Camera, Marker as MapMarker } from '@maplibre/maplibre-react-native';
-import * as Location from 'expo-location';
+import { getPositionSafe } from '../lib/location';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { Loading, Muted } from '../components/ui';
@@ -70,17 +70,15 @@ export default function DirectoryScreen({ navigation, route }: any) {
   }, [route?.params?.category]);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status === 'granted') {
-          const pos = await Location.getCurrentPositionAsync({});
-          setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        }
-      } catch {
-        /* sin ubicación: se listan sin distancia */
-      }
-    })();
+    // Con timeout (el GPS sin fix reciente podía tardar minutos) y sin setState tras desmontar.
+    // Sin ubicación: se listan sin distancia.
+    let alive = true;
+    getPositionSafe().then((p) => {
+      if (alive && p) setCoords(p);
+    });
+    return () => {
+      alive = false;
+    };
   }, []);
 
   const params = new URLSearchParams();
@@ -99,7 +97,9 @@ export default function DirectoryScreen({ navigation, route }: any) {
   const meta = categoryMeta(category);
   const title = meta ? meta.title : 'Directorio';
   const clinics = data?.data ?? [];
-  const pins = clinics.filter((c) => c.latitude != null && c.longitude != null);
+  // Solo coordenadas numéricas válidas: un `NaN` llega al marcador nativo de MapLibre y lo rompe.
+  const coord = (v: unknown) => (v == null || v === '' ? NaN : Number(v));
+  const pins = clinics.filter((c) => Number.isFinite(coord(c.latitude)) && Number.isFinite(coord(c.longitude)));
   // Encuadra al menos las 3 clínicas más cercanas (la API ya las devuelve ordenadas por distancia).
   const nearest3 = pins.slice(0, 3).map((c) => [Number(c.longitude), Number(c.latitude)] as [number, number]);
   const { center, zoom } = nearest3.length

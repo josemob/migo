@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { api, tokens } from './api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ApiError, api, onUnauthorized, tokens } from './api';
 import { appAlert } from './dialog';
 import {
   getBiometricToken,
@@ -39,6 +40,24 @@ export interface AuthUser {
   avatarUrl?: string | null;
 }
 
+const USER_CACHE = 'migo_user_cache';
+
+// Trae el usuario y guarda una copia local para poder arrancar sin red.
+async function fetchMe(): Promise<AuthUser> {
+  const u = await fetchMe();
+  AsyncStorage.setItem(USER_CACHE, JSON.stringify(u)).catch(() => {});
+  return u;
+}
+
+async function readCachedUser(): Promise<AuthUser | null> {
+  try {
+    const raw = await AsyncStorage.getItem(USER_CACHE);
+    return raw ? (JSON.parse(raw) as AuthUser) : null;
+  } catch {
+    return null;
+  }
+}
+
 interface AuthCtx {
   user: AuthUser | null;
   loading: boolean;
@@ -66,17 +85,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
     (async () => {
-      await tokens.load();
       try {
-        if (tokens.access) setUser(await api<AuthUser>('/auth/me'));
+        await tokens.load();
+        if (!tokens.access) return;
+        try {
+          const u = await fetchMe();
+          if (active) setUser(u);
+        } catch (e) {
+          // Sin red / servidor caído: conservamos la sesión con el último usuario conocido.
+          // Si el token era inválido, api() ya limpió los tokens (tokens.access queda null).
+          const transient = !(e instanceof ApiError) || e.status === 0 || e.status >= 500;
+          const cached = transient && tokens.access ? await readCachedUser() : null;
+          if (active) setUser(cached);
+        }
       } catch {
-        setUser(null);
+        if (active) setUser(null);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     })();
+    return () => {
+      active = false;
+    };
   }, []);
+
+  // Sesión expirada definitivamente (el refresh dejó de servir): volver al login
+  // desde cualquier pantalla, sin importar qué petición lo detectó.
+  useEffect(
+    () =>
+      onUnauthorized(() => {
+        setUser(null);
+        AsyncStorage.removeItem(USER_CACHE).catch(() => {});
+      }),
+    [],
+  );
 
   const login = async (email: string, password: string) => {
     const res = await api<{ accessToken: string; refreshToken: string }>('/auth/login', {
@@ -85,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       auth: false,
     });
     await tokens.set(res.accessToken, res.refreshToken);
-    setUser(await api<AuthUser>('/auth/me'));
+    setUser(await fetchMe());
     void offerBiometricEnrollment();
   };
 
@@ -96,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       auth: false,
     });
     await tokens.set(res.accessToken, res.refreshToken);
-    setUser(await api<AuthUser>('/auth/me'));
+    setUser(await fetchMe());
     void offerBiometricEnrollment();
   };
 
@@ -107,7 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       auth: false,
     });
     await tokens.set(res.accessToken, res.refreshToken);
-    setUser(await api<AuthUser>('/auth/me'));
+    setUser(await fetchMe());
     void offerBiometricEnrollment();
   };
 
@@ -125,17 +169,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Tu sesión guardada expiró. Inicia sesión con tu contraseña.');
     }
     await tokens.set(res.accessToken, res.refreshToken);
-    setUser(await api<AuthUser>('/auth/me'));
+    setUser(await fetchMe());
   };
 
   const logout = async () => {
     // No revocamos el refresh en el servidor para que el login biométrico siga sirviendo.
     await tokens.clear();
+    await AsyncStorage.removeItem(USER_CACHE).catch(() => {});
     setUser(null);
   };
 
   const refreshUser = async () => {
-    if (tokens.access) setUser(await api<AuthUser>('/auth/me'));
+    if (tokens.access) setUser(await fetchMe());
   };
 
   return (
