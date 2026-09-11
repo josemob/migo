@@ -44,7 +44,7 @@ const USER_CACHE = 'migo_user_cache';
 
 // Trae el usuario y guarda una copia local para poder arrancar sin red.
 async function fetchMe(): Promise<AuthUser> {
-  const u = await fetchMe();
+  const u = await api<AuthUser>('/auth/me');
   AsyncStorage.setItem(USER_CACHE, JSON.stringify(u)).catch(() => {});
   return u;
 }
