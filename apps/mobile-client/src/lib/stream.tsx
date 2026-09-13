@@ -27,7 +27,7 @@ const Ctx = createContext<StreamCtx>({ chatClient: null, ready: false, unread: 0
 export const useStream = () => useContext(Ctx);
 
 // Fuerza fondo blanco en los chats (message list + composer)
-const CHAT_THEME = {
+export const CHAT_THEME = {
   colors: { white_snow: '#FFFFFF' },
   messageList: { container: { backgroundColor: '#FFFFFF' } },
 } as const;
@@ -105,21 +105,25 @@ export function StreamProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
-  // Aún sin conectar: renderiza los hijos (las pantallas de chat muestran su propia carga)
-  if (!chatClient || !videoClient) {
-    return <Ctx.Provider value={{ chatClient, ready: false, unread }}>{children}</Ctx.Provider>;
-  }
-
+  // IMPORTANTE: `children` (toda la navegación) se renderiza SIEMPRE en la misma
+  // posición del árbol. Antes, al conectar Stream se envolvía la app en <Chat>/<StreamVideo>
+  // y React desmontaba y volvía a montar la navegación completa unos segundos después de
+  // abrir la app (salto visible, efectos reejecutados). Ahora solo el overlay de llamadas
+  // vive dentro de los providers de Stream; las pantallas de chat se envuelven en <Chat>
+  // por su cuenta (ver ClinicChatScreen).
+  const ready = !!chatClient && !!videoClient;
   return (
     <OverlayProvider value={{ style: CHAT_THEME }}>
-      <Chat client={chatClient} style={CHAT_THEME}>
-        <StreamVideo client={videoClient} style={callTheme}>
-          <Ctx.Provider value={{ chatClient, ready: true, unread }}>
-            {children}
-            <IncomingCallOverlay />
-          </Ctx.Provider>
-        </StreamVideo>
-      </Chat>
+      <Ctx.Provider value={{ chatClient, ready, unread }}>
+        {children}
+        {chatClient && videoClient && (
+          <Chat client={chatClient} style={CHAT_THEME}>
+            <StreamVideo client={videoClient} style={callTheme}>
+              <IncomingCallOverlay />
+            </StreamVideo>
+          </Chat>
+        )}
+      </Ctx.Provider>
     </OverlayProvider>
   );
 }

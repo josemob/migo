@@ -4,9 +4,9 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Path } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import type { Channel as StreamChannel } from 'stream-chat';
-import { Channel, MessageList, MessageComposer } from 'stream-chat-expo';
+import { Channel, Chat, MessageList, MessageComposer } from 'stream-chat-expo';
 import { api } from '../lib/api';
-import { useStream } from '../lib/stream';
+import { CHAT_THEME, useStream } from '../lib/stream';
 import { appAlert } from '../lib/dialog';
 import { Loading, Muted } from '../components/ui';
 import { BackButton } from '../components/BackButton';
@@ -145,34 +145,38 @@ export default function ClinicChatScreen({ navigation, route }: any) {
 
       {err ? (
         <View style={styles.center}><Muted>{err}</Muted></View>
-      ) : !channel ? (
+      ) : !channel || !chatClient ? (
         <Loading />
       ) : (
-        <Channel
-          channel={channel}
-          bottomInset={insets.bottom}
-          keyboardVerticalOffset={0}
-          additionalKeyboardAvoidingViewProps={{ style: { flex: 1 } }}
-          handleAttachButtonPress={() => {
-            Keyboard.dismiss();
-            setAttachOpen((o) => !o);
-          }}
-          hasFilePicker={false}
-          hasImagePicker
-          hasCameraPicker={false}
-          hasCommands={false}
-          audioRecordingEnabled={false}
-        >
-          <MessageList />
-          {attachOpen && (
-            <View style={styles.attachRow}>
-              <AttachOption icon="image" onPress={() => pick('image')} />
-              <AttachOption icon="camera" onPress={() => pick('camera')} />
-              <AttachOption icon="video" onPress={() => pick('video')} />
-            </View>
-          )}
-          <MessageComposer />
-        </Channel>
+        // <Chat> local: el provider global ya no envuelve la navegación (evita el
+        // remount de toda la app al conectar Stream), así que se provee aquí.
+        <Chat client={chatClient} style={CHAT_THEME}>
+          <Channel
+            channel={channel}
+            bottomInset={insets.bottom}
+            keyboardVerticalOffset={0}
+            additionalKeyboardAvoidingViewProps={{ style: { flex: 1 } }}
+            handleAttachButtonPress={() => {
+              Keyboard.dismiss();
+              setAttachOpen((o) => !o);
+            }}
+            hasFilePicker={false}
+            hasImagePicker
+            hasCameraPicker={false}
+            hasCommands={false}
+            audioRecordingEnabled={false}
+          >
+            <MessageList />
+            {attachOpen && (
+              <View style={styles.attachRow}>
+                <AttachOption icon="image" onPress={() => pick('image')} />
+                <AttachOption icon="camera" onPress={() => pick('camera')} />
+                <AttachOption icon="video" onPress={() => pick('video')} />
+              </View>
+            )}
+            <MessageComposer />
+          </Channel>
+        </Chat>
       )}
 
       {uploading && (
