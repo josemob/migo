@@ -162,7 +162,7 @@ export function Badge({ text, color }: { text: string; color: string }) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
   scroll: { padding: spacing.lg, gap: spacing.md, flexGrow: 1 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.canvas },
   h1: { fontSize: 26, fontWeight: '800', color: colors.text },
   h2: { fontSize: 18, fontWeight: '700', color: colors.text },
   muted: { fontSize: 14, color: colors.muted },

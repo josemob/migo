@@ -209,7 +209,9 @@ export default function App() {
   const ready = fontsLoaded || !!fontError;
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    // Fondo explícito: sin él, la ventana de Android en modo oscuro se veía gris
+    // entre el splash (blanco) y la app (clara) al arrancar.
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.canvas }}>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>

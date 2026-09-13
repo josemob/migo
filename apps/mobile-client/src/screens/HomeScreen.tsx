@@ -280,9 +280,15 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
         {/* Banner patrocinado (arte 300x100, control desde Super Admin). Si está
             apagado o sin arte, no ocupa espacio. */}
-        {banner ? (
+        {/* Mientras el banner carga se reserva su alto (placeholder invisible): antes
+            aparecía ~1s después y empujaba "Atajos" hacia abajo (brinco al abrir). */}
+        {bannerQ.isLoading || banner ? (
           <View style={styles.bannerWrap}>
-            <Image source={{ uri: banner }} style={styles.banner} resizeMode="cover" />
+            {banner ? (
+              <Image source={{ uri: banner }} style={styles.banner} resizeMode="cover" />
+            ) : (
+              <View style={[styles.banner, { backgroundColor: 'transparent' }]} />
+            )}
           </View>
         ) : null}
 
