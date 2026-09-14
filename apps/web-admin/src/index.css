@@ -11,7 +11,7 @@ body,
 }
 
 body {
-  @apply bg-canvas font-sans text-slate-800 antialiased;
+  @apply bg-warm-shell font-sans text-slate-800 antialiased;
 }
 
 @layer base {
@@ -25,7 +25,11 @@ body {
 
 @layer components {
   .card {
-    @apply rounded-card border border-slate-100 bg-white shadow-card;
+    @apply rounded-card border border-white/70 bg-white shadow-soft;
+  }
+  /* Tarjeta de énfasis: morado profundo (el equivalente Migo a las tarjetas negras) */
+  .card-dark {
+    @apply rounded-card bg-brand-900 text-white shadow-soft;
   }
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-heading text-sm font-semibold transition;

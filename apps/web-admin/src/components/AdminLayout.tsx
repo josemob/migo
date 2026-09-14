@@ -34,17 +34,20 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="flex h-screen">
+    // Marco exterior gris + paneles flotantes redondeados (sidebar morado, lienzo cálido).
+    <div className="flex h-screen gap-3 bg-warm-shell p-3">
       <aside
-        className={`flex ${collapsed ? 'w-20' : 'w-72'} shrink-0 flex-col bg-brand-900 text-white transition-[width] duration-200 ease-in-out`}
+        // Colapsado = riel de iconos de 64px (antes 80px se veía ancho de más).
+        className={`flex ${collapsed ? 'w-16' : 'w-72'} shrink-0 flex-col rounded-shell bg-brand-900 text-white shadow-soft transition-[width] duration-200 ease-in-out`}
       >
         {/* Logo + toggle */}
-        <div className={`flex items-center px-4 py-5 ${collapsed ? 'justify-center' : 'justify-between'}`}>
+        <div className={`flex items-center py-5 ${collapsed ? 'justify-center px-2' : 'justify-between px-4'}`}>
           <div className="flex items-center gap-3">
-            <MigoLogo variant="dark" height={collapsed ? 22 : 28} />
+            {/* Monocromático blanco (letras caladas). Colapsado: solo el isotipo "M". */}
+            <MigoLogo variant={collapsed ? 'isotype' : 'mono'} height={collapsed ? 24 : 26} />
             {!collapsed && (
-              <span className="inline-block rounded bg-green-400/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-green-300">
-                Sistema Operativo
+              <span className="inline-block rounded-pill bg-green-400/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-green-300">
+                Operativo
               </span>
             )}
           </div>
@@ -64,7 +67,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
 
         {!collapsed && <div className="px-6 pb-2 pt-1 text-[11px] font-semibold uppercase tracking-wider text-white/40">Menú principal</div>}
 
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3">
+        <nav className={`flex-1 space-y-1 overflow-y-auto ${collapsed ? 'px-2' : 'px-3'}`}>
           {NAV.map((n) => (
             <NavLink
               key={n.to}
@@ -72,8 +75,11 @@ export function AdminLayout({ children }: { children: ReactNode }) {
               end={n.end}
               title={collapsed ? n.label : undefined}
               className={({ isActive }) =>
-                `flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition ${collapsed ? 'justify-center' : 'gap-3'} ${
-                  isActive ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/30' : 'text-white/70 hover:bg-white/5'
+                // Activo en amarillo Migo sobre el morado: máximo contraste y el acento de la marca.
+                `flex items-center rounded-pill py-2.5 text-sm font-medium transition ${collapsed ? 'justify-center px-0' : 'gap-3 px-3.5'} ${
+                  isActive
+                    ? 'bg-accent-300 font-semibold text-brand-900 shadow-lg shadow-accent-300/20'
+                    : 'text-white/70 hover:bg-white/10'
                 }`
               }
             >
@@ -84,8 +90,8 @@ export function AdminLayout({ children }: { children: ReactNode }) {
         </nav>
 
         {/* Footer usuario */}
-        <div className={`flex border-t border-white/10 px-4 py-4 ${collapsed ? 'flex-col items-center gap-3' : 'items-center gap-3'}`}>
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm font-bold">
+        <div className={`flex border-t border-white/10 py-4 ${collapsed ? 'flex-col items-center gap-3 px-2' : 'items-center gap-3 px-4'}`}>
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm font-bold">
             {user?.fullName?.[0]?.toUpperCase() ?? 'A'}
           </div>
           {!collapsed && (
@@ -104,7 +110,8 @@ export function AdminLayout({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto bg-canvas p-8">
+      {/* Lienzo cálido: lila muy claro -> crema -> amarillo pálido (identidad Migo) */}
+      <main className="flex-1 overflow-y-auto rounded-shell bg-gradient-to-br from-warm-50 via-warm-100 to-warm-200 p-8">
         {/* Tope de ancho + centrado: en pantallas anchas (retina Mac, >1280px) el
             contenido no se estira infinitamente; queda centrado en monitores grandes. */}
         <div className="mx-auto w-full max-w-[1600px]">{children}</div>

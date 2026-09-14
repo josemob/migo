@@ -53,6 +53,14 @@ export default {
           violet: purple[500],
         },
         canvas: '#F6F7F9',
+        // Fondo cálido del panel (lila muy claro -> crema -> amarillo pálido).
+        // Es lo que da el "look" de tablero suave sin salirse de la marca.
+        warm: {
+          50: '#FBF8FC', // lila casi blanco
+          100: '#FCFAF5', // crema
+          200: '#FEF6CF', // amarillo pálido
+          shell: '#ECEEF2', // gris del marco exterior
+        },
       },
       fontFamily: {
         // Roboto = cuerpo (default), Outfit = títulos
@@ -67,11 +75,15 @@ export default {
         'body-sm': ['14px', { lineHeight: '1.5' }],
       },
       borderRadius: {
-        card: '1rem',
+        card: '1.5rem', // 24px — tarjetas del panel
+        shell: '1.75rem', // 28px — sidebar y lienzo principal
+        pill: '999px',
       },
       boxShadow: {
         // Design system: X2 Y2 · blur 21 · spread 0 · #7F398A 10%
         card: '2px 2px 21px 0 rgba(127, 57, 138, 0.10)',
+        // Sombra difusa y baja para tarjetas que "flotan" sobre el fondo cálido
+        soft: '0 1px 2px 0 rgba(41,14,49,0.04), 0 10px 28px -6px rgba(41,14,49,0.08)',
       },
     },
   },
