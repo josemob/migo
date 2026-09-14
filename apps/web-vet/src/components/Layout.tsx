@@ -56,24 +56,27 @@ export function Layout({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    // Marco exterior gris + paneles flotantes redondeados (igual que el Super Admin).
+    <div className="flex h-screen gap-3 overflow-hidden bg-warm-shell p-3">
       {/* Sidebar */}
       <aside
-        className={`flex ${collapsed ? 'w-20' : 'w-72'} shrink-0 flex-col bg-sidebar text-white transition-[width] duration-200 ease-in-out`}
+        // Colapsado = riel de iconos de 64px
+        className={`flex ${collapsed ? 'w-16' : 'w-72'} shrink-0 flex-col rounded-shell bg-brand-900 text-white shadow-soft transition-[width] duration-200 ease-in-out`}
       >
         {/* Logo + toggle */}
-        <div className={`flex items-center px-4 py-6 ${collapsed ? 'justify-center' : 'justify-between'}`}>
-          <div className="flex items-center gap-3">
-            <MigoLogo variant="dark" height={collapsed ? 22 : 26} />
+        <div className={`flex items-center py-6 ${collapsed ? 'justify-center px-2' : 'justify-between px-4'}`}>
+          <div className={collapsed ? '' : 'min-w-0 flex-1'}>
+            {/* Monocromático (letras caladas); colapsado solo el isotipo "M" */}
+            <MigoLogo variant={collapsed ? 'isotype' : 'mono'} height={collapsed ? 24 : 24} />
             {!collapsed && (
-              <div>
-                <div className="text-sm font-bold leading-tight">{orgName}</div>
-                <div className="text-xs text-sidebar-muted">Sucursal: {clinicName}</div>
+              <div className="mt-2.5 min-w-0">
+                <div className="truncate text-sm font-bold leading-tight">{orgName}</div>
+                <div className="truncate text-xs text-white/50">Sucursal: {clinicName}</div>
               </div>
             )}
           </div>
           {!collapsed && (
-            <button onClick={toggle} title="Colapsar menú" className="rounded-lg p-1.5 text-sidebar-muted transition hover:bg-sidebar-hover hover:text-white">
+            <button onClick={toggle} title="Colapsar menú" className="shrink-0 self-start rounded-lg p-1.5 text-white/60 transition hover:bg-white/10 hover:text-white">
               <Icon name="chevronLeft" className="h-5 w-5" />
             </button>
           )}
@@ -81,16 +84,16 @@ export function Layout({ children }: { children: ReactNode }) {
 
         {/* Botón expandir (visible solo colapsado) */}
         {collapsed && (
-          <button onClick={toggle} title="Expandir menú" className="mx-auto mb-2 rounded-lg p-1.5 text-sidebar-muted transition hover:bg-sidebar-hover hover:text-white">
+          <button onClick={toggle} title="Expandir menú" className="mx-auto mb-2 rounded-lg p-1.5 text-white/60 transition hover:bg-white/10 hover:text-white">
             <Icon name="chevronRight" className="h-5 w-5" />
           </button>
         )}
 
-        <nav className="flex-1 overflow-y-auto px-3 py-2">
+        <nav className={`flex-1 overflow-y-auto py-2 ${collapsed ? 'px-2' : 'px-3'}`}>
           {nav.map((group) => (
             <div key={group.section} className={collapsed ? 'mb-3' : 'mb-6'}>
               {!collapsed && (
-                <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-sidebar-muted">
+                <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-white/40">
                   {group.section}
                 </div>
               )}
@@ -101,10 +104,11 @@ export function Layout({ children }: { children: ReactNode }) {
                   end={item.end}
                   title={collapsed ? item.label : undefined}
                   className={({ isActive }) =>
-                    `mb-1 flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition ${collapsed ? 'justify-center' : 'gap-3'} ${
+                    // Activo en amarillo Migo sobre el morado (acento de la marca)
+                    `mb-1 flex items-center rounded-pill py-2.5 text-sm font-medium transition ${collapsed ? 'justify-center px-0' : 'gap-3 px-3.5'} ${
                       isActive
-                        ? 'bg-sidebar-active text-white shadow-lg'
-                        : 'text-slate-200 hover:bg-sidebar-hover'
+                        ? 'bg-accent-300 font-semibold text-brand-900 shadow-lg shadow-accent-300/20'
+                        : 'text-white/70 hover:bg-white/10'
                     }`
                   }
                 >
@@ -116,15 +120,15 @@ export function Layout({ children }: { children: ReactNode }) {
           ))}
         </nav>
 
-        <div className="border-t border-white/10 px-4 py-4">
+        <div className={`border-t border-white/10 py-4 ${collapsed ? 'px-2' : 'px-4'}`}>
           <div className={`flex ${collapsed ? 'flex-col items-center gap-3' : 'items-center gap-3'}`}>
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-migo-purple text-sm font-bold">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm font-bold">
               {user?.fullName?.[0] ?? 'U'}
             </div>
             {!collapsed && (
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-semibold">{user?.fullName}</div>
-                <div className="text-xs text-sidebar-muted">
+                <div className="truncate text-xs text-white/50">
                   {user?.staffProfile?.roleLabel ?? user?.role}
                 </div>
               </div>
@@ -132,7 +136,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <button
               onClick={logout}
               title="Cerrar sesión"
-              className="rounded-lg p-2 text-sidebar-muted hover:bg-sidebar-hover hover:text-white"
+              className="rounded-lg p-2 text-white/60 transition hover:bg-white/10 hover:text-white"
             >
               <Icon name="logout" className="h-5 w-5" />
             </button>
@@ -140,8 +144,8 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      {/* Content */}
-      <main className="flex-1 overflow-y-auto p-8">
+      {/* Content — lienzo cálido (lila -> crema -> amarillo pálido) */}
+      <main className="flex-1 overflow-y-auto rounded-shell bg-gradient-to-br from-warm-50 via-warm-100 to-warm-200 p-8">
         {/* Tope de ancho + centrado para pantallas anchas (retina Mac, >1280px): el
             contenido no se estira de borde a borde en monitores grandes. */}
         <div className="mx-auto w-full max-w-[1600px]">{children}</div>
