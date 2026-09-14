@@ -1,9 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 // maplibre-gl 6 solo expone exports nombrados (ya no hay default export).
-import { Map as MapLibreMap, Marker, NavigationControl, type MapMouseEvent } from 'maplibre-gl';
+import {
+  Map as MapLibreMap,
+  Marker,
+  NavigationControl,
+  setWorkerUrl,
+  type MapMouseEvent,
+} from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+// MapLibre parsea las teselas en un Web Worker que busca como archivo hermano
+// suyo (`new URL('./maplibre-gl-worker.mjs', import.meta.url)`). Al empaquetar,
+// import.meta.url pasa a ser el bundle de la app, así que lo pide en
+// /assets/maplibre-gl-worker.mjs, que Vite nunca emite: el worker daba 404 y el
+// mapa se quedaba en el color de fondo del estilo, sin calles. Con ?worker&url
+// Vite lo empaqueta (resolviendo su import de maplibre-gl-shared) y nos da la
+// URL final, que le pasamos a MapLibre.
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { api } from '../lib/api';
 import { Icon } from './Icon';
+
+setWorkerUrl(maplibreWorkerUrl);
 
 /**
  * Selector de ubicación con mapa real (OpenStreetMap).
