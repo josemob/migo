@@ -4,6 +4,7 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import { validate } from '../../middleware/validate';
 import { authenticate } from '../../middleware/auth';
 import { ApiError } from '../../utils/ApiError';
+import { env } from '../../config/env';
 
 /**
  * Geocodificación con OpenStreetMap (Nominatim). Gratis y sin API key.
@@ -19,7 +20,10 @@ const router = Router();
 router.use(authenticate);
 
 const NOMINATIM = 'https://nominatim.openstreetmap.org';
-const UA = 'MigoApp/1.0 (panel de clinicas; contacto: soporte@migo.app)';
+// La política de uso de Nominatim exige identificar la aplicación con un
+// contacto real: es por ahí por donde avisan antes de bloquear. Va el dominio
+// público de Migo, no un correo inventado.
+const UA = `MigoApp/1.0 (panel de clinicas; ${env.APP_PUBLIC_URL})`;
 // Sesgamos los resultados a Venezuela: es donde opera Migo.
 const COUNTRY = 've';
 
