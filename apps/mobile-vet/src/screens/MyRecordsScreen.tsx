@@ -48,6 +48,13 @@ export default function MyRecordsScreen({ navigation }: { navigation: any }) {
 
       {q.isLoading ? (
         <Loading />
+      ) : q.isError ? (
+        // Antes: un error de red decía "Aún no has emitido expedientes" y ocultaba los pendientes de firma.
+        <View style={styles.empty}>
+          <Text style={styles.emptyTxt}>No pudimos cargar tus expedientes.</Text>
+          <Text style={styles.emptyHint}>Revisa tu conexión e intenta de nuevo.</Text>
+          <Pressable onPress={() => void q.refetch()}><Text style={{ color: colors.brand, fontWeight: '800', fontSize: 15 }}>Reintentar →</Text></Pressable>
+        </View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: 20, gap: 12, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
           {pendientes > 0 && (

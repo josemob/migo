@@ -12,19 +12,28 @@ export function BiometricToggle() {
   const [supported, setSupported] = useState(true);
 
   useEffect(() => {
-    isBiometricEnabled().then(setOn);
-    biometricSupported().then(setSupported);
+    let alive = true;
+    isBiometricEnabled().then((v) => { if (alive) setOn(v); }).catch(() => {});
+    biometricSupported().then((v) => { if (alive) setSupported(v); }).catch(() => {});
+    return () => { alive = false; };
   }, []);
 
   const toggle = async (next: boolean) => {
-    if (next) {
-      if (!(await biometricSupported())) {
-        return appAlert('Biometría no disponible', 'Primero configura una huella o rostro en los ajustes de tu teléfono.');
+    try {
+      if (next) {
+        if (!(await biometricSupported())) {
+          return appAlert('Biometría no disponible', 'Primero configura una huella o rostro en los ajustes de tu teléfono.');
+        }
+        // Sin refresh token no hay sesión que guardar: el toggle quedaría "activo" sin servir.
+        if (!tokens.refresh) return appAlert('No disponible', 'Inicia sesión de nuevo con tu contraseña para activar la biometría.');
+        setOn(await enableBiometric(tokens.refresh));
+      } else {
+        await disableBiometric();
+        setOn(false);
       }
-      setOn(await enableBiometric(tokens.refresh));
-    } else {
-      await disableBiometric();
-      setOn(false);
+    } catch (e) {
+      // Un fallo del keystore era un rechazo sin manejar y el switch quedaba desincronizado.
+      appAlert('No se pudo cambiar la biometría', e instanceof Error ? e.message : 'Intenta de nuevo.');
     }
   };
 

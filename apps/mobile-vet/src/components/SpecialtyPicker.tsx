@@ -15,6 +15,9 @@ export function SpecialtyPicker({ value, onChange, max = 3 }: { value: string; o
   const selected = useMemo(() => value.split(',').map((s) => s.trim()).filter(Boolean), [value]);
   const custom = selected.find((s) => !KNOWN.includes(s)) ?? '';
   const [otherMode, setOtherMode] = useState(!!custom);
+  // Texto libre en estado local: antes cada tecla se recortaba (imposible escribir un
+  // espacio) y, al llegar al máximo, se abría un diálogo por cada pulsación.
+  const [customText, setCustomText] = useState(custom);
 
   const emit = (list: string[]) => onChange(list.join(', '));
   const atMax = () => appAlert(`Máximo ${max}`, `Puedes elegir hasta ${max} especialidades.`);
@@ -26,18 +29,21 @@ export function SpecialtyPicker({ value, onChange, max = 3 }: { value: string; o
   };
 
   const setCustom = (text: string) => {
+    setCustomText(text);
     const withoutCustom = selected.filter((s) => KNOWN.includes(s));
     const t = text.trim();
     if (!t) return emit(withoutCustom);
-    if (withoutCustom.length >= max) return atMax();
+    if (withoutCustom.length >= max) return; // el aviso se muestra al activar "Otra", no por tecla
     emit([...withoutCustom, t]);
   };
 
   const toggleOther = () => {
     if (otherMode) {
       setOtherMode(false);
+      setCustomText('');
       emit(selected.filter((s) => KNOWN.includes(s))); // quita la especialidad libre
     } else {
+      if (selected.length >= max) return atMax();
       setOtherMode(true);
     }
   };
@@ -62,7 +68,7 @@ export function SpecialtyPicker({ value, onChange, max = 3 }: { value: string; o
       {otherMode && (
         <TextInput
           style={styles.input}
-          value={custom}
+          value={customText}
           onChangeText={setCustom}
           placeholder="Escribe una especialidad"
           placeholderTextColor={colors.muted}

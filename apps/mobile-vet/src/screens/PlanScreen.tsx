@@ -43,8 +43,14 @@ export default function PlanScreen({ navigation }: { navigation: any }) {
         <View style={{ width: 40 }} />
       </View>
 
-      {q.isLoading || !data ? (
+      {q.isLoading ? (
         <Loading />
+      ) : q.isError || !data ? (
+        // Antes: spinner infinito cuando fallaba la carga.
+        <View style={{ padding: 20, gap: 12 }}>
+          <Text style={styles.meta}>No pudimos cargar tu plan. Revisa tu conexión e intenta de nuevo.</Text>
+          <Pressable onPress={() => void q.refetch()}><Text style={styles.sectionTitle}>Reintentar →</Text></Pressable>
+        </View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
           {/* Plan actual */}
@@ -71,7 +77,7 @@ export default function PlanScreen({ navigation }: { navigation: any }) {
 
           <Text style={styles.sectionTitle}>Cambiar de plan</Text>
 
-          {data.available.map((p) => {
+          {(data.available ?? []).map((p) => {
             const isCurrent = data.current?.id === p.id;
             const isPending = data.pending?.id === p.id;
             return (

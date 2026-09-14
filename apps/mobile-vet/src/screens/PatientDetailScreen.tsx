@@ -34,16 +34,21 @@ interface Ficha {
 
 const ageFrom = (iso?: string | null) => {
   if (!iso) return null;
-  const y = (Date.now() - new Date(iso).getTime()) / (365.25 * 24 * 3600 * 1000);
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return null;
+  const y = (Date.now() - t) / (365.25 * 24 * 3600 * 1000);
   return y >= 1 ? `${y.toFixed(1)} años` : `${Math.round(y * 12)} meses`;
 };
-const fmt = (iso: string) => new Date(iso).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' });
+const fmt = (iso: string) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' });
+};
 
 export default function PatientDetailScreen({ navigation, route }: any) {
-  const { petId } = route.params;
+  const { petId } = route.params ?? {};
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
-  const { data, isLoading } = useQuery({ queryKey: ['patient', petId], queryFn: () => api<Ficha>(`/patients/${petId}`) });
+  const { data, isLoading, isError, error, refetch } = useQuery({ queryKey: ['patient', petId], queryFn: () => api<Ficha>(`/patients/${petId}`) });
 
   // Formulario "Registrar vacuna"
   const [vaxOpen, setVaxOpen] = useState(false);
@@ -73,17 +78,34 @@ export default function PatientDetailScreen({ navigation, route }: any) {
     onError: (e) => appAlert('No se pudo registrar', e instanceof Error ? e.message : 'Intenta de nuevo.'),
   });
 
-  if (isLoading || !data) {
+  if (isLoading || isError || !data) {
+    // Antes: spinner infinito cuando fallaba la carga.
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.head}><BackButton onPress={() => navigation.goBack()} /><Text style={styles.title}>Ficha del Paciente</Text><View style={{ width: 44 }} /></View>
-        <Loading />
+        {isLoading ? (
+          <Loading />
+        ) : (
+          <View style={{ padding: 20, gap: 12 }}>
+            <Text style={styles.emptyTxt}>{error instanceof Error ? error.message : 'No pudimos cargar la ficha. Revisa tu conexión.'}</Text>
+            <Button title="Reintentar" onPress={() => void refetch()} />
+          </View>
+        )}
       </SafeAreaView>
     );
   }
 
+  // El backend puede omitir relaciones vacías: normalizamos a [] antes de renderizar.
+  const allergies = data.allergies ?? [];
+  const conditions = data.conditions ?? [];
+  const vaccinations = data.vaccinations ?? [];
+  const records = data.records ?? [];
   const age = ageFrom(data.birthDate);
-  const upToDate = (d?: string | null) => !d || new Date(d) > new Date();
+  const upToDate = (d?: string | null) => {
+    if (!d) return true;
+    const t = new Date(d).getTime();
+    return Number.isNaN(t) ? true : t > Date.now();
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -106,12 +128,12 @@ export default function PatientDetailScreen({ navigation, route }: any) {
         </View>
 
         {/* Alertas */}
-        {(data.allergies.length > 0 || data.conditions.length > 0) && (
+        {(allergies.length > 0 || conditions.length > 0) && (
           <View style={styles.alertBox}>
-            {data.allergies.length > 0 && (
-              <Text style={styles.alertTxt}>⚠️ <Text style={{ fontWeight: '800' }}>ALERGIAS:</Text> {data.allergies.map((a) => a.substance).join(', ')}</Text>
+            {allergies.length > 0 && (
+              <Text style={styles.alertTxt}>⚠️ <Text style={{ fontWeight: '800' }}>ALERGIAS:</Text> {allergies.map((a) => a.substance).join(', ')}</Text>
             )}
-            {data.conditions.map((c, i) => (
+            {conditions.map((c, i) => (
               <Text key={i} style={styles.noteTxt}>🔖 {c.name}</Text>
             ))}
           </View>
@@ -129,10 +151,10 @@ export default function PatientDetailScreen({ navigation, route }: any) {
           <Text style={styles.section}>Cartilla de vacunación</Text>
           <Pressable onPress={() => setVaxOpen(true)} hitSlop={8}><Text style={styles.addLink}>+ Registrar vacuna</Text></Pressable>
         </View>
-        {data.vaccinations.length === 0 ? (
+        {vaccinations.length === 0 ? (
           <Text style={styles.emptyTxt}>Sin vacunas registradas. Toca “Registrar vacuna”.</Text>
         ) : (
-          data.vaccinations.map((v, i) => (
+          vaccinations.map((v, i) => (
             <View key={i} style={styles.vaxRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.vaxName}>{v.vaccineName}</Text>
@@ -147,8 +169,8 @@ export default function PatientDetailScreen({ navigation, route }: any) {
 
         {/* Historial */}
         <Text style={styles.section}>Historial de atenciones</Text>
-        {data.records.length === 0 && <Text style={styles.emptyTxt}>Sin atenciones registradas.</Text>}
-        {data.records.map((r) => (
+        {records.length === 0 && <Text style={styles.emptyTxt}>Sin atenciones registradas.</Text>}
+        {records.map((r) => (
           <View key={r.id} style={styles.visit}>
             <View style={styles.visitDot} />
             <View style={{ flex: 1 }}>
@@ -165,7 +187,7 @@ export default function PatientDetailScreen({ navigation, route }: any) {
 
       {/* CTA fija */}
       <View style={[styles.cta, { paddingBottom: insets.bottom + 20 }]}>
-        <Button title="+ Iniciar Nueva Consulta" onPress={() => navigation.navigate('NewConsult', { petId: data.id, name: data.name, allergies: data.allergies.map((a) => a.substance), weightKg: data.weightKg })} />
+        <Button title="+ Iniciar Nueva Consulta" onPress={() => navigation.navigate('NewConsult', { petId: data.id, name: data.name, allergies: allergies.map((a) => a.substance), weightKg: data.weightKg })} />
       </View>
 
       {/* Modal registrar vacuna */}

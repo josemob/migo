@@ -27,7 +27,7 @@ export default function ClientsScreen({ navigation }: { navigation: any }) {
   const [q, setQ] = useState('');
   const term = q.trim();
 
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ['patients', by, term],
     queryFn: () => api<{ data: Pet[] }>(`/patients?by=${by}&search=${encodeURIComponent(term)}`),
     enabled: term.length >= 2,
@@ -66,6 +66,13 @@ export default function ClientsScreen({ navigation }: { navigation: any }) {
           <View style={styles.empty}><Text style={styles.emptyIcon}>🔎</Text><Text style={styles.emptyTxt}>Escribe al menos 2 caracteres para buscar.</Text></View>
         ) : isLoading || isFetching ? (
           <Loading />
+        ) : isError ? (
+          // Antes un fallo de red se mostraba como "sin pacientes que coincidan".
+          <View style={styles.empty}>
+            <Text style={styles.emptyIcon}>⚠️</Text>
+            <Text style={styles.emptyTxt}>No pudimos buscar. Revisa tu conexión.</Text>
+            <Pressable onPress={() => void refetch()}><Text style={{ color: colors.brand, fontWeight: '800' }}>Reintentar →</Text></Pressable>
+          </View>
         ) : list.length === 0 ? (
           <View style={styles.empty}><Text style={styles.emptyIcon}>🐾</Text><Text style={styles.emptyTxt}>Sin pacientes que coincidan.</Text></View>
         ) : (

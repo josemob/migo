@@ -3,6 +3,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { appAlert } from '../lib/dialog';
 import { Button, Loading } from '../components/ui';
 import { cardShadow, colors, radius } from '../theme';
 
@@ -41,12 +42,14 @@ export default function KycPendingScreen({ kyc, onRetry, onRefresh }: { kyc: Kyc
     mutationFn: (v: { id: string; accept: boolean }) => api(`/staff-kyc/invitations/${v.id}/respond`, { method: 'POST', body: { accept: v.accept } }),
     onSuccess: async (_r, v) => {
       if (v.accept) {
-        await refreshUser(); // trae el nuevo staffProfile (clínica/especialidad) al usuario
+        // trae el nuevo staffProfile (clínica/especialidad); si falla por red, el gate refresca igual
+        await refreshUser().catch(() => {});
         onRefresh(); // ya tiene clínica -> el gate lo lleva al dashboard
       } else {
-        invites.refetch();
+        void invites.refetch();
       }
     },
+    onError: (e) => appAlert('No se pudo responder la invitación', e instanceof Error ? e.message : 'Intenta de nuevo.'),
   });
 
   const pending = invites.data?.data ?? [];
@@ -78,6 +81,10 @@ export default function KycPendingScreen({ kyc, onRetry, onRefresh }: { kyc: Kyc
           <View style={{ marginTop: 8 }}>
             {invites.isLoading ? (
               <Loading />
+            ) : invites.isError ? (
+              <View style={styles.waitBox}>
+                <Text style={styles.waitTxt}>No pudimos cargar tus invitaciones. Revisa tu conexión; se reintenta automáticamente.</Text>
+              </View>
             ) : pending.length === 0 ? (
               <View style={styles.waitBox}>
                 <Text style={styles.waitTxt}>Eres profesional verificado como <Text style={{ fontWeight: '800' }}>{POSITION_LABEL[kyc.requestedPosition] ?? 'personal'}</Text>. Una clínica te agregará por tu cédula.</Text>

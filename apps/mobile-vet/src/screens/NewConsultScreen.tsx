@@ -10,7 +10,12 @@ import { cardShadow, colors, radius, type } from '../theme';
 interface Rx { drug: string; dose: string; frequency: string }
 
 export default function NewConsultScreen({ navigation, route }: any) {
-  const { petId, name, allergies = [], weightKg: prevWeight } = route.params as { petId: string; name: string; allergies?: string[]; weightKg?: string | number };
+  const { petId, name, allergies = [], weightKg: prevWeight } = (route.params ?? {}) as { petId: string; name: string; allergies?: string[]; weightKg?: string | number };
+  // "8,4" (coma decimal, habitual en es-VE) daba NaN -> null en el expediente.
+  const num = (v: string) => {
+    const n = Number(v.trim().replace(',', '.'));
+    return Number.isFinite(n) ? n : undefined;
+  };
 
   const insets = useSafeAreaInsets();
   const [reason, setReason] = useState('');
@@ -39,8 +44,8 @@ export default function NewConsultScreen({ navigation, route }: any) {
           symptoms: symptoms.trim() || undefined,
           diagnosis: diagnosis.trim() || undefined,
           treatment: treatment.trim() || undefined,
-          weightKg: weight ? Number(weight) : undefined,
-          temperature: temp ? Number(temp) : undefined,
+          weightKg: weight ? num(weight) : undefined,
+          temperature: temp ? num(temp) : undefined,
           notes: fc ? `F.C.: ${fc} lpm` : undefined,
           sign,
           prescriptions: rx.filter((r) => r.drug.trim()).map((r) => ({ drug: r.drug.trim(), dose: r.dose.trim() || undefined, frequency: r.frequency.trim() || undefined })),

@@ -1,5 +1,7 @@
+import { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import type { Call } from '@stream-io/video-react-native-sdk';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { appAlert } from '../lib/dialog';
@@ -50,6 +52,17 @@ export default function AlertScreen({ navigation }: { navigation: any }) {
   // La llamada se ANILLA DESDE EL CLIENTE (patrón recomendado por Stream): así el
   // dispositivo que llama entra al ciclo de vida de "saliente" correctamente y no se
   // queda atascado en "preparing call" (crear la sala en el servidor no lo hacía).
+  // Si el vet sale de la pantalla con una llamada saliente sonando, la cancela (antes
+  // seguía sonando en el servidor y podía reaparecer como llamada "zombi").
+  const activeCall = useRef<Call | null>(null);
+  useEffect(
+    () => () => {
+      activeCall.current?.leave({ reject: true }).catch(() => {});
+      activeCall.current = null;
+    },
+    [],
+  );
+
   const videoCall = useMutation({
     mutationFn: async (ownerId: string) => {
       const ok = await requestCallPermissions();
@@ -59,6 +72,7 @@ export default function AlertScreen({ navigation }: { navigation: any }) {
       // los participantes van en `members`, no en el id.
       const callId = `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
       const call = videoClient.call('default', callId);
+      activeCall.current = call;
       await call.getOrCreate({
         ring: true,
         data: { members: [{ user_id: streamUserId }, { user_id: ownerId }], custom: { video: true } },
@@ -73,6 +87,7 @@ export default function AlertScreen({ navigation }: { navigation: any }) {
     try {
       const ch = chatClient.channel('messaging', { members: [chatClient.userID, ownerId] });
       await ch.watch();
+      if (!ch.id) throw new Error('No se pudo crear el canal de chat.');
       navigation.navigate('ChatThread', { channelType: 'messaging', channelId: ch.id, clientName });
     } catch (e) {
       appAlert('No se pudo abrir el chat', e instanceof Error ? e.message : 'Intenta de nuevo.');
@@ -87,6 +102,13 @@ export default function AlertScreen({ navigation }: { navigation: any }) {
 
       {q.isLoading ? (
         <Loading />
+      ) : q.isError && alerts.length === 0 ? (
+        // Antes un fallo de red se mostraba como "no hay emergencias": falso negativo peligroso.
+        <View style={styles.center}>
+          <Text style={styles.icon}>⚠️</Text>
+          <Text style={styles.emptyTxt}>No pudimos actualizar las emergencias. Revisa tu conexión.</Text>
+          <Pressable onPress={() => void q.refetch()}><Text style={styles.retry}>Reintentar</Text></Pressable>
+        </View>
       ) : alerts.length === 0 ? (
         <View style={styles.center}>
           <Text style={styles.icon}>🚨</Text>
@@ -94,12 +116,19 @@ export default function AlertScreen({ navigation }: { navigation: any }) {
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+          {q.isError && <Text style={styles.offline}>⚠️ Sin conexión: mostrando la última información recibida.</Text>}
           {alerts.map((a) => {
+            // La API puede omitir owner/allergies/conditions: guardas para no tumbar la pantalla.
             const e = a.emergency;
-            const level = e.triageLevel ?? 'ORANGE';
+            const pet = e?.pet;
+            const owner = pet?.owner;
+            const allergies = pet?.allergies ?? [];
+            const conditions = pet?.conditions ?? [];
+            const level = e?.triageLevel ?? 'ORANGE';
             const tc = triageColor[level] ?? colors.amber;
             const mine = a.status === 'ACCEPTED'; // esta clínica la aceptó
-            const km = a.distanceKm != null ? `${Number(a.distanceKm).toFixed(1)} km` : null;
+            const kmNum = Number(a.distanceKm);
+            const km = a.distanceKm != null && Number.isFinite(kmNum) ? `${kmNum.toFixed(1)} km` : null;
             return (
               <View key={a.id} style={[styles.card, { borderColor: tc }]}>
                 <View style={styles.top}>
@@ -107,27 +136,27 @@ export default function AlertScreen({ navigation }: { navigation: any }) {
                   {km && <Text style={styles.dist}>{km}{a.etaMinutes ? ` · ~${a.etaMinutes} min` : ''}</Text>}
                 </View>
 
-                <Text style={styles.pet}>{e.pet.name}{e.pet.breed ? ` · ${e.pet.breed}` : ''}</Text>
-                <Text style={styles.summary}>{e.aiSummary || e.symptoms}</Text>
-                {e.aiFirstAid ? <Text style={styles.firstAid}>Primeros auxilios: {e.aiFirstAid}</Text> : null}
+                <Text style={styles.pet}>{pet?.name ?? 'Mascota'}{pet?.breed ? ` · ${pet.breed}` : ''}</Text>
+                <Text style={styles.summary}>{e?.aiSummary || e?.symptoms || 'Sin descripción'}</Text>
+                {e?.aiFirstAid ? <Text style={styles.firstAid}>Primeros auxilios: {e.aiFirstAid}</Text> : null}
 
                 {mine ? (
                   <View style={styles.acceptedBox}>
                     <Text style={styles.acceptedTitle}>✅ Aceptada · contacto del dueño</Text>
-                    <Text style={styles.ownerName}>{e.pet.owner.fullName}{e.pet.owner.nationalId ? ` · ${e.pet.owner.nationalId}` : ''}</Text>
-                    {e.pet.allergies.length > 0 && <Text style={styles.med}>Alergias: {e.pet.allergies.map((x) => x.substance).join(', ')}</Text>}
-                    {e.pet.conditions.length > 0 && <Text style={styles.med}>Condiciones: {e.pet.conditions.map((x) => x.name).join(', ')}</Text>}
+                    <Text style={styles.ownerName}>{owner?.fullName ?? 'Dueño'}{owner?.nationalId ? ` · ${owner.nationalId}` : ''}</Text>
+                    {allergies.length > 0 && <Text style={styles.med}>Alergias: {allergies.map((x) => x.substance).join(', ')}</Text>}
+                    {conditions.length > 0 && <Text style={styles.med}>Condiciones: {conditions.map((x) => x.name).join(', ')}</Text>}
                     <View style={styles.actionRow}>
-                      <Pressable style={[styles.actionBtn, styles.chat]} onPress={() => openChat(e.pet.owner.id, e.pet.owner.fullName)}>
+                      <Pressable style={[styles.actionBtn, styles.chat, !owner && { opacity: 0.5 }]} disabled={!owner} onPress={() => owner && openChat(owner.id, owner.fullName)}>
                         <TabIcon name="chat" color={colors.white} size={18} />
                         <Text style={styles.actionTxt}>Chat</Text>
                       </Pressable>
-                      <Pressable style={[styles.actionBtn, styles.video, videoCall.isPending && { opacity: 0.6 }]} disabled={videoCall.isPending} onPress={() => videoCall.mutate(e.pet.owner.id)}>
+                      <Pressable style={[styles.actionBtn, styles.video, (videoCall.isPending || !owner) && { opacity: 0.6 }]} disabled={videoCall.isPending || !owner} onPress={() => owner && videoCall.mutate(owner.id)}>
                         <TabIcon name="video" color={colors.white} size={18} />
                         <Text style={styles.actionTxt}>{videoCall.isPending ? 'Llamando…' : 'Videollamada'}</Text>
                       </Pressable>
                     </View>
-                    <Pressable style={styles.finishBtn} onPress={() => navigation.navigate('Attend', { emergencyId: e.id, petName: e.pet.name, ownerName: e.pet.owner.fullName })}>
+                    <Pressable style={styles.finishBtn} onPress={() => navigation.navigate('Attend', { emergencyId: e.id, petName: pet?.name ?? 'Mascota', ownerName: owner?.fullName ?? 'Dueño' })}>
                       <Text style={styles.finishTxt}>Atender consulta</Text>
                     </Pressable>
                   </View>
@@ -152,6 +181,8 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 32 },
   icon: { fontSize: 40 },
   emptyTxt: { color: colors.muted, fontSize: 15, textAlign: 'center' },
+  retry: { color: colors.brand, fontWeight: '800', fontSize: 15, marginTop: 4 },
+  offline: { color: colors.amber, fontWeight: '700', fontSize: 13, textAlign: 'center' },
 
   card: { backgroundColor: colors.white, borderRadius: radius.lg, padding: 16, gap: 6, borderWidth: 2, boxShadow: cardShadow },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

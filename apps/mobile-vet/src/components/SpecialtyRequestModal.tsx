@@ -49,6 +49,7 @@ export function SpecialtyRequestModal({
     setBusy(true);
     try {
       await api('/me/specialty-request', { method: 'POST', body: { specialty: specialty.trim(), documents: docs } });
+      setDocs([]); // el modal queda montado: sin esto, al reabrir se reenviaban los mismos documentos
       onSubmitted();
       onClose();
       appAlert('Solicitud enviada', 'Tu cambio de especialidades se aplicará una vez que el Super Admin apruebe los documentos.');

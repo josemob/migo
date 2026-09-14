@@ -40,7 +40,8 @@ const PATHS: Record<string, string> = {
 export function TabIcon({ name, size = 26, color }: { name: string; size?: number; color: string }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
-      <Path d={PATHS[name]} />
+      {/* Nombre desconocido -> icono por defecto, en vez de un <Path d={undefined}> */}
+      <Path d={PATHS[name] ?? PATHS.person} />
     </Svg>
   );
 }

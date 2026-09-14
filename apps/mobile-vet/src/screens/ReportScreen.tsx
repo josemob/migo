@@ -25,14 +25,25 @@ interface Ficha {
   records: Record[];
 }
 
-const fmt = (iso: string) => new Date(iso).toLocaleString('es-VE', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+const fmt = (iso: string) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('es-VE', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
 
 export default function ReportScreen({ navigation, route }: any) {
-  const { recordId, petId } = route.params;
+  const { recordId, petId } = route.params ?? {};
   const insets = useSafeAreaInsets();
-  const { data, isLoading } = useQuery({ queryKey: ['patient', petId], queryFn: () => api<Ficha>(`/patients/${petId}`) });
+  // refetchOnMount 'always': al llegar desde "emitir consulta", la ficha cacheada aún no
+  // contiene el expediente recién creado (antes: spinner permanente justo tras firmar).
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
+    queryKey: ['patient', petId],
+    queryFn: () => api<Ficha>(`/patients/${petId}`),
+    refetchOnMount: 'always',
+  });
 
-  const rec = data?.records.find((r) => r.id === recordId) ?? data?.records[0] ?? null;
+  // Sin fallback a records[0]: mostrar otro expediente "por si acaso" era engañoso.
+  const rec = data?.records?.find((r) => r.id === recordId) ?? null;
+  const prescriptions = data?.prescriptions ?? [];
   const vet = rec?.vet?.user?.fullName ?? 'Médico Veterinario';
 
   return (
@@ -43,8 +54,16 @@ export default function ReportScreen({ navigation, route }: any) {
         <View style={{ width: 44 }} />
       </View>
 
-      {isLoading || !data || !rec ? (
+      {isLoading || (!rec && isFetching) ? (
         <Loading />
+      ) : isError || !data || !rec ? (
+        <View style={styles.center}>
+          <Text style={styles.centerTxt}>
+            {isError ? 'No pudimos cargar el informe. Revisa tu conexión e intenta de nuevo.' : 'No encontramos este expediente.'}
+          </Text>
+          <Button title="Reintentar" onPress={() => void refetch()} />
+          <Button title="Volver a la ficha" variant="outline" onPress={() => navigation.goBack()} />
+        </View>
       ) : (
         <>
           <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
@@ -73,10 +92,10 @@ export default function ReportScreen({ navigation, route }: any) {
               {rec.diagnosis && (<><Text style={styles.section}>Diagnóstico presuntivo</Text><Text style={styles.body}>{rec.diagnosis}</Text></>)}
               {rec.treatment && (<><Text style={styles.section}>Plan terapéutico</Text><Text style={styles.body}>{rec.treatment}</Text></>)}
 
-              {data.prescriptions.length > 0 && (
+              {prescriptions.length > 0 && (
                 <>
                   <Text style={styles.section}>Receta</Text>
-                  {data.prescriptions.slice(0, 5).map((p, i) => (
+                  {prescriptions.slice(0, 5).map((p, i) => (
                     <View key={p.id} style={styles.rx}>
                       <Text style={styles.rxDrug}>{i + 1}. {p.drug}</Text>
                       {(p.dose || p.frequency) && <Text style={styles.rxDetail}>{[p.dose, p.frequency].filter(Boolean).join(' · ')}</Text>}
@@ -110,6 +129,8 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
   title: { fontSize: 18, fontWeight: '800', color: colors.brand },
+  center: { padding: 20, gap: 12 },
+  centerTxt: { fontSize: 15, color: colors.muted, textAlign: 'center', marginBottom: 6 },
 
   doc: { backgroundColor: colors.white, borderRadius: radius.lg, padding: 20, boxShadow: cardShadow },
   docHead: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },

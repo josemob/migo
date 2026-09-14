@@ -66,7 +66,9 @@ export function IncomingEmergencies() {
 
   const openRoute = (lat?: string | number | null, lng?: string | number | null) => {
     if (lat == null || lng == null) return appAlert('Sin ubicación', 'Esta urgencia no tiene ubicación registrada.');
-    Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`).catch(() => {});
+    Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`).catch(() =>
+      appAlert('No se pudo abrir el mapa', 'Instala Google Maps o un navegador para ver la ruta.'),
+    );
   };
 
   const accept = useMutation({
@@ -76,17 +78,32 @@ export function IncomingEmergencies() {
   });
 
   const alerts = q.data?.data ?? [];
-  if (alerts.length === 0) return null; // sin emergencias -> no ocupa espacio
+  if (alerts.length === 0) {
+    if (!q.isError) return null; // sin emergencias -> no ocupa espacio
+    // Fallo de red sin datos previos: avisar (antes el feed desaparecía en silencio).
+    return (
+      <Pressable style={styles.offline} onPress={() => void q.refetch()}>
+        <Text style={styles.offlineTxt}>⚠️ No se pudieron actualizar las urgencias. Toca para reintentar.</Text>
+      </Pressable>
+    );
+  }
 
   return (
     <View style={{ gap: 12 }}>
       <Text style={styles.header}>🚨 Emergencias cercanas ({alerts.length})</Text>
+      {q.isError && <Text style={styles.offlineTxt}>⚠️ Sin conexión: mostrando la última información recibida.</Text>}
       {alerts.map((a) => {
+        // La API puede omitir owner/allergies/conditions: guardas para no tumbar el home.
         const e = a.emergency;
-        const level = e.triageLevel ?? 'ORANGE';
+        const pet = e?.pet;
+        const owner = pet?.owner;
+        const allergies = pet?.allergies ?? [];
+        const conditions = pet?.conditions ?? [];
+        const level = e?.triageLevel ?? 'ORANGE';
         const tc = triageColor[level] ?? colors.amber;
-        const mine = e.status === 'ACCEPTED'; // en mi lista + aceptada = la acepté yo
-        const km = a.distanceKm != null ? `${Number(a.distanceKm).toFixed(1)} km` : null;
+        const mine = e?.status === 'ACCEPTED'; // en mi lista + aceptada = la acepté yo
+        const kmNum = Number(a.distanceKm);
+        const km = a.distanceKm != null && Number.isFinite(kmNum) ? `${kmNum.toFixed(1)} km` : null;
         return (
           <View key={a.id} style={[styles.card, { borderColor: tc }]}>
             <View style={styles.top}>
@@ -96,20 +113,20 @@ export function IncomingEmergencies() {
               {km && <Text style={styles.dist}>{km}{a.etaMinutes ? ` · ~${a.etaMinutes} min` : ''}</Text>}
             </View>
 
-            <Text style={styles.pet}>{e.pet.name}{e.pet.breed ? ` · ${e.pet.breed}` : ''}</Text>
-            <Text style={styles.summary}>{e.aiSummary || e.symptoms}</Text>
-            {e.requiredSpecialty && <Text style={styles.spec}>Especialidad sugerida: {e.requiredSpecialty}</Text>}
-            {e.aiFirstAid && <Text style={styles.firstAid}>Primeros auxilios: {e.aiFirstAid}</Text>}
+            <Text style={styles.pet}>{pet?.name ?? 'Mascota'}{pet?.breed ? ` · ${pet.breed}` : ''}</Text>
+            <Text style={styles.summary}>{e?.aiSummary || e?.symptoms || 'Sin descripción'}</Text>
+            {e?.requiredSpecialty && <Text style={styles.spec}>Especialidad sugerida: {e.requiredSpecialty}</Text>}
+            {e?.aiFirstAid && <Text style={styles.firstAid}>Primeros auxilios: {e.aiFirstAid}</Text>}
 
             {mine ? (
               <View style={styles.acceptedBox}>
                 <Text style={styles.acceptedTitle}>✅ Aceptada · contacto del dueño</Text>
-                <Text style={styles.ownerName}>{e.pet.owner.fullName}</Text>
-                {e.pet.allergies.length > 0 && (
-                  <Text style={styles.med}>Alergias: {e.pet.allergies.map((x) => x.substance).join(', ')}</Text>
+                <Text style={styles.ownerName}>{owner?.fullName ?? 'Dueño'}</Text>
+                {allergies.length > 0 && (
+                  <Text style={styles.med}>Alergias: {allergies.map((x) => x.substance).join(', ')}</Text>
                 )}
-                {e.pet.conditions.length > 0 && (
-                  <Text style={styles.med}>Condiciones: {e.pet.conditions.map((x) => x.name).join(', ')}</Text>
+                {conditions.length > 0 && (
+                  <Text style={styles.med}>Condiciones: {conditions.map((x) => x.name).join(', ')}</Text>
                 )}
                 <View style={styles.actionRow}>
                   <Pressable style={[styles.actionBtn, styles.video, calling && { opacity: 0.6 }]} disabled={calling} onPress={() => startVideoCall(e.id)}>
@@ -140,6 +157,8 @@ export function IncomingEmergencies() {
 
 const styles = StyleSheet.create({
   header: { fontSize: 16, fontWeight: '800', color: colors.text },
+  offline: { backgroundColor: '#FEF4E0', borderRadius: radius.md, padding: 12, borderWidth: 1, borderColor: '#F5D08A' },
+  offlineTxt: { color: colors.amber, fontWeight: '700', fontSize: 13 },
   card: { backgroundColor: colors.white, borderRadius: radius.lg, padding: 16, gap: 6, borderWidth: 2, boxShadow: cardShadow },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   badge: { borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 4 },

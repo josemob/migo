@@ -91,10 +91,21 @@ export default function IndependentHomeScreen({
   }, [profileQ.data, seeded]);
 
   const useMyLocation = async () => {
-    const perm = await Location.requestForegroundPermissionsAsync();
-    if (!perm.granted) return appAlert('Permiso de ubicación', 'Actívalo para definir tu zona de servicio.');
-    const pos = await Location.getCurrentPositionAsync({});
-    setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+    try {
+      const perm = await Location.requestForegroundPermissionsAsync();
+      if (!perm.granted) return appAlert('Permiso de ubicación', 'Actívalo para definir tu zona de servicio.');
+      // Con timeout: sin un fix reciente, el GPS podía dejar el botón "muerto" para siempre
+      // (y un rechazo sin manejar). Si se agota, usa la última posición conocida.
+      const pos = await Promise.race([
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 12000)),
+      ]);
+      const p = pos ?? (await Location.getLastKnownPositionAsync().catch(() => null));
+      if (!p) return appAlert('Sin ubicación', 'No pudimos obtener tu posición. Revisa que el GPS esté activo e intenta de nuevo.');
+      setCoords({ lat: p.coords.latitude, lng: p.coords.longitude });
+    } catch (e) {
+      appAlert('Sin ubicación', e instanceof Error ? e.message : 'No pudimos obtener tu posición.');
+    }
   };
 
   const save = useMutation({
@@ -114,12 +125,27 @@ export default function IndependentHomeScreen({
   const respondInvite = useMutation({
     mutationFn: (v: { id: string; accept: boolean }) => api(`/staff-kyc/invitations/${v.id}/respond`, { method: 'POST', body: { accept: v.accept } }),
     onSuccess: async (_r, v) => {
-      if (v.accept) { await refreshUser(); onJoinedClinic(); }
-      else void invitesQ.refetch();
+      if (v.accept) {
+        // refreshUser puede fallar por red: no dejar el rechazo sin manejar; el gate refresca igual.
+        await refreshUser().catch(() => {});
+        onJoinedClinic();
+      } else void invitesQ.refetch();
     },
+    onError: (e) => appAlert('No se pudo responder la invitación', e instanceof Error ? e.message : 'Intenta de nuevo.'),
   });
 
   if (profileQ.isLoading) return <Loading />;
+  if (profileQ.isError) {
+    // Antes: con error se mostraba el perfil editable en blanco y "Guardar" pisaba datos reales.
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 }}>
+          <Text style={{ color: colors.muted, fontSize: 15, textAlign: 'center' }}>No pudimos cargar tu perfil profesional. Revisa tu conexión.</Text>
+          <Pressable onPress={() => void profileQ.refetch()}><Text style={{ color: colors.brand, fontWeight: '800' }}>Reintentar →</Text></Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const data = profileQ.data;
   const sub = data?.subscription;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { Channel as StreamChannel } from 'stream-chat';
 import { useStream } from '../lib/stream';
@@ -20,6 +20,8 @@ export default function ChatsScreen({ navigation }: { navigation: any }) {
   const { chatClient, ready } = useStream();
   const [channels, setChannels] = useState<StreamChannel[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     if (!ready || !chatClient?.userID) return;
@@ -31,13 +33,19 @@ export default function ChatsScreen({ navigation }: { navigation: any }) {
           { last_message_at: -1 },
           { watch: true, state: true },
         );
-        if (active) setChannels(chs);
+        if (active) {
+          setChannels(chs);
+          setError(null);
+        }
+      } catch (e) {
+        // Antes no había `catch`: rechazo sin manejar y la pantalla decía "no hay conversaciones".
+        if (active) setError(e instanceof Error ? e.message : 'No se pudieron cargar las conversaciones.');
       } finally {
         if (active) setLoading(false);
       }
     })();
     return () => { active = false; };
-  }, [ready, chatClient]);
+  }, [ready, chatClient, reload]);
 
   // El "otro" miembro del canal = el cliente (dueño de la mascota)
   const clientOf = (ch: StreamChannel) => {
@@ -51,9 +59,23 @@ export default function ChatsScreen({ navigation }: { navigation: any }) {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.head}><Text style={styles.title}>Chats con Clientes</Text></View>
 
-      <View style={{ paddingHorizontal: 20 }}>
+      {/* ScrollView: antes la lista no hacía scroll y con más de ~7 chats el resto quedaba inalcanzable */}
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
         {!ready || loading ? (
           <Text style={styles.muted}>Cargando conversaciones…</Text>
+        ) : error ? (
+          <View style={styles.empty}>
+            <Text style={styles.muted}>{error}</Text>
+            <Pressable
+              onPress={() => {
+                setLoading(true);
+                setError(null);
+                setReload((n) => n + 1);
+              }}
+            >
+              <Text style={{ color: colors.brand, fontWeight: '800' }}>Reintentar →</Text>
+            </Pressable>
+          </View>
         ) : channels.length === 0 ? (
           <View style={styles.empty}>
             <TabIcon name="chat" color="#C9BBD3" size={40} />
@@ -87,7 +109,7 @@ export default function ChatsScreen({ navigation }: { navigation: any }) {
             })}
           </View>
         )}
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

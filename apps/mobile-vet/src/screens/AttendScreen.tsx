@@ -10,7 +10,7 @@ interface Med { drug: string; dose: string; frequency: string; durationDays: str
 
 export default function AttendScreen({ route, navigation }: { route: any; navigation: any }) {
   const qc = useQueryClient();
-  const { emergencyId, petName, ownerName } = route.params as { emergencyId: string; petName?: string; ownerName?: string };
+  const { emergencyId, petName, ownerName } = (route.params ?? {}) as { emergencyId: string; petName?: string; ownerName?: string };
 
   const [diagnosis, setDiagnosis] = useState('');
   const [treatment, setTreatment] = useState('');

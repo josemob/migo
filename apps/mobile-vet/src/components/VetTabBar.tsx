@@ -16,10 +16,14 @@ const INACTIVE = '#C7C7C7';
 export function VetTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const { unread } = useStream();
-  // El botón central "Alerta" es la pestaña en el índice 2
-  const left = state.routes.slice(0, 2);
-  const alerta = state.routes[2];
-  const right = state.routes.slice(3);
+  // El botón central es la pestaña "Alerta": se busca por nombre (no por índice fijo)
+  // para que reordenar o quitar pestañas no tumbe la barra completa.
+  const alertaIndex = state.routes.findIndex((r) => r.name === 'Alerta');
+  const alerta = alertaIndex < 0 ? null : state.routes[alertaIndex];
+  const splitAt = alertaIndex < 0 ? state.routes.length : alertaIndex;
+  const rightStart = alertaIndex < 0 ? splitAt : alertaIndex + 1;
+  const left = state.routes.slice(0, splitAt);
+  const right = state.routes.slice(rightStart);
 
   const renderTab = (route: (typeof state.routes)[number], index: number) => {
     const focused = state.index === index;
@@ -46,14 +50,16 @@ export function VetTabBar({ state, navigation }: BottomTabBarProps) {
     <View style={[styles.wrap, { paddingBottom: insets.bottom || 8 }]}>
       {left.map((r, i) => renderTab(r, i))}
 
-      <View style={styles.centerSlot}>
-        <Pressable style={styles.alertBtn} onPress={() => navigation.navigate(alerta!.name)}>
-          <MigoTabIcon name="paw" color={colors.brand} size={30} />
-        </Pressable>
-        <Text style={styles.alertLabel}>Alerta</Text>
-      </View>
+      {alerta && (
+        <View style={styles.centerSlot}>
+          <Pressable style={styles.alertBtn} onPress={() => navigation.navigate(alerta.name)}>
+            <MigoTabIcon name="paw" color={colors.brand} size={30} />
+          </Pressable>
+          <Text style={styles.alertLabel}>Alerta</Text>
+        </View>
+      )}
 
-      {right.map((r, i) => renderTab(r, i + 3))}
+      {right.map((r, i) => renderTab(r, i + rightStart))}
     </View>
   );
 }

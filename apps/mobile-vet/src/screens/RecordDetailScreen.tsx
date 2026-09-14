@@ -29,9 +29,14 @@ function Section({ label, value }: { label: string; value?: string | null }) {
 }
 
 export default function RecordDetailScreen({ route, navigation }: { route: any; navigation: any }) {
-  const { id } = route.params as { id: string };
+  const { id } = (route.params ?? {}) as { id: string };
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ['record', id], queryFn: () => api<Detail>(`/patients/records/${id}`) });
+  const q = useQuery({
+    queryKey: ['record', id],
+    queryFn: () => api<Detail>(`/patients/records/${id}`),
+    // El backend puede omitir `prescriptions` vacío: normalizamos antes de renderizar.
+    select: (r) => ({ ...r, prescriptions: r.prescriptions ?? [] }),
+  });
   const d = q.data;
 
   const sign = useMutation({
@@ -59,8 +64,14 @@ export default function RecordDetailScreen({ route, navigation }: { route: any; 
         <View style={{ width: 40 }} />
       </View>
 
-      {q.isLoading || !d ? (
+      {q.isLoading ? (
         <Loading />
+      ) : q.isError || !d ? (
+        // Antes: spinner infinito cuando fallaba la carga.
+        <View style={{ padding: 20, gap: 12 }}>
+          <Text style={styles.meta}>No pudimos cargar el expediente. Revisa tu conexión e intenta de nuevo.</Text>
+          <Pressable onPress={() => void q.refetch()}><Text style={styles.signTitle}>Reintentar →</Text></Pressable>
+        </View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
           {/* Cabecera */}

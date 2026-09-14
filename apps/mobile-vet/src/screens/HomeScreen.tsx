@@ -98,9 +98,9 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const list = (appts.data?.data ?? []).slice().sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
   const pendientes = list.filter((a) => a.status === 'PENDING').length;
   const emg = emergencies.data?.data?.[0] ?? null;
-  const emgPet = emg?.emergency.pet;
+  const emgPet = emg?.emergency?.pet;
   const emgBreed = emgPet?.breed || emgPet?.species || null;
-  const emgSymptom = emg?.emergency.aiSummary ?? emg?.emergency.symptoms ?? null;
+  const emgSymptom = emg?.emergency?.aiSummary ?? emg?.emergency?.symptoms ?? null;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -174,13 +174,16 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           </View>
         </Pressable>
 
-        {/* Emergencia */}
+        {/* Emergencia (si el poll falla, React Query conserva la última respuesta; avisamos) */}
+        {emergencies.isError && (
+          <Text style={[styles.emptyTxt, { color: colors.amber, marginBottom: 8 }]}>⚠️ Sin conexión: las emergencias podrían no estar actualizadas.</Text>
+        )}
         {emg && (
           <View style={styles.emgCard}>
             <Text style={styles.emgTitle}>
               ⚠️ EMERGENCIA DETECTADA{emg.distanceKm != null ? ` · A ${Number(emg.distanceKm).toFixed(1)} Km` : ''}
             </Text>
-            {(emgPet || emg.emergency.pet?.owner) && (
+            {emgPet && (
               <Text style={styles.emgMeta}>
                 {emgPet?.name ? <Text style={styles.emgMetaBold}>Mascota: </Text> : null}
                 {emgPet?.name}{emgBreed ? ` (${emgBreed})` : ''}
@@ -209,6 +212,11 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
         {appts.isLoading ? (
           <Loading />
+        ) : appts.isError ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyTxt}>No pudimos cargar las citas de hoy.</Text>
+            <Pressable onPress={() => void appts.refetch()}><Text style={styles.link}>Reintentar</Text></Pressable>
+          </View>
         ) : list.length === 0 ? (
           <View style={styles.empty}><TabIcon name="calendar" color="#C9BBD3" size={40} /><Text style={styles.emptyTxt}>No hay citas para hoy.</Text></View>
         ) : (
