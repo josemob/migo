@@ -34,6 +34,9 @@ setWorkerUrl(maplibreWorkerUrl);
 const TILES = 'https://tiles.openfreemap.org/styles/liberty';
 // Caracas: el centro por defecto cuando la clínica aún no tiene coordenadas.
 const DEFAULT_CENTER: [number, number] = [-66.9036, 10.4806];
+// Por encima de 5 km de error la ubicación no vino de un GPS sino de la IP:
+// sirve para encuadrar el mapa, no para marcar la puerta de la clínica.
+const ROUGH_ACCURACY_M = 5000;
 
 export interface PickedLocation {
   lat: number;
@@ -207,10 +210,21 @@ export function LocationPicker({ lat, lng, onPick }: Props) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setLocating(false);
-        const { latitude, longitude } = pos.coords;
+        const { latitude, longitude, accuracy } = pos.coords;
+        // En un equipo sin GPS el navegador estima por IP, y con una VPN eso cae
+        // en el nodo de salida (otro país, incluso). Se nota en la precisión:
+        // el GPS/WiFi da decenas de metros, la IP decenas de kilómetros. No
+        // bloqueamos el resultado —a veces es lo único que hay— pero avisamos y
+        // no fingimos precisión acercando el mapa a nivel de calle.
+        const rough = accuracy > ROUGH_ACCURACY_M;
         markerRef.current?.setLngLat([longitude, latitude]);
-        mapRef.current?.flyTo({ center: [longitude, latitude], zoom: 17 });
+        mapRef.current?.flyTo({ center: [longitude, latitude], zoom: rough ? 11 : 17 });
         void reverse(latitude, longitude);
+        if (rough) {
+          setNote(
+            `Ubicación aproximada (±${Math.round(accuracy / 1000)} km): tu equipo no tiene GPS y el navegador la dedujo de tu conexión. Si usas VPN, apunta a donde esté el servidor. Ajusta el pin o busca la dirección arriba.`,
+          );
+        }
       },
       () => {
         setLocating(false);
