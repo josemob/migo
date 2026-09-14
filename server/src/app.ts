@@ -19,6 +19,7 @@ import directoryRoutes from './modules/clinics/directory.routes';
 import adminRoutes from './modules/admin/admin.routes';
 import staffKycRoutes from './modules/staffKyc/staffKyc.routes';
 import streamWebhookRoutes from './modules/webhooks/stream.webhook.routes';
+import geocodeRoutes from './modules/geocode/geocode.routes';
 
 export const app = express();
 
@@ -57,6 +58,8 @@ api.use('/clinics', directoryRoutes);
 api.use('/admin', adminRoutes);
 // Onboarding/KYC del personal de clínica (app Vet)
 api.use('/staff-kyc', staffKycRoutes);
+// Geocodificación (OpenStreetMap) para el buscador de direcciones con mapa
+api.use('/geocode', geocodeRoutes);
 // Webhooks entrantes (Stream Chat -> push de nuevos mensajes)
 api.use('/webhooks', streamWebhookRoutes);
 app.use('/api/v1', api);

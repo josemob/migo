@@ -48,11 +48,13 @@ interface RequestOptions {
   method?: string;
   body?: unknown;
   auth?: boolean;
+  /** Para cancelar la petición (ej. búsquedas que quedan obsoletas al teclear). */
+  signal?: AbortSignal;
   _retried?: boolean;
 }
 
 export async function api<T = unknown>(path: string, opts: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, auth = true } = opts;
+  const { method = 'GET', body, auth = true, signal } = opts;
   const headers: Record<string, string> = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (auth && tokens.access) headers['Authorization'] = `Bearer ${tokens.access}`;
@@ -61,6 +63,7 @@ export async function api<T = unknown>(path: string, opts: RequestOptions = {}):
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
+    signal,
   });
 
   // Intento único de refresh ante 401

@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import { Card, PageHeader, SectionTitle, Spinner, ErrorNote } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { PlanSection } from '../components/PlanSection';
+import { LocationPicker } from '../components/LocationPicker';
 
 interface Hour {
   dayOfWeek: number;
@@ -327,9 +328,19 @@ export default function Configuracion() {
 
             <Card>
               <SectionTitle>Ubicación GPS & Cobertura Móvil</SectionTitle>
-              <div className="mb-3 flex h-24 items-center justify-center rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 text-brand-500">
-                <Icon name="pin" className="h-10 w-10" />
-              </div>
+              <LocationPicker
+                lat={lat.trim() && !Number.isNaN(Number(lat)) ? Number(lat) : null}
+                lng={lng.trim() && !Number.isNaN(Number(lng)) ? Number(lng) : null}
+                onPick={(loc) => {
+                  setLat(loc.lat.toFixed(6));
+                  setLng(loc.lng.toFixed(6));
+                  // La geocodificación inversa llega después de las coordenadas y
+                  // puede venir incompleta: solo pisamos lo que sí resolvió.
+                  if (loc.address) setAddress(loc.address);
+                  if (loc.city) setCity(loc.city);
+                  if (loc.state) setStateName(loc.state);
+                }}
+              />
               <label className="mb-1 block text-sm font-medium text-slate-600">Dirección</label>
               <input className="input mb-3" value={address} onChange={(e) => setAddress(e.target.value)} />
               <div className="mb-3 grid grid-cols-2 gap-3">
@@ -342,14 +353,15 @@ export default function Configuracion() {
                   <input className="input" value={stateName} onChange={(e) => setStateName(e.target.value)} />
                 </div>
               </div>
+              {/* Las coordenadas las fija el mapa; se muestran para confirmar, no para teclear. */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-600">Latitud</label>
-                  <input className="input" value={lat} onChange={(e) => setLat(e.target.value)} placeholder="10.4806" />
+                  <input className="input bg-slate-50 text-slate-500" value={lat} readOnly placeholder="Sin ubicar" />
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-600">Longitud</label>
-                  <input className="input" value={lng} onChange={(e) => setLng(e.target.value)} placeholder="-66.8564" />
+                  <input className="input bg-slate-50 text-slate-500" value={lng} readOnly placeholder="Sin ubicar" />
                 </div>
               </div>
               <div className="mt-4 space-y-2">
