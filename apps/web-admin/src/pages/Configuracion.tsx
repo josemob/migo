@@ -8,7 +8,34 @@ function TitleIcon({ name, children }: { name: IconName; children: string }) {
   return <span className="flex items-center gap-2"><Icon name={name} className="h-5 w-5 text-migo-purple" />{children}</span>;
 }
 
-interface Config { cplFeeUsd: number; commissionRate: number; bcvRate: number; paymentGateway: string }
+interface Config {
+  cplFeeUsd: number;
+  commissionRate: number;
+  bcvRate: number;
+  bcvSource?: string | null;
+  bcvUpdatedAt?: string | null;
+  bcvRateDate?: string | null;
+  bcvStale?: boolean;
+  paymentGateway: string;
+}
+
+const SOURCE_LABEL: Record<string, string> = {
+  dolarapi: 'DolarAPI Venezuela',
+  pydolarve: 'PyDolarVenezuela',
+};
+
+/** "hace 3 h", "hace 2 días", etc. */
+function hace(iso: string): string {
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return '—';
+  const min = Math.floor((Date.now() - t) / 60000);
+  if (min < 1) return 'hace un momento';
+  if (min < 60) return `hace ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `hace ${h} h`;
+  const d = Math.floor(h / 24);
+  return `hace ${d} día${d === 1 ? '' : 's'}`;
+}
 interface Admin { id: string; fullName: string; email: string; status: string; lastAccess: string }
 interface Banner { enabled: boolean; image: string | null }
 interface ConfigResp { config: Config; banner: Banner; admins: Admin[] }
@@ -34,6 +61,12 @@ export default function Configuracion() {
 
   const save = useMutation({
     mutationFn: () => api('/admin/config', { method: 'PATCH', body: { cplFeeUsd: cpl, commissionRate: rate } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-config'] }),
+  });
+
+  // Sincroniza la tasa BCV contra las fuentes públicas (el backend elige la que responda).
+  const refreshBcv = useMutation({
+    mutationFn: () => api('/admin/config/bcv/refresh', { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-config'] }),
   });
 
@@ -82,8 +115,53 @@ export default function Configuracion() {
 
             <Card>
               <SectionTitle><TitleIcon name="bank">Integración Financiera & Pasarela</TitleIcon></SectionTitle>
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">Tasa oficial BCV actual</label>
-              <div className="mt-1 rounded-xl border border-green-200 bg-green-50 px-4 py-3 font-bold text-green-700">Bs. {data.config.bcvRate.toFixed(2)} / USD</div>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">Tasa oficial BCV actual</label>
+                <button
+                  onClick={() => refreshBcv.mutate()}
+                  disabled={refreshBcv.isPending}
+                  className="rounded-pill px-2.5 py-1 text-xs font-bold text-migo-purple transition hover:bg-brand-50 disabled:opacity-50"
+                >
+                  {refreshBcv.isPending ? 'Actualizando…' : '↻ Actualizar'}
+                </button>
+              </div>
+
+              {/* Verde = sincronizada hace poco. Ámbar = lleva más de 6 h sin refrescar. */}
+              <div
+                className={`mt-1 rounded-xl border px-4 py-3 ${
+                  data.config.bcvStale
+                    ? 'border-amber-200 bg-amber-50 text-amber-800'
+                    : 'border-green-200 bg-green-50 text-green-700'
+                }`}
+              >
+                <div className="font-heading text-xl font-extrabold">
+                  Bs. {data.config.bcvRate.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / USD
+                </div>
+                {/* Fecha de la tasa según el BCV (puede ser de días atrás: no publica fines de semana) */}
+                {data.config.bcvRateDate && (
+                  <div className="mt-0.5 text-sm font-semibold opacity-90">
+                    Tasa del {new Date(data.config.bcvRateDate).toLocaleDateString('es-VE', { day: 'numeric', month: 'long' })}
+                  </div>
+                )}
+                <div className="mt-1 text-xs opacity-75">
+                  {data.config.bcvUpdatedAt ? (
+                    <>
+                      Sincronizada {hace(data.config.bcvUpdatedAt)}
+                      {data.config.bcvSource && ` · ${SOURCE_LABEL[data.config.bcvSource] ?? data.config.bcvSource}`}
+                    </>
+                  ) : (
+                    'Nunca sincronizada — toca “Actualizar”.'
+                  )}
+                </div>
+              </div>
+              {refreshBcv.isError && (
+                <p className="mt-2 text-xs text-red-600">
+                  {refreshBcv.error instanceof Error ? refreshBcv.error.message : 'No se pudo actualizar la tasa.'}
+                </p>
+              )}
+              <p className="mt-2 text-xs text-slate-400">
+                Se sincroniza sola cada 6 horas desde fuentes públicas del BCV.
+              </p>
 
               <label className="mt-5 block text-xs font-semibold uppercase tracking-wide text-slate-400">Pasarela de pagos activa</label>
               <div className="mt-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700">{data.config.paymentGateway}</div>

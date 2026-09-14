@@ -9,6 +9,7 @@ import { ApiError } from '../../utils/ApiError';
 import { sendPush, sendBulkPush } from '../push/push.service';
 import { distanceKm } from '../../lib/geo';
 import { listPlans, serializePlan, syncClinicCommission } from '../plans/plan.service';
+import { isStale, refreshBcvRate, refreshIfStale } from './bcv.service';
 
 const router = Router();
 router.use(authenticate, requireRole('SUPER_ADMIN'));
@@ -509,11 +510,17 @@ router.get(
       orderBy: { updatedAt: 'desc' },
       select: { id: true, fullName: true, email: true, status: true, updatedAt: true },
     });
+    // Si la tasa BCV está vieja, se refresca en segundo plano (no bloquea la respuesta).
+    refreshIfStale(cfg.bcvUpdatedAt);
     res.json({
       config: {
         cplFeeUsd: Number(cfg.cplFeeUsd),
         commissionRate: Number(cfg.commissionRate),
         bcvRate: Number(cfg.bcvRate),
+        bcvSource: cfg.bcvSource,
+        bcvUpdatedAt: cfg.bcvUpdatedAt,
+        bcvRateDate: cfg.bcvRateDate,
+        bcvStale: isStale(cfg.bcvUpdatedAt),
         paymentGateway: cfg.paymentGateway,
       },
       banner: { enabled: cfg.clientBannerEnabled, image: cfg.clientBannerImage },
@@ -543,6 +550,24 @@ router.patch(
       },
     });
     res.json({ enabled: cfg.clientBannerEnabled, image: cfg.clientBannerImage });
+  }),
+);
+
+// POST /admin/config/bcv/refresh -> fuerza la sincronización de la tasa BCV
+// contra las fuentes públicas. Devuelve el valor vigente aunque todas fallen.
+router.post(
+  '/config/bcv/refresh',
+  asyncHandler(async (_req, res) => {
+    await getConfig();
+    const r = await refreshBcvRate();
+    if (!r.refreshed) throw ApiError.conflict('No se pudo consultar la tasa del BCV. Intenta de nuevo en un momento.');
+    res.json({
+      bcvRate: r.rate,
+      bcvSource: r.source,
+      bcvUpdatedAt: r.updatedAt,
+      bcvRateDate: r.rateDate,
+      bcvStale: isStale(r.updatedAt),
+    });
   }),
 );
 
