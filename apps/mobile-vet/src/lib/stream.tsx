@@ -40,7 +40,6 @@ export function StreamProvider({ children }: { children: ReactNode }) {
   const [videoClient, setVideoClient] = useState<StreamVideoClient | null>(null);
   const [streamUserId, setStreamUserId] = useState<string | null>(null);
   const [unread, setUnread] = useState(0);
-  const connecting = useRef(false);
 
   // Tema de Stream: los controles de llamada no respetan el área segura por defecto,
   // así que les damos padding inferior = altura de la barra de navegación de Android.
@@ -59,53 +58,72 @@ export function StreamProvider({ children }: { children: ReactNode }) {
     return () => sub.unsubscribe();
   }, [chatClient]);
 
+  // Reconecta solo cuando cambia el USUARIO (id), no cuando cambia el objeto `user`
+  // (p. ej. al actualizar la foto de perfil): antes eso tumbaba chat y video.
+  const userId = user?.id;
   useEffect(() => {
-    if (!user || connecting.current) return;
-    connecting.current = true;
+    if (!userId) return;
+    let cancelled = false;
     let cc: StreamChat | null = null;
     let vc: StreamVideoClient | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
-    (async () => {
+    // El SDK llama al provider al (re)conectar: sobrevive a la expiración del token.
+    const tokenProvider = async () => (await api<Cred>('/clinic/stream-token')).token;
+
+    const connect = async (attempt: number) => {
       try {
         // El staff se conecta a Stream como la IDENTIDAD DE LA CLÍNICA (clinic_<clinicId>)
         const cred = await api<Cred>('/clinic/stream-token');
-        const streamUser = { id: cred.userId, name: user.staffProfile?.clinic?.name ?? 'Clínica' };
+        if (cancelled) return;
+        const streamUser = { id: cred.userId, name: user?.staffProfile?.clinic?.name ?? 'Clínica' };
         cc = StreamChat.getInstance(cred.apiKey);
-        if (!cc.userID) await cc.connectUser(streamUser, cred.token);
-        vc = StreamVideoClient.getOrCreateInstance({ apiKey: cred.apiKey, user: streamUser, token: cred.token });
+        if (!cc.userID) await cc.connectUser(streamUser, tokenProvider);
+        if (cancelled) return; // el cleanup ya desconecta `cc`
+        vc = StreamVideoClient.getOrCreateInstance({ apiKey: cred.apiKey, user: streamUser, tokenProvider });
+        if (cancelled) return;
         setChatClient(cc);
         setVideoClient(vc);
         setStreamUserId(cred.userId);
-      } catch {
-        // Stream no configurado / sin red: la app sigue funcionando sin chat en vivo
-        connecting.current = false;
+      } catch (e) {
+        // Stream no configurado / sin red: la app sigue funcionando sin chat en vivo.
+        // Reintenta unas veces con espera creciente (5s, 10s, 15s).
+        console.error('[stream] connect failed:', e instanceof Error ? e.message : e);
+        if (!cancelled && attempt < 3) retryTimer = setTimeout(() => void connect(attempt + 1), 5000 * (attempt + 1));
       }
-    })();
+    };
+    void connect(0);
 
     return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
       cc?.disconnectUser().catch(() => {});
       vc?.disconnectUser().catch(() => {});
       setChatClient(null);
       setVideoClient(null);
-      connecting.current = false;
+      setStreamUserId(null);
     };
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
-  // Aún sin conectar: renderiza los hijos (las pantallas de chat muestran su propia carga)
-  if (!chatClient || !videoClient) {
-    return <Ctx.Provider value={{ chatClient, videoClient, streamUserId, ready: false, unread }}>{children}</Ctx.Provider>;
-  }
-
+  // IMPORTANTE: `children` (toda la navegación) se renderiza SIEMPRE en la misma
+  // posición del árbol. Antes, al conectar Stream se envolvía la app en <Chat>/<StreamVideo>
+  // y React desmontaba y volvía a montar la navegación completa unos segundos después de
+  // abrir la app (salto visible, efectos reejecutados). Ahora solo el overlay de llamadas
+  // vive dentro de los providers; la pantalla de chat se envuelve en <Chat> por su cuenta.
+  const ready = !!chatClient && !!videoClient;
   return (
     <OverlayProvider>
-      <Chat client={chatClient}>
-        <StreamVideo client={videoClient} style={callTheme}>
-          <Ctx.Provider value={{ chatClient, videoClient, streamUserId, ready: true, unread }}>
-            {children}
-            <IncomingCallOverlay />
-          </Ctx.Provider>
-        </StreamVideo>
-      </Chat>
+      <Ctx.Provider value={{ chatClient, videoClient, streamUserId, ready, unread }}>
+        {children}
+        {chatClient && videoClient && (
+          <Chat client={chatClient}>
+            <StreamVideo client={videoClient} style={callTheme}>
+              <IncomingCallOverlay />
+            </StreamVideo>
+          </Chat>
+        )}
+      </Ctx.Provider>
     </OverlayProvider>
   );
 }

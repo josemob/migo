@@ -1,12 +1,14 @@
 import 'react-native-gesture-handler';
 import { useEffect, useState } from 'react';
+import { AppState, View, type AppStateStatus } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import NetInfo from '@react-native-community/netinfo';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, focusManager, onlineManager, useQuery } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import * as Notifications from 'expo-notifications';
 
@@ -18,8 +20,10 @@ import { IndependentBackContext } from './src/lib/independentMode';
 import { IndependentVideoProvider } from './src/lib/vetVideo';
 import { api } from './src/lib/api';
 import { DialogHost } from './src/lib/dialog';
-import { Loading } from './src/components/ui';
+import { Button, Loading, Muted } from './src/components/ui';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { VetTabBar } from './src/components/VetTabBar';
+import { colors } from './src/theme';
 
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
@@ -41,6 +45,21 @@ import MyRecordsScreen from './src/screens/MyRecordsScreen';
 import RecordDetailScreen from './src/screens/RecordDetailScreen';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
+
+// React Query en RN no sabe por sí solo cuándo la app pasa a segundo plano ni si
+// hay red. Sin esto, los pollers siguen consultando en background y las consultas
+// fallan en cadena sin conexión.
+try {
+  focusManager.setEventListener((handleFocus) => {
+    const sub = AppState.addEventListener('change', (s: AppStateStatus) => handleFocus(s === 'active'));
+    return () => sub.remove();
+  });
+  onlineManager.setEventListener((setOnline) =>
+    NetInfo.addEventListener((state) => setOnline(!!state.isConnected && state.isInternetReachable !== false)),
+  );
+} catch (e) {
+  console.log('[query] managers no disponibles:', e instanceof Error ? e.message : e);
+}
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 const AuthNav = createNativeStackNavigator();
@@ -73,12 +92,11 @@ function MainApp({ onBackToIndependent }: { onBackToIndependent?: () => void }) 
   useEffect(() => {
     registerForPush();
     // Navega a la pantalla de Alerta cuando el vet toca una notificación de emergencia.
-    const goToAlerta = () => {
-      const nav = () => {
-        if (navigationRef.isReady()) (navigationRef as never as { navigate: (n: string) => void }).navigate('Alerta');
-        else setTimeout(nav, 300);
-      };
-      nav();
+    // Si la navegación aún no está lista (arranque en frío), reintenta unas veces y desiste
+    // (antes el reintento era infinito).
+    const goToAlerta = (attempt = 0) => {
+      if (navigationRef.isReady()) (navigationRef as never as { navigate: (n: string) => void }).navigate('Alerta');
+      else if (attempt < 20) setTimeout(() => goToAlerta(attempt + 1), 300);
     };
     try {
       // Tap con la app abierta / en segundo plano
@@ -132,6 +150,17 @@ function IndependentRoot({ onJoinedClinic }: { onJoinedClinic: () => void }) {
   );
 }
 
+/** Error de red al decidir la puerta de entrada: antes caía en la pantalla de KYC
+ *  como si el vet no estuviera verificado. */
+function GateError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14, backgroundColor: colors.canvas }}>
+      <Muted>No pudimos cargar tu perfil. Revisa tu conexión e intenta de nuevo.</Muted>
+      <Button title="Reintentar" onPress={onRetry} />
+    </View>
+  );
+}
+
 /** Tras iniciar sesión: decide entre la app completa (clínica), el home independiente,
  *  el KYC o la pantalla de estado. */
 function StaffGate() {
@@ -142,6 +171,7 @@ function StaffGate() {
   if (kycQ.isLoading || vetQ.isLoading) return <Loading />;
   const kyc = kycQ.data?.kyc ?? null;
   const refetch = () => { void kycQ.refetch(); void vetQ.refetch(); };
+  if (kycQ.isError || vetQ.isError) return <GateError onRetry={refetch} />;
 
   if (kycQ.data?.hasClinic) return <MainApp />; // ya es staff de una clínica -> app completa
   if (vetQ.data?.isIndependent) return <IndependentRoot onJoinedClinic={refetch} />; // verificado sin clínica
@@ -157,16 +187,20 @@ function Root() {
 }
 
 export default function App() {
-  const [fontsLoaded] = useFonts(OUTFIT_FONTS);
+  const [fontsLoaded, fontError] = useFonts(OUTFIT_FONTS);
   if (fontsLoaded) enableOutfit();
+  // Si las fuentes no cargan, seguimos con la fuente del sistema en vez de
+  // quedarnos en "cargando" para siempre.
+  const ready = fontsLoaded || !!fontError;
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    // Fondo explícito: sin él, la ventana de Android en modo oscuro se veía gris al arrancar.
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.canvas }}>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <StatusBar style="dark" />
-            {fontsLoaded ? <Root /> : <Loading />}
+            <ErrorBoundary>{ready ? <Root /> : <Loading />}</ErrorBoundary>
             <DialogHost />
           </AuthProvider>
         </QueryClientProvider>

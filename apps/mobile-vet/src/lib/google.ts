@@ -7,7 +7,12 @@ import { useAuth } from './auth';
 // la firma de la app automáticamente. Sin navegador -> sin el bloqueo de expo-auth-session.
 const GOOGLE_WEB_CLIENT_ID = '967962081340-023koe87cn4vadbf771oe533hg62r5ug.apps.googleusercontent.com';
 
-GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
+// Protegido: si el módulo nativo no estuviera en el build, no debe tumbar la app al importar.
+try {
+  GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
+} catch (e) {
+  console.log('[google] configure no disponible:', e instanceof Error ? e.message : e);
+}
 
 /** Hook de "Continuar con Google" (Google Sign-In nativo). */
 export function useGoogleSignIn(onError?: (msg: string) => void) {

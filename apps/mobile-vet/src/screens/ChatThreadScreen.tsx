@@ -5,7 +5,7 @@ import Svg, { Path } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import { useQuery } from '@tanstack/react-query';
 import type { Channel as StreamChannel } from 'stream-chat';
-import { Channel, MessageList, MessageComposer } from 'stream-chat-expo';
+import { Channel, Chat, MessageList, MessageComposer } from 'stream-chat-expo';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { appAlert } from '../lib/dialog';
@@ -17,7 +17,7 @@ import { cardShadow, colors, radius } from '../theme';
 interface Service { id: string; name: string; category: string; priceUsd: string | number; durationMin: number }
 
 export default function ChatThreadScreen({ navigation, route }: any) {
-  const { channelType, channelId, clientName } = route.params as { channelType: string; channelId: string; clientName?: string };
+  const { channelType, channelId, clientName } = (route.params ?? {}) as { channelType: string; channelId: string; clientName?: string };
   const { user } = useAuth();
   const { chatClient, ready } = useStream();
   const insets = useSafeAreaInsets();
@@ -124,34 +124,38 @@ export default function ChatThreadScreen({ navigation, route }: any) {
 
       {err ? (
         <View style={styles.center}><Text style={styles.muted}>{err}</Text></View>
-      ) : !channel ? (
+      ) : !channel || !chatClient ? (
         <Loading />
       ) : (
-        <Channel
-          channel={channel}
-          bottomInset={insets.bottom}
-          keyboardVerticalOffset={0}
-          additionalKeyboardAvoidingViewProps={{ style: { flex: 1 } }}
-          handleAttachButtonPress={() => {
-            Keyboard.dismiss();
-            setAttachOpen((o) => !o);
-          }}
-          hasFilePicker={false}
-          hasImagePicker
-          hasCameraPicker={false}
-          hasCommands={false}
-          audioRecordingEnabled={false}
-        >
-          <MessageList />
-          {attachOpen && (
-            <View style={styles.attachRow}>
-              <AttachOption icon="image" onPress={() => pick('image')} />
-              <AttachOption icon="camera" onPress={() => pick('camera')} />
-              <AttachOption icon="video" onPress={() => pick('video')} />
-            </View>
-          )}
-          <MessageComposer />
-        </Channel>
+        // <Chat> local: el provider global ya no envuelve la navegación (evita el
+        // remount de toda la app al conectar Stream), así que se provee aquí.
+        <Chat client={chatClient}>
+          <Channel
+            channel={channel}
+            bottomInset={insets.bottom}
+            keyboardVerticalOffset={0}
+            additionalKeyboardAvoidingViewProps={{ style: { flex: 1 } }}
+            handleAttachButtonPress={() => {
+              Keyboard.dismiss();
+              setAttachOpen((o) => !o);
+            }}
+            hasFilePicker={false}
+            hasImagePicker
+            hasCameraPicker={false}
+            hasCommands={false}
+            audioRecordingEnabled={false}
+          >
+            <MessageList />
+            {attachOpen && (
+              <View style={styles.attachRow}>
+                <AttachOption icon="image" onPress={() => pick('image')} />
+                <AttachOption icon="camera" onPress={() => pick('camera')} />
+                <AttachOption icon="video" onPress={() => pick('video')} />
+              </View>
+            )}
+            <MessageComposer />
+          </Channel>
+        </Chat>
       )}
 
       {uploading && (

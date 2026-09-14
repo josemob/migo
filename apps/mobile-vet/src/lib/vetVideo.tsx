@@ -30,7 +30,6 @@ export function IndependentVideoProvider({ children }: { children: ReactNode }) 
   const insets = useSafeAreaInsets();
   const [client, setClient] = useState<StreamVideoClient | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const connecting = useRef(false);
 
   // Padding inferior a los controles de llamada (área segura / barra de navegación).
   const callTheme = useMemo<any>(
@@ -38,44 +37,56 @@ export function IndependentVideoProvider({ children }: { children: ReactNode }) 
     [insets.bottom],
   );
 
+  // Reconecta solo cuando cambia el id del usuario (no el objeto `user`), con guard
+  // de cancelación, tokenProvider (sobrevive a la expiración) y reintentos.
+  const authUserId = user?.id;
   useEffect(() => {
-    if (!user || connecting.current) return;
-    connecting.current = true;
+    if (!authUserId) return;
+    let cancelled = false;
     let vc: StreamVideoClient | null = null;
-    (async () => {
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    const tokenProvider = async () => (await api<Cred>('/me/stream-token')).token;
+
+    const connect = async (attempt: number) => {
       try {
         const cred = await api<Cred>('/me/stream-token');
+        if (cancelled) return;
         vc = StreamVideoClient.getOrCreateInstance({
           apiKey: cred.apiKey,
-          user: { id: cred.userId, name: user.fullName ?? undefined },
-          token: cred.token,
+          user: { id: cred.userId, name: user?.fullName ?? undefined },
+          tokenProvider,
         });
+        if (cancelled) return;
         setClient(vc);
         setUserId(cred.userId);
-      } catch {
+      } catch (e) {
         // Sin Stream / sin red: el panel sigue funcionando sin video en vivo.
-        connecting.current = false;
+        console.error('[vetVideo] connect failed:', e instanceof Error ? e.message : e);
+        if (!cancelled && attempt < 3) retryTimer = setTimeout(() => void connect(attempt + 1), 5000 * (attempt + 1));
       }
-    })();
+    };
+    void connect(0);
+
     return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
       vc?.disconnectUser().catch(() => {});
       setClient(null);
       setUserId(null);
-      connecting.current = false;
     };
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authUserId]);
 
-  if (!client) {
-    return <Ctx.Provider value={{ client: null, userId: null }}>{children}</Ctx.Provider>;
-  }
-
+  // `children` siempre en la misma posición del árbol (evita remount del panel al conectar).
   return (
-    <StreamVideo client={client} style={callTheme}>
-      <Ctx.Provider value={{ client, userId }}>
-        {children}
-        <CallOverlay />
-      </Ctx.Provider>
-    </StreamVideo>
+    <Ctx.Provider value={{ client, userId }}>
+      {children}
+      {client && (
+        <StreamVideo client={client} style={callTheme}>
+          <CallOverlay />
+        </StreamVideo>
+      )}
+    </Ctx.Provider>
   );
 }
 
