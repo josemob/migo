@@ -19,6 +19,7 @@
     },
     "android": {
       "package": "com.migo.client",
+      "versionCode": 1,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#7F398A",

@@ -30,10 +30,16 @@ router.get(
     const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startWeek = new Date(startToday.getTime() - 6 * 24 * 3600_000);
 
-    const [clinics, emergenciasHoy, vetsCount, monthLedger, weekLedger, weekEmergencies] = await Promise.all([
+    // Las cuentas eliminadas se conservan anonimizadas (borrado suave, ver
+    // me.routes "eliminar cuenta"), asi que hay que excluirlas de los conteos
+    // o la red se ve mas grande de lo que es.
+    const alive = { not: 'DELETED' } as const;
+
+    const [clinics, emergenciasHoy, vetsCount, clientesCount, monthLedger, weekLedger, weekEmergencies] = await Promise.all([
       prisma.clinic.findMany({ select: { verificationStatus: true, radarSuspended: true } }),
       prisma.emergency.count({ where: { createdAt: { gte: startToday } } }),
-      prisma.user.count({ where: { role: 'VET' } }),
+      prisma.user.count({ where: { role: 'VET', status: alive } }),
+      prisma.user.count({ where: { role: 'PET_OWNER', status: alive } }),
       prisma.ledgerEntry.findMany({ where: { createdAt: { gte: startMonth } }, select: { grossUsd: true, migoFeeUsd: true } }),
       prisma.ledgerEntry.findMany({ where: { createdAt: { gte: startWeek } }, select: { grossUsd: true, createdAt: true } }),
       prisma.emergency.findMany({ where: { createdAt: { gte: startWeek } }, select: { createdAt: true } }),
@@ -59,6 +65,7 @@ router.get(
       gmvMensual: Number(gmvMensual.toFixed(2)),
       revenueMigo: Number(revenueMigo.toFixed(2)),
       vetsGuardia: vetsCount,
+      clientes: clientesCount,
       solicitudes: clinics.filter((c) => clinicStatus(c) === 'PENDING').length,
       suspendidos: clinics.filter((c) => clinicStatus(c) === 'SUSPENDED').length,
       trend,

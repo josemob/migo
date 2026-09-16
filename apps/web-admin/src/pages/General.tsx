@@ -11,6 +11,7 @@ interface Overview {
   gmvMensual: number;
   revenueMigo: number;
   vetsGuardia: number;
+  clientes: number;
   solicitudes: number;
   suspendidos: number;
   trend: { label: string; revenue: number; emergencies: number }[];
@@ -37,7 +38,8 @@ export default function General() {
         </div>
 
         {data && (
-          <div className="flex items-start gap-9">
+          <div className="flex flex-wrap items-start gap-x-9 gap-y-4">
+            <StatBig value={data.clientes} label="Clientes" icon={<Icon name="paw" className="h-3.5 w-3.5" />} />
             <StatBig value={data.comerciosActivos} label="Comercios" icon={<Icon name="store" className="h-3.5 w-3.5" />} />
             <StatBig value={data.vetsGuardia} label="Veterinarios" icon={<Icon name="hospital" className="h-3.5 w-3.5" />} />
             <StatBig value={data.emergenciasHoy} label="Urgencias hoy" icon={<Icon name="emergency" className="h-3.5 w-3.5" />} />
