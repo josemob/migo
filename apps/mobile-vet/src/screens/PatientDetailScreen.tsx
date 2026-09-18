@@ -32,6 +32,10 @@ interface Ficha {
   records: { id: string; visitedAt: string; reason?: string | null; diagnosis?: string | null; vet?: { user?: { fullName?: string } } | null }[];
 }
 
+// El backend manda el enum crudo (MALE / FEMALE / UNKNOWN). Se traduce, y si no
+// está definido se omite en vez de imprimir "UNKNOWN" en la ficha.
+const sexLabel = (sex?: string | null) => (sex === 'MALE' ? 'Macho' : sex === 'FEMALE' ? 'Hembra' : null);
+
 const ageFrom = (iso?: string | null) => {
   if (!iso) return null;
   const t = new Date(iso).getTime();
@@ -120,7 +124,7 @@ export default function PatientDetailScreen({ navigation, route }: any) {
         <View style={styles.hero}>
           <Text style={{ fontSize: 52 }}>🐶</Text>
           <Text style={styles.name}>{data.name}</Text>
-          <Text style={styles.sub}>{[data.breed, data.sex, age].filter(Boolean).join(' · ') || data.species}</Text>
+          <Text style={styles.sub}>{[data.breed, sexLabel(data.sex), age].filter(Boolean).join(' · ') || data.species}</Text>
           <View style={styles.ownerRow}>
             <Text style={styles.owner}>👤 {data.owner?.fullName ?? '—'}</Text>
             {data.owner?.phone && <Text style={styles.owner}>📞 {data.owner.phone}</Text>}
