@@ -34,7 +34,7 @@ const schema = z.object({
   RESEND_API_KEY: z.string().optional(),
   MAIL_FROM: z.string().default('Migo <onboarding@resend.dev>'),
   // URL pública del panel/app para enlaces dentro de los correos (si aplica).
-  APP_PUBLIC_URL: z.string().default('https://holamigo.app'),
+  APP_PUBLIC_URL: z.string().default('https://migopet.app'),
 });
 
 const parsed = schema.safeParse(process.env);

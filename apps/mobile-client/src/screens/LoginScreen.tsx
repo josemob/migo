@@ -139,7 +139,7 @@ export default function LoginScreen() {
 
         {mode === 'forgot' ? (
           <>
-            <Input label="Correo" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" placeholder="usuario@holamigo.app" editable={forgotStep === 'request'} />
+            <Input label="Correo" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" placeholder="usuario@migopet.app" editable={forgotStep === 'request'} />
             {forgotStep === 'request' ? (
               <>
                 {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -167,7 +167,7 @@ export default function LoginScreen() {
                 <PhoneInput label="Teléfono" value={phone} onChangeText={setPhone} />
               </>
             )}
-            <Input label="Correo" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" placeholder="usuario@holamigo.app" />
+            <Input label="Correo" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" placeholder="usuario@migopet.app" />
             <PasswordInput label="Contraseña" value={password} onChangeText={setPassword} placeholder="••••••••" />
             {mode === 'register' && (
               <PasswordInput label="Repite tu contraseña" value={confirm} onChangeText={setConfirm} placeholder="••••••••" />
