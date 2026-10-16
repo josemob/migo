@@ -49,6 +49,7 @@ import RegisterPetScreen from './src/screens/RegisterPetScreen';
 import ReceiptsScreen from './src/screens/ReceiptsScreen';
 import RecordDetailScreen from './src/screens/RecordDetailScreen';
 import VaccineCardScreen from './src/screens/VaccineCardScreen';
+import PetTagScreen from './src/screens/PetTagScreen';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
 
@@ -86,17 +87,19 @@ function Tabs() {
 function MainApp() {
   useEffect(() => {
     registerForPush();
-    // Navega a Citas cuando el usuario toca una notificación de cita. Si la navegación
-    // aún no está lista (arranque en frío), reintenta unas veces y luego desiste.
-    const goToCitas = (attempt = 0) => {
+    // Navega al tocar una notificación. Si la navegación aún no está lista
+    // (arranque en frío), reintenta unas veces y luego desiste.
+    const goTo = (screen: string, params: object, attempt = 0) => {
       if (navigationRef.isReady()) {
-        (navigationRef as never as { navigate: (n: string, p: object) => void }).navigate('Tabs', { screen: 'Citas' });
+        (navigationRef as never as { navigate: (n: string, p: object) => void }).navigate(screen, params);
       } else if (attempt < 20) {
-        setTimeout(() => goToCitas(attempt + 1), 300);
+        setTimeout(() => goTo(screen, params, attempt + 1), 300);
       }
     };
-    const handle = (data?: { type?: string }) => {
-      if (data?.type === 'appointment') goToCitas();
+    const handle = (data?: { type?: string; petId?: string }) => {
+      if (data?.type === 'appointment') goTo('Tabs', { screen: 'Citas' });
+      // Alguien escaneó la placa QR y avisó: abre la placa, donde están los avisos.
+      if (data?.type === 'PET_FOUND' && data.petId) goTo('PetTag', { id: data.petId });
     };
     try {
       // Tap con la app abierta / en segundo plano
@@ -134,6 +137,7 @@ function MainApp() {
         <Stack.Screen name="Perfil" component={ProfileScreen} options={{ headerShown: false }} />
         <Stack.Screen name="PetProfile" component={PetProfileScreen} options={{ headerShown: false }} />
         <Stack.Screen name="VaccineCard" component={VaccineCardScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="PetTag" component={PetTagScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ClinicDetail" component={ClinicDetailScreen} options={{ headerShown: false }} />
         <Stack.Screen name="BookAppointment" component={BookAppointmentScreen} options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="ConfirmPay" component={ConfirmPayScreen} options={{ headerShown: false }} />

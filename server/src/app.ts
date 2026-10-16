@@ -20,10 +20,26 @@ import adminRoutes from './modules/admin/admin.routes';
 import staffKycRoutes from './modules/staffKyc/staffKyc.routes';
 import streamWebhookRoutes from './modules/webhooks/stream.webhook.routes';
 import geocodeRoutes from './modules/geocode/geocode.routes';
+import publicPetsRoutes from './modules/publicPets/publicPets.routes';
 
 export const app = express();
 
+// Render pone un proxy delante: sin esto req.ip es la IP del proxy y el limitador
+// de las rutas públicas metería a todos los visitantes en el mismo cupo.
+app.set('trust proxy', 1);
+
 app.use(helmet());
+
+// Placa QR: rutas públicas que llama migopet.app/m/:code desde cualquier teléfono.
+// Van antes del CORS global porque necesitan aceptar cualquier origen, y sin
+// credenciales: no hay sesión que proteger, son públicas por diseño.
+app.use(
+  '/api/v1/public',
+  cors({ origin: true, credentials: false }),
+  express.json({ limit: '16kb' }),
+  publicPetsRoutes,
+);
+
 app.use(
   cors({
     origin: env.corsOrigins.length ? env.corsOrigins : true,

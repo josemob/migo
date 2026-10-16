@@ -254,21 +254,21 @@ model User {
 
   // relaciones
   pets               Pet[]
-  ownedOrganizations Organization[] @relation("OrgOwner")
+  ownedOrganizations Organization[]    @relation("OrgOwner")
   staffProfile       ClinicStaff?
   vetProfile         VetProfile?
   vetSubscription    VetSubscription?
-  emergencies        Emergency[]    @relation("EmergencyOwner")
-  appointments       Appointment[]  @relation("AppointmentBookedBy")
-  teleconsults       Teleconsult[]  @relation("TeleconsultOwner")
+  emergencies        Emergency[]       @relation("EmergencyOwner")
+  appointments       Appointment[]     @relation("AppointmentBookedBy")
+  teleconsults       Teleconsult[]     @relation("TeleconsultOwner")
   reviews            Review[]
-  receipts           Receipt[]      @relation("ReceiptOwner")
+  receipts           Receipt[]         @relation("ReceiptOwner")
   subscriptions      Subscription[]
   refreshTokens      RefreshToken[]
   pushTokens         PushToken[]
   staffKyc           StaffKyc?
   staffInvitations   StaffInvitation[]
-  auditLogsActor     AuditLog[]     @relation("AuditActor")
+  auditLogsActor     AuditLog[]        @relation("AuditActor")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -359,9 +359,9 @@ model StaffKyc {
   // La clínica lo busca por User.nationalId (cédula) y lo adopta (crea ClinicStaff).
 
   // documentos capturados con la cámara (data URI o URL de storage)
-  selfieUrl     String?
-  idDocumentUrl String? // cédula
-  cmvCardUrl    String? // carnet del Colegio de Médicos Veterinarios (solo VET)
+  selfieUrl        String?
+  idDocumentUrl    String? // cédula
+  cmvCardUrl       String? // carnet del Colegio de Médicos Veterinarios (solo VET)
   collegiateNumber String?
   specialty        String?
 
@@ -406,22 +406,22 @@ model AiKnowledgeEntry {
 
 // ── Super Admin: Configuración Global (singleton) ──
 model PlatformConfig {
-  id             String   @id @default("singleton")
-  cplFeeUsd      Decimal  @default(5) @db.Decimal(10, 2)
-  commissionRate Decimal  @default(0.08) @db.Decimal(4, 3)
+  id                  String    @id @default("singleton")
+  cplFeeUsd           Decimal   @default(5) @db.Decimal(10, 2)
+  commissionRate      Decimal   @default(0.08) @db.Decimal(4, 3)
   // Tasa oficial BCV (Bs./USD). Se sincroniza sola contra APIs publicas
   // (ver modules/admin/bcv.service.ts); bcvSource/bcvUpdatedAt registran de donde
   // y cuando se trajo, para poder mostrarlo en el panel.
-  bcvRate        Decimal   @default(36.5) @db.Decimal(12, 2)
-  bcvSource      String?
-  bcvUpdatedAt   DateTime? // cuándo sincronizamos nosotros (controla el refresco)
-  bcvRateDate    DateTime? // fecha de publicación de la tasa según el BCV
-  paymentGateway String   @default("Stripe + Pago Móvil Local (C2P)")
+  bcvRate             Decimal   @default(36.5) @db.Decimal(12, 2)
+  bcvSource           String?
+  bcvUpdatedAt        DateTime? // cuándo sincronizamos nosotros (controla el refresco)
+  bcvRateDate         DateTime? // fecha de publicación de la tasa según el BCV
+  paymentGateway      String    @default("Stripe + Pago Móvil Local (C2P)")
   // Banner patrocinado del dashboard del cliente (arte 300x50). Se controla desde
   // el Super Admin; a futuro lo reemplaza Google AdSense.
-  clientBannerEnabled Boolean @default(false)
+  clientBannerEnabled Boolean   @default(false)
   clientBannerImage   String? // data URI (base64) del arte 300x50
-  updatedAt      DateTime @updatedAt
+  updatedAt           DateTime  @updatedAt
 }
 
 // A quién aplica un plan del catálogo.
@@ -483,6 +483,16 @@ model Pet {
   specialCondition String? // "Condición Especial"
   frequentVet      String? // "Veterinaria Frecuente"
 
+  // Placa QR de identificación: página pública en migopet.app/m/:publicCode.
+  // El código se genera la primera vez que el dueño abre la placa, no al crear la
+  // mascota, así que las mascotas que ya existen no necesitan relleno.
+  publicCode     String?          @unique
+  lostMode       Boolean          @default(false)
+  lostSince      DateTime?
+  lostMessage    String? // nota del dueño, visible solo en modo extraviado
+  showOwnerPhone Boolean          @default(false) // en modo extraviado, mostrar o no el teléfono del dueño
+  foundReports   PetFoundReport[]
+
   allergies     Allergy[]
   conditions    PetCondition[] // preexistencias
   vaccinations  Vaccination[]
@@ -499,6 +509,22 @@ model Pet {
   @@index([ownerId])
   @@index([species])
   @@index([status])
+}
+
+// Aviso de quien encontró una mascota escaneando su placa QR. Se guarda además
+// del push para que el dueño no lo pierda si la notificación no le llega.
+model PetFoundReport {
+  id        String    @id @default(uuid())
+  pet       Pet       @relation(fields: [petId], references: [id], onDelete: Cascade)
+  petId     String
+  message   String?
+  contact   String? // teléfono o forma de contacto que dejó quien la encontró, si quiso
+  lat       Float?
+  lng       Float?
+  seenAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([petId, createdAt])
 }
 
 model Allergy {
@@ -548,19 +574,19 @@ model Vaccination {
 
 // Prescripciones estructuradas (pantalla Historiales: "Últimas Prescripciones")
 model Prescription {
-  id           String         @id @default(uuid())
-  pet          Pet            @relation(fields: [petId], references: [id], onDelete: Cascade)
-  petId        String
-  record       MedicalRecord? @relation(fields: [recordId], references: [id])
-  recordId     String?
-  drug         String // ej. "Prednisolona 5mg"
-  dose         String? // ej. "1 tab"
-  frequency    String? // ej. "c/12h"
-  durationDays Int? // ej. 5
-  instructions String?
-  prescribedBy ClinicStaff?   @relation(fields: [prescribedById], references: [id])
+  id             String         @id @default(uuid())
+  pet            Pet            @relation(fields: [petId], references: [id], onDelete: Cascade)
+  petId          String
+  record         MedicalRecord? @relation(fields: [recordId], references: [id])
+  recordId       String?
+  drug           String // ej. "Prednisolona 5mg"
+  dose           String? // ej. "1 tab"
+  frequency      String? // ej. "c/12h"
+  durationDays   Int? // ej. 5
+  instructions   String?
+  prescribedBy   ClinicStaff?   @relation(fields: [prescribedById], references: [id])
   prescribedById String?
-  createdAt    DateTime       @default(now())
+  createdAt      DateTime       @default(now())
 
   @@index([petId])
 }
@@ -577,16 +603,16 @@ model MedicalRecord {
   appointment   Appointment? @relation(fields: [appointmentId], references: [id])
   appointmentId String?      @unique
 
-  visitedAt   DateTime @default(now())
-  reason      String? // ej. "Ingreso Emergencia", "Control Alergia", "Vacuna Anual"
-  symptoms    String?
-  diagnosis   String?
-  treatment   String?
-  weightKg    Decimal? @db.Decimal(6, 2)
-  temperature Decimal? @db.Decimal(4, 1)
-  notes       String?
-  attachments Json? // urls a exámenes/imágenes
-  signedAt    DateTime? // "finalizar y firmar": queda firmado por el vet (vetId) en esta fecha
+  visitedAt         DateTime  @default(now())
+  reason            String? // ej. "Ingreso Emergencia", "Control Alergia", "Vacuna Anual"
+  symptoms          String?
+  diagnosis         String?
+  treatment         String?
+  weightKg          Decimal?  @db.Decimal(6, 2)
+  temperature       Decimal?  @db.Decimal(4, 1)
+  notes             String?
+  attachments       Json? // urls a exámenes/imágenes
+  signedAt          DateTime? // "finalizar y firmar": queda firmado por el vet (vetId) en esta fecha
   // Snapshot del firmante — persiste aunque el vet deje la clínica y se borre su ClinicStaff
   signedByName      String?
   signedByLicense   String? // nº colegiado
@@ -607,8 +633,8 @@ model MedicalRecord {
 
 // El comercio legal — "Migo Clínicas". Es lo que audita el Super Admin (RIF).
 model Organization {
-  id        String @id @default(uuid())
-  owner     User   @relation("OrgOwner", fields: [ownerId], references: [id])
+  id        String  @id @default(uuid())
+  owner     User    @relation("OrgOwner", fields: [ownerId], references: [id])
   ownerId   String
   name      String // marca comercial, ej. "Migo Clínicas"
   legalName String?
@@ -687,7 +713,7 @@ model Clinic {
   services            Service[]
   appointments        Appointment[]
   emergencyAlerts     EmergencyAlert[]
-  emergenciesAccepted Emergency[]        @relation("EmergencyAcceptedClinic")
+  emergenciesAccepted Emergency[]         @relation("EmergencyAcceptedClinic")
   records             MedicalRecord[]
   vaccinations        Vaccination[]
   reviews             Review[]
@@ -696,7 +722,7 @@ model Clinic {
   invoices            Invoice[]
   settlementAccount   SettlementAccount?
   sponsorships        ClinicSponsorship[]
-  receipts            Receipt[]          @relation("ClinicReceipts")
+  receipts            Receipt[]           @relation("ClinicReceipts")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -772,8 +798,8 @@ model ClinicStaff {
   vaccinations  Vaccination[]
   prescriptions Prescription[]
   records       MedicalRecord[]
-  appointments  Appointment[]  @relation("AppointmentVet")
-  teleconsults  Teleconsult[]  @relation("TeleconsultVet")
+  appointments  Appointment[]   @relation("AppointmentVet")
+  teleconsults  Teleconsult[]   @relation("TeleconsultVet")
   shifts        StaffShift[]
   serviceStaff  ServiceStaff[]
   reviews       Review[]
@@ -803,15 +829,15 @@ model VetProfile {
   ratingAvg          Decimal            @default(0) @db.Decimal(3, 2)
   ratingCount        Int                @default(0)
   // Ubicación de servicio (para el ruteo por radio de emergencias/telemedicina)
-  serviceLat      Decimal? @db.Decimal(9, 6)
-  serviceLng      Decimal? @db.Decimal(9, 6)
-  serviceRadiusKm Int      @default(15)
+  serviceLat         Decimal?           @db.Decimal(9, 6)
+  serviceLng         Decimal?           @db.Decimal(9, 6)
+  serviceRadiusKm    Int                @default(15)
 
   // Teleconsultas atendidas como vet independiente (telemedicina)
-  teleconsults Teleconsult[] @relation("TeleconsultIndependentVet")
+  teleconsults        Teleconsult[]         @relation("TeleconsultIndependentVet")
   // Emergencias ruteadas / aceptadas como vet independiente (Fase C)
-  emergencyAlerts     EmergencyAlert[] @relation("EmergencyAlertIndependentVet")
-  acceptedEmergencies Emergency[]      @relation("EmergencyAcceptedVet")
+  emergencyAlerts     EmergencyAlert[]      @relation("EmergencyAlertIndependentVet")
+  acceptedEmergencies Emergency[]           @relation("EmergencyAcceptedVet")
   // Solicitudes de cambio de especialidad (con documentos, aprobadas por Super Admin)
   specialtyRequests   VetSpecialtyRequest[]
 
@@ -827,8 +853,8 @@ model VetSpecialtyRequest {
   id                 String     @id @default(uuid())
   vetProfile         VetProfile @relation(fields: [vetProfileId], references: [id], onDelete: Cascade)
   vetProfileId       String
-  requestedSpecialty String     // especialidades separadas por coma (hasta 3)
-  documents          Json       // [{ type, label, url }] — url = data URI (imagen o PDF)
+  requestedSpecialty String // especialidades separadas por coma (hasta 3)
+  documents          Json // [{ type, label, url }] — url = data URI (imagen o PDF)
   status             String     @default("PENDING") // PENDING | APPROVED | REJECTED
   reviewNote         String?
   reviewedById       String?
@@ -977,14 +1003,14 @@ model Emergency {
   // Especialidad sugerida por la IA para rutear a vets independientes (Fase C)
   requiredSpecialty String?
 
-  status           EmergencyStatus @default(TRIAGING)
-  acceptedClinic   Clinic?         @relation("EmergencyAcceptedClinic", fields: [acceptedClinicId], references: [id])
-  acceptedClinicId String?
+  status               EmergencyStatus @default(TRIAGING)
+  acceptedClinic       Clinic?         @relation("EmergencyAcceptedClinic", fields: [acceptedClinicId], references: [id])
+  acceptedClinicId     String?
   // Vet INDEPENDIENTE que aceptó la urgencia (alternativo a la clínica)
-  acceptedVetProfile   VetProfile? @relation("EmergencyAcceptedVet", fields: [acceptedVetProfileId], references: [id])
+  acceptedVetProfile   VetProfile?     @relation("EmergencyAcceptedVet", fields: [acceptedVetProfileId], references: [id])
   acceptedVetProfileId String?
-  acceptedAt       DateTime?
-  attendedAt       DateTime?
+  acceptedAt           DateTime?
+  attendedAt           DateTime?
 
   alerts      EmergencyAlert[]
   ledgerEntry LedgerEntry?
@@ -999,21 +1025,21 @@ model Emergency {
 
 // Broadcast de una emergencia a cada sucursal cercana candidata
 model EmergencyAlert {
-  id          String               @id @default(uuid())
-  emergency   Emergency            @relation(fields: [emergencyId], references: [id], onDelete: Cascade)
-  emergencyId String
+  id           String               @id @default(uuid())
+  emergency    Emergency            @relation(fields: [emergencyId], references: [id], onDelete: Cascade)
+  emergencyId  String
   // Destino de la alerta: una CLÍNICA o un VET INDEPENDIENTE (uno de los dos)
-  clinic      Clinic?              @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  clinicId    String?
-  vetProfile   VetProfile?         @relation("EmergencyAlertIndependentVet", fields: [vetProfileId], references: [id], onDelete: Cascade)
+  clinic       Clinic?              @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  clinicId     String?
+  vetProfile   VetProfile?          @relation("EmergencyAlertIndependentVet", fields: [vetProfileId], references: [id], onDelete: Cascade)
   vetProfileId String?
-  status      EmergencyAlertStatus @default(SENT)
-  distanceKm  Decimal?             @db.Decimal(6, 2) // "1.2 km"
-  etaMinutes  Int? // "~4 min de llegada"
-  seenAt      DateTime?
-  respondedAt DateTime?
-  expiresAt   DateTime?
-  createdAt   DateTime             @default(now())
+  status       EmergencyAlertStatus @default(SENT)
+  distanceKm   Decimal?             @db.Decimal(6, 2) // "1.2 km"
+  etaMinutes   Int? // "~4 min de llegada"
+  seenAt       DateTime?
+  respondedAt  DateTime?
+  expiresAt    DateTime?
+  createdAt    DateTime             @default(now())
 
   @@unique([emergencyId, clinicId])
   @@unique([emergencyId, vetProfileId])
@@ -1026,15 +1052,15 @@ model EmergencyAlert {
 // ─────────────────────────────────────────────────────────────────────
 
 model Teleconsult {
-  id      String       @id @default(uuid())
-  owner   User         @relation("TeleconsultOwner", fields: [ownerId], references: [id])
-  ownerId String
-  pet     Pet?         @relation(fields: [petId], references: [id])
-  petId   String?
-  vet     ClinicStaff? @relation("TeleconsultVet", fields: [vetId], references: [id])
-  vetId   String?
+  id           String       @id @default(uuid())
+  owner        User         @relation("TeleconsultOwner", fields: [ownerId], references: [id])
+  ownerId      String
+  pet          Pet?         @relation(fields: [petId], references: [id])
+  petId        String?
+  vet          ClinicStaff? @relation("TeleconsultVet", fields: [vetId], references: [id])
+  vetId        String?
   // Vet INDEPENDIENTE que atiende (telemedicina sin clínica). Alternativo a `vet`.
-  vetProfile   VetProfile? @relation("TeleconsultIndependentVet", fields: [vetProfileId], references: [id])
+  vetProfile   VetProfile?  @relation("TeleconsultIndependentVet", fields: [vetProfileId], references: [id])
   vetProfileId String?
 
   type         TeleconsultType   @default(PAY_PER_EVENT)
@@ -1223,9 +1249,9 @@ model Invoice {
   planSubtotalUsd Decimal @default(0) @db.Decimal(12, 2) // cuota Pro del período
   totalUsd        Decimal @default(0) @db.Decimal(12, 2)
 
-  issuedAt DateTime?
-  dueAt    DateTime?
-  paidAt   DateTime?
+  issuedAt  DateTime?
+  dueAt     DateTime?
+  paidAt    DateTime?
   reference String? // referencia de pago (Pago Móvil / transferencia)
 
   ledgerEntries LedgerEntry[]
@@ -1288,18 +1314,18 @@ model Payout {
 
 // Datos de liquidación local ("Datos de Liquidación local" — Venezuela)
 model SettlementAccount {
-  id                String          @id @default(uuid())
-  clinic            Clinic          @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  clinicId          String          @unique
-  bankName          String // "Banco Nacional de Descuento"
-  accountType       BankAccountType @default(CHECKING)
-  accountLast4      String? // "****4521"
-  holderName        String?
-  holderIdNumber    String? // cédula/RIF del titular
-  c2pEnabled        Boolean         @default(false) // "Pago C2P Interbancario Habilitado"
-  mobilePayPhone    String? // Pago Móvil
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  id             String          @id @default(uuid())
+  clinic         Clinic          @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  clinicId       String          @unique
+  bankName       String // "Banco Nacional de Descuento"
+  accountType    BankAccountType @default(CHECKING)
+  accountLast4   String? // "****4521"
+  holderName     String?
+  holderIdNumber String? // cédula/RIF del titular
+  c2pEnabled     Boolean         @default(false) // "Pago C2P Interbancario Habilitado"
+  mobilePayPhone String? // Pago Móvil
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 }
 
 // ─────────────────────────────────────────────────────────────────────

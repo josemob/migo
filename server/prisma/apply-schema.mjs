@@ -7,16 +7,28 @@
  * funcionan. El pooler de transacciones (6543) sí funciona por-sentencia, que
  * es lo que hace este script.
  *
- * Uso:  npm run db:apply
- * Flujo al cambiar el schema:
- *   1) npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > prisma/migrations/0_init/migration.sql
- *      (o genera una migración incremental con --from-schema-datasource)
- *   2) npm run db:apply
+ * Uso:  npm run db:apply                        -> esquema completo (0_init, base vacía)
+ *       npm run db:apply -- <ruta/migration.sql> -> una migración incremental
+ *
+ * Flujo al cambiar el schema de una base que ya tiene datos:
+ *   1) Diff contra el schema del último commit, sin tocar la base:
+ *        git show HEAD:server/prisma/schema.prisma > old.prisma
+ *        npx prisma migrate diff --from-schema-datamodel old.prisma --to-schema-datamodel prisma/schema.prisma --script
+ *      Guarda la salida en prisma/migrations/<n>_<nombre>/migration.sql
+ *   2) npm run db:apply -- prisma/migrations/<n>_<nombre>/migration.sql
+ *   3) npm run db:sql   (regenera 0_init para que siga describiendo el esquema completo)
+ *
+ * OJO: correr 0_init sobre una base con datos falla en la primera sentencia
+ * (CREATE TABLE de una tabla que ya existe). Para producción, siempre incremental.
  */
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { PrismaClient } from '@prisma/client';
 
-const MIGRATION = new URL('./migrations/0_init/migration.sql', import.meta.url);
+const MIGRATION = process.argv[2]
+  ? pathToFileURL(resolve(process.argv[2]))
+  : new URL('./migrations/0_init/migration.sql', import.meta.url);
 const p = new PrismaClient();
 
 const statements = readFileSync(MIGRATION, 'utf8')
@@ -27,7 +39,7 @@ const statements = readFileSync(MIGRATION, 'utf8')
   .map((s) => s.trim())
   .filter(Boolean);
 
-console.log(`Aplicando ${statements.length} sentencias vía pooler de transacciones...`);
+console.log(`Aplicando ${statements.length} sentencias de ${MIGRATION.pathname} vía pooler de transacciones...`);
 let ok = 0;
 try {
   for (const stmt of statements) {

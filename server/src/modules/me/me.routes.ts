@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/prisma';
+import { env } from '../../config/env';
+import { newPublicCode } from '../../utils/publicCode';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { validate } from '../../middleware/validate';
 import { authenticate } from '../../middleware/auth';
@@ -169,6 +172,107 @@ router.patch(
       return updated;
     });
     res.json(pet);
+  }),
+);
+
+// ─── Placa QR de identificación ──────────────────────────────────────────────
+const tagSelect = {
+  id: true, name: true, publicCode: true,
+  lostMode: true, lostSince: true, lostMessage: true, showOwnerPhone: true,
+} as const;
+
+const tagView = (pet: Prisma.PetGetPayload<{ select: typeof tagSelect }>) => ({
+  name: pet.name,
+  code: pet.publicCode,
+  // La URL que va dentro del QR. Corta a propósito: menos módulos en el QR,
+  // y cuanto más grandes los módulos, mejor escanea en una placa de 25 mm.
+  url: pet.publicCode ? `${env.APP_PUBLIC_URL}/m/${pet.publicCode}` : null,
+  lostMode: pet.lostMode,
+  lostSince: pet.lostSince,
+  lostMessage: pet.lostMessage,
+  showOwnerPhone: pet.showOwnerPhone,
+});
+
+// POST /me/pets/:id/tag -> asegura el código de la placa y devuelve su URL pública.
+// Idempotente: si ya tiene código devuelve el mismo, porque la placa ya impresa
+// no puede cambiar. El código se crea aquí y no al registrar la mascota.
+router.post(
+  '/pets/:id/tag',
+  validate({ params: z.object({ id: z.string().uuid() }) }),
+  asyncHandler(async (req, res) => {
+    let pet = await prisma.pet.findFirst({ where: { id: req.params.id, ownerId: req.user!.id }, select: tagSelect });
+    if (!pet) throw ApiError.notFound('Mascota no encontrada');
+
+    // Colisión improbable (~594M códigos), pero posible: reintenta con otro.
+    for (let attempt = 0; !pet.publicCode && attempt < 5; attempt++) {
+      try {
+        pet = await prisma.pet.update({ where: { id: pet.id }, data: { publicCode: newPublicCode() }, select: tagSelect });
+      } catch (e) {
+        if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002')) throw e;
+      }
+    }
+    if (!pet.publicCode) throw new ApiError(500, 'No se pudo generar el código de la placa. Intenta de nuevo.');
+
+    res.json(tagView(pet));
+  }),
+);
+
+// PATCH /me/pets/:id/lost -> activar o desactivar el modo extraviado
+router.patch(
+  '/pets/:id/lost',
+  validate({
+    params: z.object({ id: z.string().uuid() }),
+    body: z.object({
+      lostMode: z.boolean(),
+      lostMessage: z.string().trim().max(300).nullable().optional(),
+      showOwnerPhone: z.boolean().optional(),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const existing = await prisma.pet.findFirst({
+      where: { id: req.params.id, ownerId: req.user!.id },
+      select: { id: true, lostMode: true, lostSince: true },
+    });
+    if (!existing) throw ApiError.notFound('Mascota no encontrada');
+
+    const { lostMode, lostMessage, showOwnerPhone } = req.body as {
+      lostMode: boolean; lostMessage?: string | null; showOwnerPhone?: boolean;
+    };
+
+    const pet = await prisma.pet.update({
+      where: { id: existing.id },
+      data: lostMode
+        ? {
+            lostMode: true,
+            // Si ya estaba extraviada, conserva la fecha original al editar el mensaje.
+            lostSince: existing.lostMode && existing.lostSince ? existing.lostSince : new Date(),
+            ...(lostMessage !== undefined && { lostMessage: lostMessage || null }),
+            ...(showOwnerPhone !== undefined && { showOwnerPhone }),
+          }
+        : // Al volver a casa se borra todo lo del extravío y el teléfono vuelve a
+          // ocultarse: la próxima vez el dueño decide de nuevo si lo muestra.
+          { lostMode: false, lostSince: null, lostMessage: null, showOwnerPhone: false },
+      select: tagSelect,
+    });
+    res.json(tagView(pet));
+  }),
+);
+
+// GET /me/pets/:id/found-reports -> avisos de quienes la encontraron (y los marca vistos)
+router.get(
+  '/pets/:id/found-reports',
+  validate({ params: z.object({ id: z.string().uuid() }) }),
+  asyncHandler(async (req, res) => {
+    const pet = await prisma.pet.findFirst({ where: { id: req.params.id, ownerId: req.user!.id }, select: { id: true } });
+    if (!pet) throw ApiError.notFound('Mascota no encontrada');
+
+    const reports = await prisma.petFoundReport.findMany({
+      where: { petId: pet.id },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+    await prisma.petFoundReport.updateMany({ where: { petId: pet.id, seenAt: null }, data: { seenAt: new Date() } });
+    res.json({ data: reports });
   }),
 );
 

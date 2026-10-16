@@ -228,6 +228,9 @@ CREATE TABLE "PlatformConfig" (
     "cplFeeUsd" DECIMAL(10,2) NOT NULL DEFAULT 5,
     "commissionRate" DECIMAL(4,3) NOT NULL DEFAULT 0.08,
     "bcvRate" DECIMAL(12,2) NOT NULL DEFAULT 36.5,
+    "bcvSource" TEXT,
+    "bcvUpdatedAt" TIMESTAMP(3),
+    "bcvRateDate" TIMESTAMP(3),
     "paymentGateway" TEXT NOT NULL DEFAULT 'Stripe + Pago Móvil Local (C2P)',
     "clientBannerEnabled" BOOLEAN NOT NULL DEFAULT false,
     "clientBannerImage" TEXT,
@@ -279,10 +282,29 @@ CREATE TABLE "Pet" (
     "size" TEXT,
     "specialCondition" TEXT,
     "frequentVet" TEXT,
+    "publicCode" TEXT,
+    "lostMode" BOOLEAN NOT NULL DEFAULT false,
+    "lostSince" TIMESTAMP(3),
+    "lostMessage" TEXT,
+    "showOwnerPhone" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Pet_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "PetFoundReport" (
+    "id" TEXT NOT NULL,
+    "petId" TEXT NOT NULL,
+    "message" TEXT,
+    "contact" TEXT,
+    "lat" DOUBLE PRECISION,
+    "lng" DOUBLE PRECISION,
+    "seenAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "PetFoundReport_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -885,6 +907,9 @@ CREATE INDEX "Plan_audience_isActive_idx" ON "Plan"("audience", "isActive");
 CREATE UNIQUE INDEX "Pet_microchip_key" ON "Pet"("microchip");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "Pet_publicCode_key" ON "Pet"("publicCode");
+
+-- CreateIndex
 CREATE INDEX "Pet_ownerId_idx" ON "Pet"("ownerId");
 
 -- CreateIndex
@@ -892,6 +917,9 @@ CREATE INDEX "Pet_species_idx" ON "Pet"("species");
 
 -- CreateIndex
 CREATE INDEX "Pet_status_idx" ON "Pet"("status");
+
+-- CreateIndex
+CREATE INDEX "PetFoundReport_petId_createdAt_idx" ON "PetFoundReport"("petId", "createdAt");
 
 -- CreateIndex
 CREATE INDEX "Allergy_petId_idx" ON "Allergy"("petId");
@@ -1117,6 +1145,9 @@ ALTER TABLE "StaffKyc" ADD CONSTRAINT "StaffKyc_userId_fkey" FOREIGN KEY ("userI
 
 -- AddForeignKey
 ALTER TABLE "Pet" ADD CONSTRAINT "Pet_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PetFoundReport" ADD CONSTRAINT "PetFoundReport_petId_fkey" FOREIGN KEY ("petId") REFERENCES "Pet"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Allergy" ADD CONSTRAINT "Allergy_petId_fkey" FOREIGN KEY ("petId") REFERENCES "Pet"("id") ON DELETE CASCADE ON UPDATE CASCADE;
