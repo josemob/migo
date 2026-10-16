@@ -11,13 +11,15 @@ export interface DialogOptions {
   title: string;
   message?: string;
   buttons?: DialogButton[];
+  /** Se cerró sin tocar ningún botón (el "atrás" de Android). */
+  onDismiss?: () => void;
 }
 
 let externalShow: ((opts: DialogOptions) => void) | null = null;
 
 /** Diálogo Migo, misma firma que Alert.alert — igual en Android e iOS. */
-export function appAlert(title: string, message?: string, buttons?: DialogButton[]) {
-  externalShow?.({ title, message, buttons });
+export function appAlert(title: string, message?: string, buttons?: DialogButton[], onDismiss?: () => void) {
+  externalShow?.({ title, message, buttons, onDismiss });
 }
 
 /** Montar una vez en la raíz de la app. */
@@ -32,11 +34,18 @@ export function DialogHost() {
   }, []);
 
   const close = () => setOpts(null);
+  // Solo para el "atrás" de Android: avisa a quien esperaba una respuesta (si no,
+  // una elección hecha con promesas quedaría pendiente para siempre).
+  const dismiss = () => {
+    const onDismiss = opts?.onDismiss;
+    setOpts(null);
+    onDismiss?.();
+  };
   const buttons = opts?.buttons?.length ? opts.buttons : [{ text: 'OK' } as DialogButton];
   const stacked = buttons.length > 2;
 
   return (
-    <Modal visible={!!opts} transparent animationType="fade" onRequestClose={close}>
+    <Modal visible={!!opts} transparent animationType="fade" onRequestClose={dismiss}>
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <Text style={styles.title}>{opts?.title}</Text>

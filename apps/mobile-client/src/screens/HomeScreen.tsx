@@ -230,7 +230,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                       {upcoming ? `${upcoming.service?.name ?? 'Cita'} ${fmtCitaDate(upcoming.scheduledAt)}` : 'Sin citas próximas'}
                     </Text>
                   </View>
-                  <Pressable style={styles.petChevron} onPress={() => navigation.navigate('Citas')}>
+                  <Pressable style={styles.petChevron} onPress={() => navigation.navigate('PetProfile', { id: pet.id })}>
                     <Text style={styles.petChevronTxt}>›</Text>
                   </Pressable>
                 </View>

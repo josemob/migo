@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
@@ -25,6 +25,9 @@ interface Ficha {
   size?: string;
   specialCondition?: string;
   frequentVet?: string;
+  lostMode?: boolean;
+  lostSince?: string | null;
+  lostMessage?: string | null;
   allergies: { substance: string }[];
   conditions: { name: string }[];
   vaccinations: { nextDueAt?: string }[];
@@ -120,6 +123,57 @@ export default function PetProfileScreen({ route, navigation }: { route: any; na
       { text: 'Eliminar', style: 'destructive', onPress: () => del.mutate() },
     ]);
 
+  // ─── Extravío ───────────────────────────────────────────────────────────────
+  const refrescarExtravio = () => {
+    qc.invalidateQueries({ queryKey: ['pet', id] });
+    qc.invalidateQueries({ queryKey: ['pet-tag', id] });
+    qc.invalidateQueries({ queryKey: ['pets'] });
+  };
+
+  const reportarExtravio = () =>
+    editField({
+      title: `Mensaje para quien encuentre a ${data.name} (opcional)`,
+      value: '',
+      multiline: true,
+      onSave: async (v) => {
+        // Sin código público la alerta no se vería en ninguna parte: si la placa
+        // todavía no existía, se crea aquí (el endpoint es idempotente).
+        await api(`/me/pets/${id}/tag`, { method: 'POST' });
+        await api(`/me/pets/${id}/lost`, { method: 'PATCH', body: { lostMode: true, lostMessage: v.trim() || null } });
+        refrescarExtravio();
+      },
+    });
+
+  const yaVolvio = () =>
+    appAlert(`¿${data.name} ya está en casa?`, 'Se quita la alerta de su ficha pública y tu teléfono vuelve a ocultarse.', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Sí, ya volvió',
+        onPress: async () => {
+          try {
+            await api(`/me/pets/${id}/lost`, { method: 'PATCH', body: { lostMode: false } });
+            refrescarExtravio();
+          } catch (e) {
+            appAlert('No se pudo guardar', e instanceof Error ? e.message : 'Intenta de nuevo');
+          }
+        },
+      },
+    ]);
+
+  const compartirFicha = async () => {
+    try {
+      const t = await api<{ url: string }>(`/me/pets/${id}/tag`, { method: 'POST' });
+      await Share.share({ message: `${data.name} se perdió. Si tienes información, avisa aquí: ${t.url}` });
+    } catch (e) {
+      appAlert('No se pudo compartir', e instanceof Error ? e.message : 'Intenta de nuevo');
+    }
+  };
+
+  const desde = data.lostSince ? new Date(data.lostSince) : null;
+  const fechaExtravio = desde && !Number.isNaN(desde.getTime())
+    ? desde.toLocaleDateString('es-VE', { day: 'numeric', month: 'long' })
+    : null;
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
@@ -153,6 +207,31 @@ export default function PetProfileScreen({ route, navigation }: { route: any; na
             </View>
           </View>
         </View>
+
+        {/* Alerta de extravío: arriba de todo mientras esté activa */}
+        {data.lostMode && (
+          <View style={styles.lost}>
+            <View style={styles.lostHead}>
+              <View style={styles.lostDot} />
+              <Text style={styles.lostTitle}>
+                {data.name} se perdió{fechaExtravio ? ` el ${fechaExtravio}` : ''}
+              </Text>
+            </View>
+            {data.lostMessage ? <Text style={styles.lostMsg}>{data.lostMessage}</Text> : null}
+            <View style={styles.lostActions}>
+              <Pressable style={[styles.lostBtn, styles.lostBtnMain]} onPress={compartirFicha}>
+                <TabIcon name="share" color={colors.white} size={16} />
+                <Text style={styles.lostBtnMainTxt}>Compartir su ficha</Text>
+              </Pressable>
+              <Pressable style={styles.lostBtn} onPress={yaVolvio}>
+                <Text style={styles.lostBtnTxt}>Ya volvió a casa</Text>
+              </Pressable>
+            </View>
+            <Pressable onPress={() => navigation.navigate('PetTag', { id, name: data.name })} hitSlop={8}>
+              <Text style={styles.lostLink}>Ver placa y avisos recibidos ›</Text>
+            </Pressable>
+          </View>
+        )}
 
         {/* Stats */}
         <View style={styles.stats}>
@@ -204,6 +283,7 @@ export default function PetProfileScreen({ route, navigation }: { route: any; na
           <Action icon="calendar" label="Calendario de cuidados" onPress={() => navigation.navigate('Tabs', { screen: 'Citas' })} border />
           <Action icon="syringe" label="Cartilla de vacunación" onPress={() => navigation.navigate('VaccineCard', { id, name: data.name })} border />
           <Action icon="qr" label="Placa QR de identificación" onPress={() => navigation.navigate('PetTag', { id, name: data.name })} border />
+          {!data.lostMode && <Action icon="bell" label="Reportar extravío" onPress={reportarExtravio} border danger />}
         </View>
 
         <Pressable style={styles.delBtn} onPress={confirmDelete} disabled={del.isPending}>
@@ -240,11 +320,11 @@ function Field({ label, value, onEdit, border, valueColor }: { label: string; va
   );
 }
 
-function Action({ icon, label, onPress, border }: { icon: string; label: string; onPress: () => void; border?: boolean }) {
+function Action({ icon, label, onPress, border, danger }: { icon: string; label: string; onPress: () => void; border?: boolean; danger?: boolean }) {
   return (
     <Pressable style={[styles.action, border && styles.fieldBorder]} onPress={onPress}>
-      <TabIcon name={icon} color={colors.brand} size={20} />
-      <Text style={styles.actionLabel}>{label}</Text>
+      <TabIcon name={icon} color={danger ? colors.red : colors.brand} size={20} />
+      <Text style={[styles.actionLabel, danger && { color: colors.red }]}>{label}</Text>
       <Text style={styles.chevron}>›</Text>
     </Pressable>
   );
@@ -265,6 +345,18 @@ const styles = StyleSheet.create({
   name: { fontSize: 24, fontWeight: '800', color: colors.text },
   sub: { fontSize: 15, color: colors.muted, marginTop: 2 },
   badge: { alignSelf: 'flex-start', borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 4, marginTop: 8 },
+
+  lost: { marginTop: 16, backgroundColor: '#FDF1F1', borderRadius: radius.lg, borderWidth: 2, borderColor: colors.red, padding: 16, gap: 10 },
+  lostHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  lostDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.red },
+  lostTitle: { flex: 1, fontSize: 17, fontWeight: '800', color: colors.redDark },
+  lostMsg: { fontSize: 15, color: colors.text, lineHeight: 21 },
+  lostActions: { flexDirection: 'row', gap: 10 },
+  lostBtn: { flex: 1, height: 46, borderRadius: 12, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.red },
+  lostBtnMain: { backgroundColor: colors.red },
+  lostBtnTxt: { fontSize: 15, fontWeight: '700', color: colors.red },
+  lostBtnMainTxt: { fontSize: 15, fontWeight: '700', color: colors.white },
+  lostLink: { fontSize: 14, fontWeight: '700', color: colors.brand },
 
   stats: { flexDirection: 'row', gap: 12, marginTop: 16 },
   stat: { flex: 1, backgroundColor: colors.white, borderRadius: radius.md, padding: 14, boxShadow: cardShadow },

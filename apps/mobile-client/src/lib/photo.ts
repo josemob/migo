@@ -7,24 +7,60 @@ import { appAlert } from './dialog';
 // queda en ~40-80KB, más que suficiente para un avatar.
 const MAX_SIDE = 640;
 
+type Origen = 'camara' | 'galeria';
+
+/** Pregunta de dónde sacar la foto. null si cancela o cierra con "atrás". */
+function elegirOrigen(): Promise<Origen | null> {
+  return new Promise((resolve) => {
+    // DialogHost apila 3+ botones en orden inverso: este arreglo se ve de arriba
+    // a abajo como Tomar foto / Elegir de la galería / Cancelar.
+    appAlert(
+      'Cambiar foto',
+      undefined,
+      [
+        { text: 'Cancelar', style: 'cancel', onPress: () => resolve(null) },
+        { text: 'Elegir de la galería', onPress: () => resolve('galeria') },
+        { text: 'Tomar foto', onPress: () => resolve('camara') },
+      ],
+      () => resolve(null),
+    );
+  });
+}
+
 /**
- * Abre la galería, recorta a cuadrado, redimensiona y devuelve la imagen como
- * data URI (base64) lista para guardar en el backend. null si se cancela, no hay
- * permiso o falla. Nunca lanza: los errores se muestran con appAlert.
+ * Pregunta si tomar la foto con la cámara o elegirla de la galería, recorta a
+ * cuadrado, redimensiona y devuelve la imagen como data URI (base64) lista para
+ * guardar en el backend. null si se cancela, no hay permiso o falla. Nunca lanza:
+ * los errores se muestran con appAlert.
  */
 export async function pickPhotoAsDataUri(aspect: [number, number] = [1, 1]): Promise<string | null> {
   try {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const origen = await elegirOrigen();
+    if (!origen) return null;
+    // Deja que el diálogo termine de cerrarse antes de abrir la cámara o la
+    // galería: en iOS no se puede presentar el selector encima de un modal que
+    // todavía se está ocultando, y no avisa, simplemente no abre.
+    await new Promise((r) => setTimeout(r, 350));
+
+    const perm =
+      origen === 'camara'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      appAlert('Permiso necesario', 'Activa el acceso a tus fotos para cambiar la imagen.');
+      appAlert(
+        'Permiso necesario',
+        origen === 'camara'
+          ? 'Activa el acceso a la cámara para tomar la foto.'
+          : 'Activa el acceso a tus fotos para cambiar la imagen.',
+      );
       return null;
     }
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect,
-      quality: 0.8,
-    });
+
+    const opciones: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], allowsEditing: true, aspect, quality: 0.8 };
+    const res =
+      origen === 'camara'
+        ? await ImagePicker.launchCameraAsync(opciones)
+        : await ImagePicker.launchImageLibraryAsync(opciones);
     const asset = res.canceled ? null : res.assets?.[0];
     if (!asset?.uri) return null;
 
