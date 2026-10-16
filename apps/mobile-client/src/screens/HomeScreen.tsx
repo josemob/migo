@@ -23,7 +23,7 @@ const { width: W } = Dimensions.get('window');
 const CARD_GAP = 12;
 const CARD_W = (W - 40 - CARD_GAP) / 2;
 
-interface Pet { id: string; name: string; alias?: string | null; breed?: string | null; weightKg?: string | number | null; birthDate?: string | null; size?: string | null }
+interface Pet { id: string; name: string; alias?: string | null; breed?: string | null; photoUrl?: string | null; weightKg?: string | number | null; birthDate?: string | null; size?: string | null }
 interface EmergencyMine { id: string; status: string }
 const ACTIVE = ['TRIAGING', 'BROADCASTING', 'ACCEPTED', 'EN_ROUTE'];
 
@@ -195,12 +195,19 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           </Pressable>
         )}
 
-        {/* Card de mascota: imagen según la raza + próxima cita + chips (peso/edad/tamaño) */}
+        {/* Card de mascota: foto real si el dueño subió una; si no, la ilustración de su
+            raza; si tampoco hay raza conocida, un placeholder. + próxima cita + chips */}
         {pet && (
           <View style={styles.petCard}>
             <Image source={require('../assets/pet-card-bg.jpg')} style={StyleSheet.absoluteFill as any} resizeMode="cover" />
 
-            {breedImage(pet.breed) ? (
+            {pet.photoUrl ? (
+              // La foto es un rectángulo con fondo propio: recortada en círculo con aro
+              // blanco, no "contain" como la ilustración (que tiene fondo transparente).
+              <View style={styles.petPhotoRing}>
+                <Image source={{ uri: pet.photoUrl }} style={styles.petPhoto} resizeMode="cover" />
+              </View>
+            ) : breedImage(pet.breed) ? (
               <Image source={breedImage(pet.breed)!} style={styles.petImg} resizeMode="contain" />
             ) : (
               <View style={[styles.petImg, styles.petImgFallback]}><Text style={{ fontSize: 44 }}>🐶</Text></View>
@@ -338,6 +345,8 @@ const styles = StyleSheet.create({
   // Card de mascota (Figma): imagen de raza + próxima cita + chips, fondo degradado morado
   petCard: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 20, marginBottom: 18, borderRadius: 24, overflow: 'hidden', paddingVertical: 10, paddingLeft: 0, paddingRight: 14, boxShadow: cardShadow },
   petImg: { width: 100, height: 100 },
+  petPhotoRing: { width: 92, height: 92, marginLeft: 10, borderRadius: 46, padding: 3, backgroundColor: '#FFFFFF', boxShadow: cardShadow },
+  petPhoto: { width: '100%', height: '100%', borderRadius: 43, backgroundColor: '#F1ECF5' },
   petImgFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1ECF5', borderRadius: 20 },
   petInfo: { flex: 1, alignSelf: 'stretch', justifyContent: 'space-between', paddingVertical: 2, gap: 8 },
   petHeadGroup: { alignSelf: 'stretch', gap: 3 },
