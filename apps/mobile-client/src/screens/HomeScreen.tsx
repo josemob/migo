@@ -98,6 +98,9 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const { user } = useAuth();
   const [page, setPage] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
+  // Alto real de la card de mascota: la foto cuadrada se dimensiona con él (12 px de aire
+  // arriba y abajo) y se centra en vertical. aspectRatio + stretch no la centraba bien.
+  const [petCardH, setPetCardH] = useState(0);
 
   // Banner patrocinado: lo controla el Super Admin (encender/apagar + arte 300x100).
   const bannerQ = useQuery({
@@ -198,15 +201,17 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         {/* Card de mascota: foto real si el dueño subió una; si no, la ilustración de su
             raza; si tampoco hay raza conocida, un placeholder. + próxima cita + chips */}
         {pet && (
-          <View style={styles.petCard}>
+          <View style={styles.petCard} onLayout={(e) => setPetCardH(e.nativeEvent.layout.height)}>
             <Image source={require('../assets/pet-card-bg.jpg')} style={StyleSheet.absoluteFill as any} resizeMode="cover" />
 
             {pet.photoUrl ? (
-              // La foto es un rectángulo con fondo propio: recortada en círculo con aro
-              // blanco, no "contain" como la ilustración (que tiene fondo transparente).
-              <View style={styles.petPhotoRing}>
-                <Image source={{ uri: pet.photoUrl }} style={styles.petPhoto} resizeMode="cover" />
-              </View>
+              // La foto es un rectángulo con fondo propio: va en "cover" y cuadrada, a 12 px
+              // de los bordes de la card, no "contain" como la ilustración (fondo transparente).
+              <Image
+                source={{ uri: pet.photoUrl }}
+                style={[styles.petPhoto, petCardH > 24 && { width: petCardH - 24, height: petCardH - 24 }]}
+                resizeMode="cover"
+              />
             ) : breedImage(pet.breed) ? (
               <Image source={breedImage(pet.breed)!} style={styles.petImg} resizeMode="contain" />
             ) : (
@@ -345,8 +350,10 @@ const styles = StyleSheet.create({
   // Card de mascota (Figma): imagen de raza + próxima cita + chips, fondo degradado morado
   petCard: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 20, marginBottom: 18, borderRadius: 24, overflow: 'hidden', paddingVertical: 10, paddingLeft: 0, paddingRight: 14, boxShadow: cardShadow },
   petImg: { width: 100, height: 100 },
-  petPhotoRing: { width: 92, height: 92, marginLeft: 10, borderRadius: 46, padding: 3, backgroundColor: '#FFFFFF', boxShadow: cardShadow },
-  petPhoto: { width: '100%', height: '100%', borderRadius: 43, backgroundColor: '#F1ECF5' },
+  // Lado = alto de la card menos 12 px arriba y abajo (se calcula en onLayout). Arranca en 0
+  // para que la foto nunca fije el alto de la card: así la medida no rebota entre renders.
+  // Radio 12 = 24 de la card - 12 de separación: curvas paralelas.
+  petPhoto: { width: 0, height: 0, alignSelf: 'center', marginLeft: 12, borderRadius: 12, backgroundColor: '#F1ECF5' },
   petImgFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1ECF5', borderRadius: 20 },
   petInfo: { flex: 1, alignSelf: 'stretch', justifyContent: 'space-between', paddingVertical: 2, gap: 8 },
   petHeadGroup: { alignSelf: 'stretch', gap: 3 },
