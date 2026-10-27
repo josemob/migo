@@ -1,6 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
+import { Platform } from 'react-native';
 import { SaveFormat, manipulateAsync } from 'expo-image-manipulator';
 import { appAlert } from './dialog';
 
@@ -48,10 +49,15 @@ export async function pickDocumentAsDataUri(): Promise<{ url: string; name: stri
  */
 export async function pickPhotoAsDataUri(aspect: [number, number] = [1, 1]): Promise<string | null> {
   try {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      appAlert('Permiso necesario', 'Activa el acceso a tus fotos para cambiar la imagen.');
-      return null;
+    // En Android la galería abre el selector de fotos del sistema, que no pide
+    // permiso: la app no declara READ_MEDIA_* (Google Play solo los acepta en apps
+    // cuya función principal es la galería). Solo iOS necesita pedirlo.
+    if (Platform.OS !== 'android') {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        appAlert('Permiso necesario', 'Activa el acceso a tus fotos para cambiar la imagen.');
+        return null;
+      }
     }
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect, quality: 0.8 });
     const asset = res.canceled ? null : res.assets?.[0];

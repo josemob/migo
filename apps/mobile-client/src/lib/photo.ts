@@ -1,4 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
+import { Platform } from 'react-native';
 import { SaveFormat, manipulateAsync } from 'expo-image-manipulator';
 import { appAlert } from './dialog';
 
@@ -42,10 +43,15 @@ export async function pickPhotoAsDataUri(aspect: [number, number] = [1, 1]): Pro
     // todavía se está ocultando, y no avisa, simplemente no abre.
     await new Promise((r) => setTimeout(r, 350));
 
+    // En Android la galería abre el selector de fotos del sistema, que no pide
+    // permiso: la app no declara READ_MEDIA_* (Google Play solo los acepta en apps
+    // cuya función principal es la galería). Solo iOS necesita pedirlo.
     const perm =
       origen === 'camara'
         ? await ImagePicker.requestCameraPermissionsAsync()
-        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+        : Platform.OS === 'android'
+          ? { granted: true }
+          : await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
       appAlert(
         'Permiso necesario',

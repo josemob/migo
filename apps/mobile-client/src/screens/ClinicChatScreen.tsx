@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
@@ -102,8 +102,11 @@ export default function ClinicChatScreen({ navigation, route }: any) {
         if (!perm.granted) return appAlert('Permiso necesario', 'Habilita el acceso a la cámara para tomar fotos.');
         result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.7 });
       } else {
-        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!perm.granted) return appAlert('Permiso necesario', 'Habilita el acceso a tus fotos para adjuntar archivos.');
+        // Android usa el selector de fotos del sistema, sin permiso (ver lib/photo.ts).
+        if (Platform.OS !== 'android') {
+          const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (!perm.granted) return appAlert('Permiso necesario', 'Habilita el acceso a tus fotos para adjuntar archivos.');
+        }
         result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: kind === 'video' ? ['videos'] : ['images'],
           quality: 0.7,
