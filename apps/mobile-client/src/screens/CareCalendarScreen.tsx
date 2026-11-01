@@ -89,7 +89,7 @@ export default function CareCalendarScreen({ navigation }: { navigation: any }) 
     // Antes: en error se mostraba "No tienes tareas próximas", como si las citas hubieran desaparecido.
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
-        <View style={{ padding: 20, gap: 12 }}>
+        <View style={{ paddingHorizontal: 16, paddingVertical: 20, gap: 12 }}>
           <Text style={styles.headerTitle}>Calendario de Cuidados</Text>
           <Text style={{ fontSize: 15, color: '#64748B' }}>No pudimos cargar tu calendario. Revisa tu conexión e intenta de nuevo.</Text>
           <Pressable onPress={() => void refetch()}>
@@ -111,7 +111,7 @@ export default function CareCalendarScreen({ navigation }: { navigation: any }) 
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 32, gap: 20 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 20, paddingBottom: 32, gap: 20 }} showsVerticalScrollIndicator={false}>
         {/* Calendario */}
         <View style={styles.card}>
           <View style={styles.monthRow}>

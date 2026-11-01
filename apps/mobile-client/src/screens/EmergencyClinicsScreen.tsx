@@ -115,7 +115,7 @@ export default function EmergencyClinicsScreen({ navigation }: { navigation: any
           </View>
         </View>
       ) : (
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Muted>Selecciona la mascota y describe qué ocurre. Migo AI hará el triaje y alertará a las clínicas cercanas.</Muted>
 
         <Text style={styles.section}>Mascota</Text>
@@ -201,11 +201,11 @@ export default function EmergencyClinicsScreen({ navigation }: { navigation: any
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
-  header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
+  header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
   headerTitle: { fontSize: 26, fontWeight: '800', color: colors.text },
 
   // Estado "alerta en curso" (no permite crear otra)
-  inProgress: { flex: 1, justifyContent: 'center', padding: 20 },
+  inProgress: { flex: 1, justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 20 },
   inProgressCard: { backgroundColor: colors.white, borderRadius: radius.lg, padding: 24, alignItems: 'center', gap: 10, borderWidth: 2, borderColor: colors.red, boxShadow: cardShadow },
   inProgressEmoji: { fontSize: 44 },
   inProgressTitle: { fontSize: 20, fontWeight: '800', color: colors.text, textAlign: 'center' },

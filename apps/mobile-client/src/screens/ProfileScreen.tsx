@@ -101,7 +101,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
         <View style={{ width: 44 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 20, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
         {/* Perfil */}
         <View style={styles.hero}>
           <Pressable style={styles.avatarWrap} onPress={changeAvatar}>

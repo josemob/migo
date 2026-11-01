@@ -60,7 +60,7 @@ export default function ClinicDetailScreen({ navigation, route }: any) {
           <Text style={styles.topTitle} numberOfLines={1}>Veterinaria</Text>
           <View style={{ width: 40 }} />
         </View>
-        <View style={{ padding: 20, gap: 12 }}>
+        <View style={{ paddingHorizontal: 16, paddingVertical: 20, gap: 12 }}>
           <Muted>{error instanceof Error ? error.message : 'No pudimos cargar esta clínica.'}</Muted>
           <Pressable style={styles.agendar} onPress={() => void refetch()}>
             <Text style={styles.agendarText}>Reintentar</Text>
@@ -122,7 +122,7 @@ export default function ClinicDetailScreen({ navigation, route }: any) {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 20, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
         {/* Mapa real (con marcador de la clínica). Sin API key válida → pin placeholder. */}
         <View style={styles.map}>
           {showMap ? (

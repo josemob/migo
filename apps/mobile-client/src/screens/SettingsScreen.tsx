@@ -126,7 +126,7 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 20, paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
         {sections.map((section) => (
           <View key={section.title} style={{ marginBottom: 22 }}>
             <Text style={styles.sectionTitle}>{section.title}</Text>

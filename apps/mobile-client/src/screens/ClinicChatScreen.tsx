@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
   offerBtn: { backgroundColor: colors.brand, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 9 },
   offerBtnTxt: { color: colors.white, fontWeight: '800', fontSize: 14 },
   // Fila de opciones de adjuntar: sobre el input, a 14px; fondo del chat para continuidad
-  attachRow: { flexDirection: 'row', gap: 16, paddingTop: 12, paddingBottom: 14, paddingHorizontal: 20, backgroundColor: colors.canvas },
+  attachRow: { flexDirection: 'row', gap: 16, paddingTop: 12, paddingBottom: 14, paddingHorizontal: 16, backgroundColor: colors.canvas },
   // Iconos gris oscuro en círculos 34x34 con borde gris
   attachOpt: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center' },
   uploading: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },

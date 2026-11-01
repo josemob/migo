@@ -91,7 +91,7 @@ export default function BookAppointmentScreen({ navigation, route }: any) {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 20 }} showsVerticalScrollIndicator={false}>
         {/* Resumen mascota + servicio */}
         <View style={styles.summary}>
           <View style={styles.summaryLeft}>
@@ -188,7 +188,7 @@ export default function BookAppointmentScreen({ navigation, route }: any) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
   title: { fontSize: 24, fontWeight: '800', color: colors.text },
   close: { fontSize: 22, color: colors.text, fontWeight: '700' },
 
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
   slotTextOn: { color: colors.brand },
   slotTextOff: { color: colors.muted },
 
-  footer: { padding: 20, paddingTop: 10, backgroundColor: colors.canvas, borderTopWidth: 1, borderTopColor: '#EFEBF2' },
+  footer: { paddingHorizontal: 16, paddingBottom: 20, paddingTop: 10, backgroundColor: colors.canvas, borderTopWidth: 1, borderTopColor: '#EFEBF2' },
   cta: { backgroundColor: colors.brand, borderRadius: 16, height: 56, alignItems: 'center', justifyContent: 'center' },
   ctaText: { color: colors.white, fontWeight: '800', fontSize: 16 },
 });

@@ -161,7 +161,8 @@ export function Badge({ text, color }: { text: string; color: string }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
-  scroll: { padding: spacing.lg, gap: spacing.md, flexGrow: 1 },
+  // Margen lateral de pantalla = 16 en toda la app (antes 24 aquí y 20 en el resto).
+  scroll: { paddingHorizontal: spacing.md, paddingVertical: spacing.lg, gap: spacing.md, flexGrow: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.canvas },
   h1: { fontSize: 26, fontWeight: '800', color: colors.text },
   h2: { fontSize: 18, fontWeight: '700', color: colors.text },

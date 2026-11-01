@@ -102,14 +102,14 @@ export default function RecordDetailScreen({ route, navigation }: { route: any; 
         <ActivityIndicator color={colors.brand} style={{ marginTop: 40 }} />
       ) : isError || !data ? (
         // Antes: spinner infinito cuando fallaba la carga.
-        <View style={{ padding: 20, gap: 12 }}>
+        <View style={{ paddingHorizontal: 16, paddingVertical: 20, gap: 12 }}>
           <Text style={{ fontSize: 15, color: colors.muted }}>No pudimos cargar la consulta. Revisa tu conexión e intenta de nuevo.</Text>
           <Pressable onPress={() => void refetch()}>
             <Text style={{ fontSize: 15, fontWeight: '700', color: colors.brand }}>Reintentar →</Text>
           </Pressable>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 34 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 20, paddingBottom: insets.bottom + 34 }} showsVerticalScrollIndicator={false}>
           <View style={styles.card}>
             <Text style={styles.reason}>{data.reason ?? 'Consulta'}</Text>
             <Text style={styles.meta}>{longDate(data.visitedAt)}{data.clinicName ? ` · ${data.clinicName}` : ''}</Text>

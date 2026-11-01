@@ -80,7 +80,7 @@ export default function PetTagScreen({ route, navigation }: { route: any; naviga
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <Header title="Placa QR" onBack={() => navigation.goBack()} />
-        <View style={{ padding: 20, gap: 12 }}>
+        <View style={{ paddingHorizontal: 16, paddingVertical: 20, gap: 12 }}>
           <Text style={styles.muted}>{tag.error instanceof Error ? tag.error.message : 'No pudimos cargar la placa.'}</Text>
           <Pressable style={styles.outlineBtn} onPress={() => void tag.refetch()}>
             <Text style={styles.outlineBtnTxt}>Reintentar</Text>
@@ -169,7 +169,7 @@ export default function PetTagScreen({ route, navigation }: { route: any; naviga
     <SafeAreaView style={styles.safe} edges={['top']}>
       <Header title={`Placa de ${petName}`} onBack={() => navigation.goBack()} />
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 20, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
         {/* La placa */}
         <View style={[styles.placa, t.lostMode && styles.placaPerdida]}>
           {t.lostMode && (

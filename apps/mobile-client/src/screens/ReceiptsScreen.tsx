@@ -89,7 +89,7 @@ export default function ReceiptsScreen({ navigation }: { navigation: any }) {
         <View style={{ width: 44 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 34 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 20, paddingBottom: insets.bottom + 34 }} showsVerticalScrollIndicator={false}>
         {receipts.isLoading ? (
           <ActivityIndicator color={colors.brand} style={{ marginTop: 40 }} />
         ) : receipts.isError ? (

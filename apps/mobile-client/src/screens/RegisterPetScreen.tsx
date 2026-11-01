@@ -1,7 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Image,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -49,6 +52,19 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
   const [color, setColor] = useState('');
   const [allergy, setAllergy] = useState('');
   const [busy, setBusy] = useState(false);
+  const [kbd, setKbd] = useState(false);
+
+  // Con edge-to-edge, Android ya no achica la ventana con el teclado (adjustResize no
+  // aplica) y los campos de abajo quedaban tapados: lo hace el KeyboardAvoidingView, y el
+  // botón de guardar se oculta mientras se escribe para no comerse el espacio visible.
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKbd(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKbd(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   const selectedBreedImg = useMemo(() => breedImage(breed), [breed]);
   const filteredBreeds = useMemo(
@@ -106,7 +122,8 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: (footerH || 90) + 62 }} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 20, paddingBottom: kbd ? 24 : (footerH || 90) + 62 }} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Cuéntanos sobre tu mejor amigo</Text>
         <Text style={styles.subtitle}>Esta información ayuda a la IA de Migo a personalizar su cuidado diario y médico.</Text>
 
@@ -173,7 +190,8 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
             <Field label="¿Cómo le dices de cariño? (Alias)">
               <TextInput style={styles.input} placeholder="Ej. El gordo, Chiquito..." placeholderTextColor={colors.muted} value={alias} onChangeText={setAlias} />
             </Field>
-            <Text style={styles.label}>Tamaño aproximado</Text>
+            {/* Fuera de <Field>, así que el margen superior de 18 va aparte (antes quedaba pegada al Alias). */}
+            <Text style={[styles.label, { marginTop: 18 }]}>Tamaño aproximado</Text>
             <View style={styles.typeRow}>
               {SIZES.map((s) => (
                 <TypeBtn key={s} label={s} active={size === s} onPress={() => setSize(s)} small />
@@ -193,11 +211,14 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
       </ScrollView>
 
       {/* Footer */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 34 }]} onLayout={(e) => setFooterH(e.nativeEvent.layout.height)}>
-        <Pressable style={[styles.saveBtn, busy && { opacity: 0.6 }]} onPress={save} disabled={busy}>
-          <Text style={styles.saveText}>{busy ? 'Guardando…' : '¡Listo, guardar mascota!'}</Text>
-        </Pressable>
-      </View>
+      {!kbd && (
+        <View style={[styles.footer, { paddingBottom: insets.bottom + 34 }]} onLayout={(e) => setFooterH(e.nativeEvent.layout.height)}>
+          <Pressable style={[styles.saveBtn, busy && { opacity: 0.6 }]} onPress={save} disabled={busy}>
+            <Text style={styles.saveText}>{busy ? 'Guardando…' : '¡Listo, guardar mascota!'}</Text>
+          </Pressable>
+        </View>
+      )}
+      </KeyboardAvoidingView>
 
       {/* Selector de raza */}
       <Modal visible={breedOpen} animationType="slide" transparent onRequestClose={() => setBreedOpen(false)}>
@@ -274,6 +295,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
+  flex: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 8 },
   back: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
   backArrow: { fontSize: 22, color: colors.text },
@@ -293,8 +315,9 @@ const styles = StyleSheet.create({
   typeRow: { flexDirection: 'row', gap: 12 },
   typeBtn: { flex: 1, paddingVertical: 16, borderRadius: radius.md, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
   typeBtnActive: { backgroundColor: colors.brand, borderColor: colors.brand },
-  typeBtnText: { fontSize: 15, fontWeight: '700', color: colors.text },
-  typeBtnTextActive: { color: colors.white },
+  // Opciones un peso por debajo de la etiqueta (700) para que se lea la jerarquía.
+  typeBtnText: { fontSize: 15, fontWeight: '500', color: colors.text },
+  typeBtnTextActive: { color: colors.white, fontWeight: '600' },
 
   input: { backgroundColor: colors.white, borderRadius: radius.md, paddingHorizontal: 16, paddingVertical: 15, fontSize: 15, color: colors.text, borderWidth: 1, borderColor: colors.border },
   inputRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, paddingRight: 16 },
@@ -304,7 +327,7 @@ const styles = StyleSheet.create({
   chevron: { fontSize: 20, color: colors.muted },
 
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: colors.canvas, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20 },
+  modalSheet: { backgroundColor: colors.canvas, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 20 },
   modalHandle: { alignSelf: 'center', width: 44, height: 5, borderRadius: 3, backgroundColor: colors.border, marginBottom: 12 },
   modalTitle: { fontSize: 18, fontWeight: '900', color: colors.text, marginBottom: 12 },
   search: { backgroundColor: colors.white, borderRadius: radius.md, paddingHorizontal: 16, paddingVertical: 12, fontSize: 15, color: colors.text, borderWidth: 1, borderColor: colors.border, marginBottom: 8 },
@@ -322,7 +345,7 @@ const styles = StyleSheet.create({
   medicalChevron: { fontSize: 18, color: colors.brand, fontWeight: '800' },
   medicalBody: { backgroundColor: '#F7F1FB', borderRadius: radius.md, borderTopLeftRadius: 0, borderTopRightRadius: 0, padding: 16, paddingTop: 4, borderWidth: 1, borderColor: '#E3D0EE', borderTopWidth: 0 },
 
-  footer: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, paddingTop: 12, backgroundColor: colors.canvas, borderTopWidth: 1, borderTopColor: colors.border },
+  footer: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 16, paddingBottom: 20, paddingTop: 12, backgroundColor: colors.canvas, borderTopWidth: 1, borderTopColor: colors.border },
   saveBtn: { backgroundColor: colors.brand, paddingVertical: 17, borderRadius: radius.full, alignItems: 'center' },
   saveText: { color: colors.white, fontSize: 17, fontWeight: '800' },
 });

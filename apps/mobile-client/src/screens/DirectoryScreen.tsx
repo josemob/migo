@@ -154,14 +154,14 @@ export default function DirectoryScreen({ navigation, route }: any) {
         {isLoading ? (
           <Loading />
         ) : (
-          <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 18, paddingBottom: 40, gap: 14 }} showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 18, paddingBottom: 40, gap: 14 }} showsVerticalScrollIndicator={false}>
             <Text style={styles.resultsLabel}>
               {clinics.length > 0 ? 'Resultados más cercanos a ti' : 'Directorio'}
               {isFetching && !isLoading ? '  ·  actualizando…' : ''}
             </Text>
 
             {/* Chips de categoría (filtro) */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} style={{ flexGrow: 0, marginHorizontal: -20, paddingHorizontal: 20 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} style={{ flexGrow: 0, marginHorizontal: -16, paddingHorizontal: 16 }}>
               <Chip label="Todos" icon="paw" active={!category} onPress={() => setCategory(null)} />
               {SERVICE_CATEGORIES.map((c) => (
                 <Chip key={c.key} label={c.label} icon={c.icon} active={category === c.key} onPress={() => setCategory(category === c.key ? null : c.key)} />

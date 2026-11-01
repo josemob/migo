@@ -19,9 +19,12 @@ import { TabIcon } from '../components/TabIcon';
 import { cardShadow, colors, control, radius, type } from '../theme';
 
 const { width: W } = Dimensions.get('window');
-// Dos tarjetas por vista: (ancho - padding lateral 20*2 - gap 12) / 2
+// Dos tarjetas por vista: (ancho - padding lateral 16*2 - gap 12) / 2
 const CARD_GAP = 12;
-const CARD_W = (W - 40 - CARD_GAP) / 2;
+const CARD_W = (W - 32 - CARD_GAP) / 2;
+// Tope de escalado de la letra del sistema dentro de la card de la mascota: es la card con
+// menos aire de la app (foto + nombre + cita + 3 chips) y a 1.3x ya se cortaba.
+const PET_CARD_MAX_SCALE = 1.2;
 
 interface Pet { id: string; name: string; alias?: string | null; breed?: string | null; photoUrl?: string | null; weightKg?: string | number | null; birthDate?: string | null; size?: string | null }
 interface EmergencyMine { id: string; status: string }
@@ -100,7 +103,11 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const scrollRef = useRef<ScrollView>(null);
   // Alto real de la card de mascota: la foto cuadrada se dimensiona con él (12 px de aire
   // arriba y abajo) y se centra en vertical. aspectRatio + stretch no la centraba bien.
-  const [petCardH, setPetCardH] = useState(0);
+  const [petCard, setPetCard] = useState({ w: 0, h: 0 });
+  // Lado de la foto: alto de la card menos 12 arriba y abajo, con tope del 36% del ancho.
+  // Sin tope, con letra grande la card crecía, la foto crecía con ella y le quitaba ancho
+  // al texto ("Próxima cita" terminaba partido en sílabas).
+  const petPhotoSide = petCard.h > 24 ? Math.min(petCard.h - 24, petCard.w * 0.36) : 0;
 
   // Banner patrocinado: lo controla el Super Admin (encender/apagar + arte 300x100).
   const bannerQ = useQuery({
@@ -142,6 +149,18 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const avatarUrl = (user as { avatarUrl?: string } | null)?.avatarUrl;
   const pet = pets.data?.data?.[0] ?? null;
   const active = emergencies.data?.data?.find((e) => ACTIVE.includes(e.status));
+
+  // Atajo "Registrar Vacuna o Desparasitación": va directo a la cartilla (antes caía en la
+  // lista de mascotas, sin nada que registrar). Con varias mascotas, primero se elige cuál.
+  const openVaccineCard = () => {
+    const list = pets.data?.data ?? [];
+    if (list.length === 0) return navigation.navigate('RegisterPet');
+    if (list.length === 1) return navigation.navigate('VaccineCard', { id: list[0].id, name: list[0].name });
+    appAlert('¿De qué mascota?', undefined, [
+      ...list.slice(0, 4).map((p) => ({ text: p.name, onPress: () => navigation.navigate('VaccineCard', { id: p.id, name: p.name }) })),
+      { text: 'Cancelar', style: 'cancel' as const },
+    ]);
+  };
 
   const petChips = pet
     ? [
@@ -201,7 +220,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         {/* Card de mascota: foto real si el dueño subió una; si no, la ilustración de su
             raza; si tampoco hay raza conocida, un placeholder. + próxima cita + chips */}
         {pet && (
-          <View style={styles.petCard} onLayout={(e) => setPetCardH(e.nativeEvent.layout.height)}>
+          <View style={styles.petCard} onLayout={(e) => setPetCard({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
             <Image source={require('../assets/pet-card-bg.jpg')} style={StyleSheet.absoluteFill as any} resizeMode="cover" />
 
             {pet.photoUrl ? (
@@ -209,7 +228,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               // de los bordes de la card, no "contain" como la ilustración (fondo transparente).
               <Image
                 source={{ uri: pet.photoUrl }}
-                style={[styles.petPhoto, petCardH > 24 && { width: petCardH - 24, height: petCardH - 24 }]}
+                style={[styles.petPhoto, petPhotoSide > 0 && { width: petPhotoSide, height: petPhotoSide }]}
                 resizeMode="cover"
               />
             ) : breedImage(pet.breed) ? (
@@ -221,17 +240,17 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             <View style={styles.petInfo}>
               <View style={styles.petHeadGroup}>
                 <View style={styles.petNameRow}>
-                  <Text style={styles.petName} numberOfLines={1}>{pet.name}</Text>
+                  <Text style={styles.petName} numberOfLines={1} maxFontSizeMultiplier={PET_CARD_MAX_SCALE}>{pet.name}</Text>
                   {pet.alias ? (
                     <View style={styles.aliasChip}>
-                      <Text style={styles.aliasChipTxt} numberOfLines={1}>Alias: {pet.alias}</Text>
+                      <Text style={styles.aliasChipTxt} numberOfLines={1} maxFontSizeMultiplier={PET_CARD_MAX_SCALE}>Alias: {pet.alias}</Text>
                     </View>
                   ) : null}
                 </View>
                 <View style={styles.petCitaRow}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.petCitaLabel}>Próxima cita:</Text>
-                    <Text style={styles.petCitaVal} numberOfLines={1}>
+                    <Text style={styles.petCitaLabel} numberOfLines={1} maxFontSizeMultiplier={PET_CARD_MAX_SCALE}>Próxima cita:</Text>
+                    <Text style={styles.petCitaVal} numberOfLines={1} maxFontSizeMultiplier={PET_CARD_MAX_SCALE}>
                       {upcoming ? `${upcoming.service?.name ?? 'Cita'} ${fmtCitaDate(upcoming.scheduledAt)}` : 'Sin citas próximas'}
                     </Text>
                   </View>
@@ -242,7 +261,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               </View>
               <View style={styles.petChipsRow}>
                 {petChips.map((c) => (
-                  <View key={c} style={styles.petChip}><Text style={styles.petChipTxt} numberOfLines={1}>{c}</Text></View>
+                  <View key={c} style={styles.petChip}><Text style={styles.petChipTxt} numberOfLines={1} maxFontSizeMultiplier={PET_CARD_MAX_SCALE}>{c}</Text></View>
                 ))}
               </View>
             </View>
@@ -256,7 +275,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           showsHorizontalScrollIndicator={false}
           snapToInterval={CARD_W + CARD_GAP}
           decelerationRate="fast"
-          contentContainerStyle={{ paddingHorizontal: 20, gap: CARD_GAP }}
+          contentContainerStyle={{ paddingHorizontal: 16, gap: CARD_GAP }}
           onMomentumScrollEnd={(e) => setPage(Math.round(e.nativeEvent.contentOffset.x / (CARD_W + CARD_GAP)))}
         >
           {SERVICES.map((s) => (
@@ -306,12 +325,12 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
         {/* Atajos */}
         <Text style={styles.shortcutsTitle}>Atajos</Text>
-        <View style={{ paddingHorizontal: 20, gap: 10 }}>
+        <View style={{ paddingHorizontal: 16, gap: 10 }}>
           {SHORTCUTS.map((s) => (
             <Pressable
               key={s.key}
               style={styles.shortcut}
-              onPress={() => (s.key === 'vax' ? navigation.navigate('Expediente') : appAlert('Migo', 'Función disponible próximamente.'))}
+              onPress={() => (s.key === 'vax' ? openVaccineCard() : appAlert('Migo', 'Función disponible próximamente.'))}
             >
               <View style={styles.shortcutIcon}>
                 <TabIcon name={s.icon} color={colors.brand} size={22} />
@@ -332,7 +351,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
   userRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   avatar: { width: 48, height: 48, borderRadius: 8, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
   avatarImg: { width: 48, height: 48, borderRadius: 8, backgroundColor: '#EFE3F5' },
@@ -341,14 +360,14 @@ const styles = StyleSheet.create({
   hiSub: { fontSize: 14, fontWeight: '400', color: '#6B7280', marginTop: 1 },
   bell: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#F1ECF5', alignItems: 'center', justifyContent: 'center' },
 
-  rateCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 20, marginBottom: 14, padding: 14, backgroundColor: '#FEFBEA', borderRadius: radius.lg, borderWidth: 2, borderColor: colors.accent, boxShadow: cardShadow },
+  rateCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginBottom: 14, padding: 14, backgroundColor: '#FEFBEA', borderRadius: radius.lg, borderWidth: 2, borderColor: colors.accent, boxShadow: cardShadow },
   rateIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#FFF3C4', alignItems: 'center', justifyContent: 'center' },
   rateTitle: { fontSize: 15, fontWeight: '800', color: colors.text },
   rateSub: { fontSize: 13, color: colors.muted, marginTop: 2 },
   rateCta: { color: colors.brand, fontWeight: '800', fontSize: 14 },
 
   // Card de mascota (Figma): imagen de raza + próxima cita + chips, fondo degradado morado
-  petCard: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 20, marginBottom: 18, borderRadius: 24, overflow: 'hidden', paddingVertical: 10, paddingLeft: 0, paddingRight: 14, boxShadow: cardShadow },
+  petCard: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginBottom: 18, borderRadius: 24, overflow: 'hidden', paddingVertical: 10, paddingLeft: 0, paddingRight: 14, boxShadow: cardShadow },
   petImg: { width: 100, height: 100 },
   // Lado = alto de la card menos 12 px arriba y abajo (se calcula en onLayout). Arranca en 0
   // para que la foto nunca fije el alto de la card: así la medida no rebota entre renders.
@@ -366,11 +385,13 @@ const styles = StyleSheet.create({
   petCitaVal: { fontSize: 14, color: '#000000', marginTop: 1 },
   petChevron: { width: 28, height: 28, borderRadius: 4, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
   petChevronTxt: { color: colors.white, fontSize: 20, fontWeight: '800', lineHeight: 22, marginTop: -1 },
-  petChipsRow: { flexDirection: 'row', gap: 5 },
-  petChip: { flex: 1, backgroundColor: colors.white, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, alignItems: 'center' },
+  // Los chips toman el ancho de su texto y reparten el sobrante; si no caben, bajan a otra
+  // línea en vez de cortarse en "Tama…" (antes flex: 1 los forzaba a anchos iguales).
+  petChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
+  petChip: { flexGrow: 1, backgroundColor: colors.white, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, alignItems: 'center' },
   petChipTxt: { color: colors.brand, fontSize: 12, fontWeight: '600' },
 
-  reminder: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 20, marginBottom: 18, padding: 12, backgroundColor: colors.white, borderRadius: radius.lg, borderWidth: 2, borderColor: colors.accent, boxShadow: cardShadow },
+  reminder: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginBottom: 18, padding: 12, backgroundColor: colors.white, borderRadius: radius.lg, borderWidth: 2, borderColor: colors.accent, boxShadow: cardShadow },
   reminderIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#F1ECF5', alignItems: 'center', justifyContent: 'center' },
   reminderText: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.text },
   reminderSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
@@ -389,7 +410,7 @@ const styles = StyleSheet.create({
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.accent },
   dotActive: { backgroundColor: colors.brand, width: 8, height: 8 },
 
-  urg: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#FEFBEA', borderRadius: radius.lg, overflow: 'hidden', alignItems: 'center', boxShadow: cardShadow },
+  urg: { flexDirection: 'row', marginHorizontal: 16, backgroundColor: '#FEFBEA', borderRadius: radius.lg, overflow: 'hidden', alignItems: 'center', boxShadow: cardShadow },
   urgImg: { width: 120, height: 120 },
   urgBody: { flex: 1, padding: 14, paddingLeft: 4 },
   urgTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
@@ -398,10 +419,10 @@ const styles = StyleSheet.create({
   urgBtnText: { ...type.h4, color: colors.text },
 
   // Banner patrocinado: ancho completo, proporción 6:1 (como 300x50), con border radius.
-  bannerWrap: { marginHorizontal: 20, marginTop: 18 },
+  bannerWrap: { marginHorizontal: 16, marginTop: 18 },
   banner: { width: '100%', aspectRatio: 6, borderRadius: radius.md, overflow: 'hidden', backgroundColor: '#EEEEEE' },
 
-  shortcutsTitle: { fontSize: 20, fontWeight: '800', color: colors.text, marginHorizontal: 20, marginTop: 22, marginBottom: 12 },
+  shortcutsTitle: { fontSize: 20, fontWeight: '800', color: colors.text, marginHorizontal: 16, marginTop: 22, marginBottom: 12 },
   // Card de atajo (Figma node 112-80): padding 8/8/8/14 · gap 12 · radio 16
   shortcut: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.white, borderRadius: radius.lg, paddingVertical: 8, paddingLeft: 8, paddingRight: 14, boxShadow: cardShadow },
   shortcutIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(138,47,160,0.14)', alignItems: 'center', justifyContent: 'center' },

@@ -94,7 +94,7 @@ export default function PetProfileScreen({ route, navigation }: { route: any; na
           <Text style={styles.headerTitle}>Perfil</Text>
           <View style={{ width: 44 }} />
         </View>
-        <View style={{ padding: 20, gap: 12 }}>
+        <View style={{ paddingHorizontal: 16, paddingVertical: 20, gap: 12 }}>
           <Text style={styles.sub}>{error instanceof Error ? error.message : 'No pudimos cargar el perfil.'}</Text>
           <Pressable style={[styles.delBtn, { borderColor: colors.brand }]} onPress={() => void refetch()}>
             <Text style={[styles.delText, { color: colors.brand }]}>Reintentar</Text>
@@ -182,7 +182,7 @@ export default function PetProfileScreen({ route, navigation }: { route: any; na
         <View style={{ width: 44 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 20, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
         {/* Card principal */}
         <View style={styles.hero}>
           <Pressable style={styles.avatarWrap} onPress={changePhoto}>

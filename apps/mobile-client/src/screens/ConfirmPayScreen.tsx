@@ -94,7 +94,7 @@ export default function ConfirmPayScreen({ navigation, route }: any) {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 20 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 20 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Resumen */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Resumen de la cita</Text>
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
   totalVal: { fontSize: 18, fontWeight: '900', color: colors.brand },
   bcv: { fontSize: 12, color: colors.muted, marginTop: 6 },
 
-  footer: { padding: 20, paddingTop: 10, backgroundColor: colors.canvas, borderTopWidth: 1, borderTopColor: '#EFEBF2' },
+  footer: { paddingHorizontal: 16, paddingBottom: 20, paddingTop: 10, backgroundColor: colors.canvas, borderTopWidth: 1, borderTopColor: '#EFEBF2' },
   cta: { backgroundColor: colors.brand, borderRadius: 16, height: 56, alignItems: 'center', justifyContent: 'center' },
   ctaText: { color: colors.white, fontWeight: '800', fontSize: 16 },
 
