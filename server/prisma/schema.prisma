@@ -554,19 +554,27 @@ model PetCondition {
   @@index([petId])
 }
 
+enum VaccinationKind {
+  VACCINE
+  DEWORMING // desparasitación (interna o externa)
+}
+
 model Vaccination {
-  id          String       @id @default(uuid())
-  pet         Pet          @relation(fields: [petId], references: [id], onDelete: Cascade)
-  petId       String
-  vaccineName String // ej. "Séxtuple Canina", "Rabia Canina", "Tos de Perreras"
-  lotNumber   String?
-  appliedAt   DateTime
-  nextDueAt   DateTime? // "Vencido hace 30d" / "Al Día" se derivan de esto
-  appliedBy   ClinicStaff? @relation(fields: [appliedById], references: [id])
-  appliedById String?
-  clinic      Clinic?      @relation(fields: [clinicId], references: [id])
-  clinicId    String?
-  createdAt   DateTime     @default(now())
+  id              String          @id @default(uuid())
+  pet             Pet             @relation(fields: [petId], references: [id], onDelete: Cascade)
+  petId           String
+  kind            VaccinationKind @default(VACCINE)
+  vaccineName     String // ej. "Séxtuple Canina", "Rabia Canina", "Tos de Perreras"; o el antiparasitario
+  lotNumber       String?
+  appliedAt       DateTime
+  nextDueAt       DateTime? // "Vencido hace 30d" / "Al Día" se derivan de esto
+  appliedBy       ClinicStaff?    @relation(fields: [appliedById], references: [id])
+  appliedById     String?
+  clinic          Clinic?         @relation(fields: [clinicId], references: [id])
+  clinicId        String?
+  // true = la cargó el dueño desde la app (vacunó fuera de Migo); el vet la ve marcada así.
+  recordedByOwner Boolean         @default(false)
+  createdAt       DateTime        @default(now())
 
   @@index([petId])
   @@index([nextDueAt])

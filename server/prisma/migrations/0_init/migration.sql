@@ -86,6 +86,9 @@ CREATE TYPE "InvitationStatus" AS ENUM ('PENDING', 'ACCEPTED', 'REJECTED', 'CANC
 CREATE TYPE "PlanAudience" AS ENUM ('VET', 'CLINIC');
 
 -- CreateEnum
+CREATE TYPE "VaccinationKind" AS ENUM ('VACCINE', 'DEWORMING');
+
+-- CreateEnum
 CREATE TYPE "VetPlanStatus" AS ENUM ('ACTIVE', 'PAST_DUE', 'CANCELLED', 'EXPIRED');
 
 -- CreateEnum
@@ -337,12 +340,14 @@ CREATE TABLE "PetCondition" (
 CREATE TABLE "Vaccination" (
     "id" TEXT NOT NULL,
     "petId" TEXT NOT NULL,
+    "kind" "VaccinationKind" NOT NULL DEFAULT 'VACCINE',
     "vaccineName" TEXT NOT NULL,
     "lotNumber" TEXT,
     "appliedAt" TIMESTAMP(3) NOT NULL,
     "nextDueAt" TIMESTAMP(3),
     "appliedById" TEXT,
     "clinicId" TEXT,
+    "recordedByOwner" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Vaccination_pkey" PRIMARY KEY ("id")

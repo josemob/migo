@@ -28,7 +28,7 @@ interface Ficha {
   owner?: { fullName: string; phone?: string | null; nationalId?: string | null } | null;
   allergies: { substance: string }[];
   conditions: { name: string }[];
-  vaccinations: { vaccineName: string; appliedAt: string; nextDueAt?: string | null }[];
+  vaccinations: { vaccineName: string; appliedAt: string; nextDueAt?: string | null; kind?: 'VACCINE' | 'DEWORMING'; recordedByOwner?: boolean }[];
   records: { id: string; visitedAt: string; reason?: string | null; diagnosis?: string | null; vet?: { user?: { fullName?: string } } | null }[];
 }
 
@@ -161,8 +161,10 @@ export default function PatientDetailScreen({ navigation, route }: any) {
           vaccinations.map((v, i) => (
             <View key={i} style={styles.vaxRow}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.vaxName}>{v.vaccineName}</Text>
+                <Text style={styles.vaxName}>{v.kind === 'DEWORMING' ? '🪱 ' : ''}{v.vaccineName}</Text>
                 {v.nextDueAt && <Text style={styles.vaxDue}>Próxima: {fmt(v.nextDueAt)}</Text>}
+                {/* Anotada por el dueño desde su app (vacunó fuera de Migo): el vet la toma como referencia, no como registro clínico propio. */}
+                {v.recordedByOwner && <Text style={styles.vaxOwner}>Registrada por el dueño</Text>}
               </View>
               <View style={[styles.pill, { backgroundColor: upToDate(v.nextDueAt) ? '#DFF3E6' : '#FDECEC' }]}>
                 <Text style={[styles.pillTxt, { color: upToDate(v.nextDueAt) ? colors.green : colors.red }]}>{upToDate(v.nextDueAt) ? 'Al día' : 'Vencida'}</Text>
@@ -265,6 +267,7 @@ const styles = StyleSheet.create({
   vaxRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.white, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8, boxShadow: cardShadow, gap: 8 },
   vaxName: { fontSize: 15, color: colors.text, fontWeight: '600' },
   vaxDue: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  vaxOwner: { fontSize: 11, color: colors.amber, fontWeight: '700', marginTop: 2 },
 
   mBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   mSheet: { backgroundColor: colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, gap: 8 },

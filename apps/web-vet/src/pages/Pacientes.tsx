@@ -20,7 +20,7 @@ interface Ficha {
   bloodType?: string;
   allergies: { substance: string }[];
   conditions: { name: string }[];
-  vaccinations: { vaccineName: string; nextDueAt?: string }[];
+  vaccinations: { vaccineName: string; nextDueAt?: string; kind?: 'VACCINE' | 'DEWORMING'; recordedByOwner?: boolean }[];
   prescriptions: { drug: string; frequency?: string; durationDays?: number }[];
   records: { id: string; visitedAt: string; reason?: string; diagnosis?: string }[];
 }
@@ -141,7 +141,11 @@ export default function Pacientes() {
               <Block title="Esquema de Vacunación">
                 {ficha.data.vaccinations.map((v, i) => (
                   <div key={i} className="flex items-center justify-between py-0.5 text-sm">
-                    <span className="text-slate-700">{v.vaccineName}</span>
+                    <span className="text-slate-700">
+                      {v.kind === 'DEWORMING' ? '🪱 ' : ''}
+                      {v.vaccineName}
+                      {v.recordedByOwner && <span className="ml-1.5 text-xs font-semibold text-amber-600">· Registrada por el dueño</span>}
+                    </span>
                     {vaxUpToDate(v.nextDueAt) ? (
                       <Badge tone="green">Al Día</Badge>
                     ) : (

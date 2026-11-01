@@ -904,6 +904,47 @@ router.post(
   }),
 );
 
+// POST /me/pets/:id/vaccinations -> el dueño anota en la cartilla una vacuna o
+// desparasitación aplicada fuera de Migo. Queda marcada recordedByOwner (sin clínica).
+router.post(
+  '/pets/:id/vaccinations',
+  validate({
+    params: z.object({ id: z.string().uuid() }),
+    body: z
+      .object({
+        kind: z.enum(['VACCINE', 'DEWORMING']).default('VACCINE'),
+        vaccineName: z.string().trim().min(2).max(80),
+        appliedAt: z.coerce.date(),
+        nextDueAt: z.coerce.date().optional(),
+        lotNumber: z.string().trim().max(40).optional(),
+      })
+      .refine((b) => b.appliedAt.getTime() <= Date.now() + 86_400_000, { message: 'La fecha de aplicación no puede ser futura', path: ['appliedAt'] })
+      .refine((b) => !b.nextDueAt || b.nextDueAt > b.appliedAt, { message: 'La próxima dosis debe ser después de la aplicación', path: ['nextDueAt'] }),
+  }),
+  asyncHandler(async (req, res) => {
+    const pet = await prisma.pet.findFirst({ where: { id: req.params.id, ownerId: req.user!.id } });
+    if (!pet) throw ApiError.notFound('Mascota no encontrada');
+    const vax = await prisma.vaccination.create({ data: { ...req.body, petId: pet.id, recordedByOwner: true } });
+    res.status(201).json(vax);
+  }),
+);
+
+// DELETE /me/pets/:id/vaccinations/:vaxId -> el dueño solo puede borrar las que él anotó;
+// las que registró una clínica son parte del historial clínico.
+router.delete(
+  '/pets/:id/vaccinations/:vaxId',
+  validate({ params: z.object({ id: z.string().uuid(), vaxId: z.string().uuid() }) }),
+  asyncHandler(async (req, res) => {
+    const vax = await prisma.vaccination.findFirst({
+      where: { id: req.params.vaxId, petId: req.params.id, pet: { ownerId: req.user!.id } },
+    });
+    if (!vax) throw ApiError.notFound('Registro no encontrado');
+    if (!vax.recordedByOwner) throw ApiError.forbidden('Solo puedes borrar los registros que anotaste tú');
+    await prisma.vaccination.delete({ where: { id: vax.id } });
+    res.status(204).end();
+  }),
+);
+
 // GET /me/receipts -> recibos/comprobantes del dueño
 router.get(
   '/receipts',
