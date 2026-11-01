@@ -121,9 +121,9 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
       <View style={styles.header}>
         <BackButton onPress={() => navigation.goBack()} />
         <Text style={styles.headerTitle}>Configuración</Text>
-        <Pressable style={styles.skip} onPress={() => navigation.goBack()}>
-          <Text style={styles.skipText}>Saltar</Text>
-        </Pressable>
+        {/* Contrapeso del botón atrás (44) para que el título quede centrado. Antes había un
+            "Saltar" que hacía lo mismo que "‹". */}
+        <View style={{ width: 44 }} />
       </View>
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 20, paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
@@ -184,8 +184,6 @@ const styles = StyleSheet.create({
   back: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
   backArrow: { fontSize: 22, color: colors.text },
   headerTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '800', color: colors.text },
-  skip: { backgroundColor: '#FFFDEB', borderWidth: 1.5, borderColor: colors.accent, paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.full },
-  skipText: { fontWeight: '800', color: colors.text },
 
   sectionTitle: { fontSize: 14, color: colors.muted, marginBottom: 10, marginLeft: 4 },
   card: { backgroundColor: colors.white, borderRadius: radius.lg, boxShadow: cardShadow },
