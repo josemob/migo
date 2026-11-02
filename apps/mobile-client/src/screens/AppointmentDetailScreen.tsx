@@ -32,6 +32,8 @@ const STATUS: Record<AppointmentDetail['status'], { label: string; color: string
 
 const longDate = (iso: string) =>
   new Date(iso).toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'long' });
+// "lunes, 2 de noviembre" -> "Lunes, 2 de noviembre" (textTransform capitalize ponía "De Noviembre")
+const capFirst = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const timeLabel = (iso: string) =>
   new Date(iso).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: true });
 
@@ -96,7 +98,7 @@ export default function AppointmentDetailScreen({ route, navigation }: { route: 
               <Text style={styles.title}>{data.service?.name ?? data.reason ?? 'Cita veterinaria'}</Text>
               {st && <Badge text={st.label} color={st.color} />}
             </View>
-            <Text style={styles.when}>{longDate(data.scheduledAt)}</Text>
+            <Text style={styles.when}>{capFirst(longDate(data.scheduledAt))}</Text>
             <Text style={styles.time}>{timeLabel(data.scheduledAt)}</Text>
           </View>
 
@@ -147,7 +149,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: colors.white, borderRadius: radius.lg, padding: 16, boxShadow: cardShadow },
   topRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
   title: { flex: 1, fontSize: 18, fontWeight: '900', color: colors.text },
-  when: { fontSize: 15, fontWeight: '700', color: colors.brand, marginTop: 8, textTransform: 'capitalize' },
+  when: { fontSize: 15, fontWeight: '700', color: colors.brand, marginTop: 8 },
   time: { fontSize: 14, color: colors.muted, marginTop: 2 },
   row: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F0ECF3' },
   rowLabel: { fontSize: 12, color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
