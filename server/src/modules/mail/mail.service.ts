@@ -65,6 +65,31 @@ export async function sendWelcomeEmail(to: string, name: string) {
   });
 }
 
+// Código para confirmar el correo nuevo (se envía al correo NUEVO).
+export async function sendEmailChangeCodeEmail(to: string, name: string, code: string) {
+  const first = name?.split(' ')[0] || '';
+  return sendEmail({
+    to,
+    subject: `Tu código para cambiar el correo: ${code}`,
+    html: layout('Confirma tu nuevo correo',
+      p(`Hola${first ? ' ' + first : ''}, pediste usar este correo en tu cuenta de Migo. Escribe este código en la app:`) +
+      `<div style="text-align:center;margin:18px 0"><span style="display:inline-block;font-size:30px;letter-spacing:8px;font-weight:800;color:${BRAND};background:#F5EBFA;border-radius:12px;padding:12px 20px">${code}</span></div>` +
+      p('El código vence en 15 minutos. Si no fuiste tú, ignora este correo.')),
+  });
+}
+
+// Aviso al correo ANTERIOR de que la cuenta cambió de correo.
+export async function sendEmailChangedNoticeEmail(to: string, name: string, newEmail: string) {
+  const first = name?.split(' ')[0] || '';
+  return sendEmail({
+    to,
+    subject: 'El correo de tu cuenta Migo cambió',
+    html: layout('Tu correo cambió',
+      p(`Hola${first ? ' ' + first : ''}, el correo de tu cuenta de Migo ahora es <b>${newEmail}</b>.`) +
+      p(`Si no fuiste tú, escríbenos de inmediato respondiendo a este correo.`)),
+  });
+}
+
 export async function sendPasswordResetEmail(to: string, name: string, code: string) {
   const first = name?.split(' ')[0] || '';
   return sendEmail({

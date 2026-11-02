@@ -42,10 +42,18 @@ function familyFor(flat: FlatText): string {
   return WEIGHT_TO_FAMILY[w] ?? 'Outfit_400Regular';
 }
 
-type AnyComp = React.ComponentType<{ style?: unknown }> & { __outfit?: boolean; displayName?: string; name?: string };
+// Tope global del tamaño de letra del sistema. Con "letra enorme" (2.0×) los botones y
+// las etiquetas se partían en sílabas ("Director / io") o se cortaban. Hasta 1.3× la
+// app sigue respetando la preferencia del usuario; por encima, se queda en 1.3×.
+// Un componente puede pedir otro tope con su propio maxFontSizeMultiplier.
+export const MAX_FONT_SCALE = 1.3;
+
+type ThemedProps = { style?: unknown; maxFontSizeMultiplier?: number | null };
+type AnyComp = React.ComponentType<ThemedProps> & { __outfit?: boolean; displayName?: string; name?: string };
 
 function makeThemed(Orig: AnyComp): AnyComp {
-  const Themed: AnyComp = (props: { style?: unknown }) => {
+  const Themed: AnyComp = (raw: ThemedProps) => {
+    const props = raw.maxFontSizeMultiplier === undefined ? { ...raw, maxFontSizeMultiplier: MAX_FONT_SCALE } : raw;
     const flat = (StyleSheet.flatten(props.style as never) as FlatText) || {};
     // Si el estilo ya trae su propia familia, se respeta tal cual.
     if (flat.fontFamily) return React.createElement(Orig, props);

@@ -1,5 +1,7 @@
 import { env } from '../../config/env';
 import { prisma } from '../../config/prisma';
+import { geminiGenerate } from '../../lib/gemini';
+import { mentions, mentionsAny } from '../../lib/textMatch';
 
 export interface ChatTurn {
   role: 'user' | 'assistant';
@@ -128,15 +130,15 @@ function computeSuggestions(userText: string, replyText: string, rules: TriageRu
 
   // 1) Reglas configuradas por el Super Admin (según lo que describe el dueño): severidad -> acción
   for (const r of rules) {
-    if (r.keywords.some((k) => u.includes(k.toLowerCase()))) {
+    if (r.keywords.some((k) => mentions(u, k.toLowerCase()))) {
       out.push(r.severity === 'CRITICA' ? EMERGENCY : CONSULT);
     }
   }
 
   // 2) Lógica base (respaldo). Emergencia SOLO según lo que describe el dueño.
-  if (EMERGENCY_KW.some((k) => u.includes(k))) out.push(EMERGENCY);
-  if (GROOMING_KW.some((k) => all.includes(k))) out.push(GROOMING);
-  if (CONSULT_KW.some((k) => all.includes(k))) out.push(CONSULT);
+  if (mentionsAny(u, EMERGENCY_KW)) out.push(EMERGENCY);
+  if (mentionsAny(all, GROOMING_KW)) out.push(GROOMING);
+  if (mentionsAny(all, CONSULT_KW)) out.push(CONSULT);
 
   // Dedupe por acción, conservando el orden (las reglas del admin tienen prioridad)
   const seen = new Set<string>();
@@ -180,42 +182,19 @@ REGLAS: responde SIEMPRE en español; ofrece orientación general y primeros aux
     .slice(-12)
     .map((m) => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.text }] }));
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent?key=${env.GEMINI_API_KEY}`;
-  const body = JSON.stringify({
+  // Presupuesto alto: los modelos flash nuevos gastan tokens en "pensamiento";
+  // con poco margen la respuesta visible se corta (finishReason MAX_TOKENS).
+  return geminiGenerate({
     system_instruction: { parts: [{ text: system }] },
     contents,
-    // Presupuesto alto: los modelos flash nuevos gastan tokens en "pensamiento";
-    // con poco margen la respuesta visible se corta (finishReason MAX_TOKENS).
     generationConfig: { temperature: 0.7, maxOutputTokens: 1200 },
   });
-
-  // Reintenta ante saturación de Google (503) o rate-limit (429), que son
-  // transitorios: sin esto, cada pico tumbaba el chat al fallback genérico.
-  let lastStatus = 0;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (attempt > 0) await new Promise((r) => setTimeout(r, 900 * attempt));
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 20000);
-    let res: Response;
-    try {
-      res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: controller.signal });
-    } finally {
-      clearTimeout(timer);
-    }
-    if (res.status === 503 || res.status === 429) { lastStatus = res.status; continue; } // transitorio → reintenta
-    if (!res.ok) throw new Error(`Gemini HTTP ${res.status}`);
-    const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-    const text = (data.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? '').join('').trim();
-    if (!text) throw new Error('Gemini sin texto');
-    return text;
-  }
-  throw new Error(`Gemini HTTP ${lastStatus} (saturado tras reintentos)`);
 }
 
 // ─── Fallback heurístico (sin API key) ────────────────────
 function fallbackReply(input: AiChatInput): string {
   const last = [...input.messages].reverse().find((m) => m.role === 'user')?.text.toLowerCase() ?? '';
-  const has = (arr: string[]) => arr.some((k) => last.includes(k));
+  const has = (arr: string[]) => mentionsAny(last, arr); // ignora "no ha vomitado", "sin sangre"
   const petName = input.pet?.name || 'tu mascota';
 
   if (has(['no respira', 'respirac', 'ahog', 'convuls', 'sangr', 'hemorrag', 'veneno', 'intoxic', 'atropell', 'inconsc', 'colaps'])) {

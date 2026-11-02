@@ -1,4 +1,5 @@
 import { env } from '../../config/env';
+import { geminiGenerate } from '../../lib/gemini';
 import { VET_SPECIALTIES } from './specialties';
 
 export interface CarnetScanResult {
@@ -50,33 +51,17 @@ Definiciones:
 - specialty: especialidad SOLO si el carnet la indica explícitamente; si no aparece, null. Muchos carnets NO listan especialidad.
 Si detectas una especialidad, normalízala (si encaja) a una de esta lista: ${VET_SPECIALTIES.join(', ')}.`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent?key=${env.GEMINI_API_KEY}`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20000);
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: prompt },
-              { inline_data: { mime_type: img.mimeType, data: img.data } },
-            ],
-          },
+  const text = await geminiGenerate({
+    contents: [
+      {
+        parts: [
+          { text: prompt },
+          { inline_data: { mime_type: img.mimeType, data: img.data } },
         ],
-        generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
-      }),
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timer);
-  }
-  if (!res.ok) throw new Error(`Gemini HTTP ${res.status}`);
-  const body = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-  const text = body.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
+      },
+    ],
+    generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
+  });
   const parsed = JSON.parse(text) as Partial<Record<'fullName' | 'nationalId' | 'collegiateNumber' | 'specialty', string | null>>;
 
   const clean = (v: unknown) => {

@@ -136,7 +136,7 @@ export default function RegisterPetScreen({ onComplete, onSkip, navigation }: Pr
               <Text style={{ fontSize: 56 }}>{species === 'CAT' ? '🐱' : '🐶'}</Text>
             )}
             <View style={styles.camera}>
-              <TabIcon name="medical" color={colors.white} size={16} />
+              <TabIcon name="camera" color={colors.white} size={16} />
             </View>
           </Pressable>
         </View>

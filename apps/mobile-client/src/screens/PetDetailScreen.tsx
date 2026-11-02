@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Print from 'expo-print';
@@ -44,8 +44,10 @@ const fmtDate = (iso?: string) => {
 };
 
 export default function PetDetailScreen({ route, navigation }: { route: any; navigation: any }) {
-  const { id } = route.params ?? {};
+  // autoExport: viene del atajo "Compartir Historial Médico" del inicio → abre el PDF al cargar.
+  const { id, autoExport } = route.params ?? {};
   const [exporting, setExporting] = useState(false);
+  const autoDone = useRef(false);
   const { data, isLoading, isError, error, refetch } = useQuery({ queryKey: ['pet', id], queryFn: () => api<Ficha>(`/me/pets/${id}`) });
   const ai = useQuery({ queryKey: ['pet-ai', id], queryFn: () => api<{ data: AiSummary[] }>(`/me/pets/${id}/chat-summaries`) });
 
@@ -62,6 +64,14 @@ export default function PetDetailScreen({ route, navigation }: { route: any; nav
       setExporting(false);
     }
   };
+
+  useEffect(() => {
+    if (autoExport && data && !autoDone.current) {
+      autoDone.current = true;
+      void exportPdf();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoExport, data]);
 
   if (isLoading) return <Loading />;
   if (isError || !data) {

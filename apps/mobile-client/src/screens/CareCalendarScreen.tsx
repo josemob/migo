@@ -202,7 +202,7 @@ function TaskCard({ e, navigation }: { e: CareEvent; navigation: any }) {
             <Pill
               label="Ver Cita"
               color={colors.brand}
-              onPress={() => (e.clinicId ? navigation.navigate('ClinicDetail', { id: e.clinicId, name: e.clinicName }) : null)}
+              onPress={() => navigation.navigate('AppointmentDetail', { id: e.id })}
             />
           ) : (
             <Pill

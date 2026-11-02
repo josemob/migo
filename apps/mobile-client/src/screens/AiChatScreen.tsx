@@ -124,12 +124,12 @@ export default function AiChatScreen({ navigation }: { navigation: any }) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
       >
-        <ScrollView ref={scroller} contentContainerStyle={{ padding: 16, gap: 12 }} onContentSizeChange={toEnd} showsVerticalScrollIndicator={false}>
+        <ScrollView ref={scroller} style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 12 }} onContentSizeChange={toEnd} showsVerticalScrollIndicator={false}>
           <View style={styles.dayChip}><Text style={styles.dayChipText}>HOY</Text></View>
           {messages.map((m, i) => (
             <View key={i} style={{ gap: 8, alignItems: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
               <View style={[styles.bubble, m.role === 'user' ? styles.user : styles.ai]}>
-                <Text style={[styles.msgText, m.role === 'user' && { color: colors.white }]}>{m.text}</Text>
+                <Text style={[styles.msgText, m.role === 'user' && { color: colors.white }]}>{m.role === 'user' ? m.text : richText(m.text)}</Text>
               </View>
               {m.suggestions?.map((s, j) => (
                 <Pressable
@@ -150,7 +150,7 @@ export default function AiChatScreen({ navigation }: { navigation: any }) {
         </ScrollView>
 
         {/* Acciones rápidas */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quick} style={{ flexGrow: 0 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quick} style={{ flexGrow: 0, flexShrink: 0 }}>
           <Pressable style={[styles.qBtn, styles.qDanger]} onPress={() => navigation.navigate('Tabs', { screen: 'Alerta' })}>
             <Text style={styles.qDangerText}>🚨 Es una emergencia</Text>
           </Pressable>
@@ -182,6 +182,16 @@ export default function AiChatScreen({ navigation }: { navigation: any }) {
   );
 }
 
+// Las respuestas de Gemini traen markdown simple (**negrita**, *negrita*, viñetas "* ").
+// Antes se veían los asteriscos tal cual; aquí se pinta la negrita y las viñetas como "•".
+function richText(text: string) {
+  const clean = text.replace(/^\s*[*-]\s+/gm, '• ');
+  return clean.split(/(\*\*[^*]+\*\*|\*[^*\n]+\*)/g).map((part, i) => {
+    const m = part.match(/^\*\*([^*]+)\*\*$/) ?? part.match(/^\*([^*\n]+)\*$/);
+    return m ? <Text key={i} style={{ fontWeight: '700' }}>{m[1]}</Text> : part;
+  });
+}
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
   topbar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
@@ -197,7 +207,8 @@ const styles = StyleSheet.create({
   ai: { alignSelf: 'flex-start', backgroundColor: '#F1EFF3', borderTopLeftRadius: 6 },
   user: { alignSelf: 'flex-end', backgroundColor: colors.brand, borderTopRightRadius: 6 },
   msgText: { fontSize: 15, color: colors.text, lineHeight: 21 },
-  typing: { fontSize: 14, color: colors.muted, fontStyle: 'italic' },
+  // Sin cursiva: Outfit no tiene itálica cargada y Android la dibujaba en Roboto.
+  typing: { fontSize: 14, color: colors.muted },
 
   suggestion: { alignSelf: 'flex-start', maxWidth: '92%', flexDirection: 'row', alignItems: 'center', backgroundColor: colors.brandLight, borderWidth: 1.5, borderColor: colors.brand, borderRadius: radius.full, paddingHorizontal: 16, paddingVertical: 11 },
   suggestionText: { color: colors.brand, fontWeight: '800', fontSize: 14 },

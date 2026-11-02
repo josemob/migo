@@ -88,7 +88,7 @@ export default function ChatsScreen({ navigation, route }: { navigation: any; ro
         <Pressable onPress={() => navigation.navigate('AiChat')}>
           <Card style={styles.migoCard}>
             <View style={[styles.icon, { backgroundColor: colors.brand }]}>
-              <TabIcon name="medical" color={colors.white} size={24} />
+              <TabIcon name="sparkle" color={colors.white} size={24} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.cardTitle}>Migo IA</Text>

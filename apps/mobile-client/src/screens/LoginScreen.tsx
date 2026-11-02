@@ -148,8 +148,8 @@ export default function LoginScreen() {
             ) : (
               <>
                 <Input label="Código (6 dígitos)" value={code} onChangeText={setCode} keyboardType="number-pad" placeholder="123456" maxLength={6} />
-                <PasswordInput label="Nueva contraseña" value={password} onChangeText={setPassword} placeholder="••••••••" />
-                <PasswordInput label="Repite la contraseña" value={confirm} onChangeText={setConfirm} placeholder="••••••••" />
+                <PasswordInput label="Nueva contraseña" value={password} onChangeText={setPassword} placeholder="Nueva contraseña" />
+                <PasswordInput label="Repite la contraseña" value={confirm} onChangeText={setConfirm} placeholder="Escríbela otra vez" />
                 {error ? <Text style={styles.error}>{error}</Text> : null}
                 <Button title="Restablecer contraseña" onPress={doReset} loading={busy} />
                 <Text style={styles.forgot} onPress={sendResetCode}>Reenviar código</Text>
@@ -168,9 +168,9 @@ export default function LoginScreen() {
               </>
             )}
             <Input label="Correo" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" placeholder="usuario@migopet.app" />
-            <PasswordInput label="Contraseña" value={password} onChangeText={setPassword} placeholder="••••••••" />
+            <PasswordInput label="Contraseña" value={password} onChangeText={setPassword} placeholder="Tu contraseña" />
             {mode === 'register' && (
-              <PasswordInput label="Repite tu contraseña" value={confirm} onChangeText={setConfirm} placeholder="••••••••" />
+              <PasswordInput label="Repite tu contraseña" value={confirm} onChangeText={setConfirm} placeholder="Escríbela otra vez" />
             )}
 
             {error ? <Text style={styles.error}>{error}</Text> : null}

@@ -24,6 +24,12 @@ const SLOTS = [
   { label: '04:30 PM', h: 16, m: 30, off: false },
 ];
 
+// Emoji según la categoría del servicio (antes siempre ✂️, también en consultas médicas).
+const CATEGORY_EMOJI: Record<string, string> = {
+  CONSULTATION: '🩺', GROOMING: '✂️', VACCINATION: '💉', DEWORMING: '💊', LAB: '🧪',
+  IMAGING: '🩻', SURGERY: '🏥', DENTAL: '🦷', EMERGENCY: '🚑', OTHER: '🐾',
+};
+
 export default function BookAppointmentScreen({ navigation, route }: any) {
   const { clinicId, clinicName, service } = route.params as {
     clinicId: string; clinicName: string; service: Service;
@@ -104,7 +110,7 @@ export default function BookAppointmentScreen({ navigation, route }: any) {
             )}
             <View style={{ flex: 1 }}>
               <Text style={styles.petName}>{pet?.name ?? 'Mascota'}</Text>
-              <Text style={styles.svcLine} numberOfLines={2}>✂️ {service.name} en {clinicName}</Text>
+              <Text style={styles.svcLine} numberOfLines={2}>{CATEGORY_EMOJI[service.category] ?? '🐾'} {service.name} en {clinicName}</Text>
             </View>
           </View>
           <View style={styles.priceTag}>

@@ -44,7 +44,8 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
           <MigoTabIcon name={ICONS[route.name] ?? 'home'} color={color} size={24} />
           {route.name === 'Chats' && unread > 0 && <View style={styles.dot} />}
         </View>
-        <Text style={[styles.label, { color }]}>{route.name}</Text>
+        {/* Tope más bajo que el global: 5 pestañas en una fila no dan para más. */}
+        <Text style={[styles.label, { color }]} numberOfLines={1} maxFontSizeMultiplier={1.15}>{route.name}</Text>
       </Pressable>
     );
   };
@@ -59,7 +60,7 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
       {alerta && (
         <View style={styles.centerSlot}>
           <View style={styles.alertIconSpace} />
-          <Text style={styles.alertLabel}>Alerta</Text>
+          <Text style={styles.alertLabel} numberOfLines={1} maxFontSizeMultiplier={1.15}>Alerta</Text>
           <Pressable style={styles.alertBtn} onPress={() => navigation.navigate(alerta.name)}>
             <MigoTabIcon name="paw" color={colors.white} size={30} />
           </Pressable>

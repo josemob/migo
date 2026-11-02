@@ -50,6 +50,7 @@ import ReceiptsScreen from './src/screens/ReceiptsScreen';
 import RecordDetailScreen from './src/screens/RecordDetailScreen';
 import VaccineCardScreen from './src/screens/VaccineCardScreen';
 import PetTagScreen from './src/screens/PetTagScreen';
+import AppointmentDetailScreen from './src/screens/AppointmentDetailScreen';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
 
@@ -96,8 +97,12 @@ function MainApp() {
         setTimeout(() => goTo(screen, params, attempt + 1), 300);
       }
     };
-    const handle = (data?: { type?: string; petId?: string }) => {
-      if (data?.type === 'appointment') goTo('Tabs', { screen: 'Citas' });
+    const handle = (data?: { type?: string; petId?: string; appointmentId?: string }) => {
+      // Aviso de una cita concreta (confirmada/cancelada por la clínica) → su detalle.
+      if (data?.type === 'appointment') {
+        if (data.appointmentId) goTo('AppointmentDetail', { id: data.appointmentId });
+        else goTo('Tabs', { screen: 'Citas' });
+      }
       // Alguien escaneó la placa QR y avisó: abre la placa, donde están los avisos.
       if (data?.type === 'PET_FOUND' && data.petId) goTo('PetTag', { id: data.petId });
     };
@@ -144,6 +149,7 @@ function MainApp() {
         <Stack.Screen name="AiChat" component={AiChatScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ClinicChat" component={ClinicChatScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Rating" component={RatingScreen} options={{ headerShown: false, presentation: 'modal' }} />
+        <Stack.Screen name="AppointmentDetail" component={AppointmentDetailScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

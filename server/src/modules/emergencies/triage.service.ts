@@ -1,5 +1,7 @@
 import type { TriageLevel } from '@prisma/client';
 import { env } from '../../config/env';
+import { geminiGenerate } from '../../lib/gemini';
+import { mentionsAny } from '../../lib/textMatch';
 import { VET_SPECIALTIES } from '../staffKyc/specialties';
 
 export interface TriageResult {
@@ -50,29 +52,14 @@ Devuelve exactamente este formato:
 Criterio: RED = riesgo vital inmediato (dificultad respiratoria, convulsiones, hemorragia, trauma grave, intoxicación). ORANGE = urgente. YELLOW = atención pronta. GREEN = orientación, no urgente.
 requiredSpecialty: la especialidad veterinaria más adecuada para este caso, EXACTAMENTE una de: ${VET_SPECIALTIES.join(', ')}. Si no aplica una específica o es general, usa null.`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent?key=${env.GEMINI_API_KEY}`;
-  // Timeout duro: si Gemini tarda, abortamos y caemos a la heurística (no colgar la urgencia).
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 12000);
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
-      }),
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timer);
-  }
-  if (!res.ok) throw new Error(`Gemini HTTP ${res.status}`);
-  const data = (await res.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
-  };
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  // Timeout duro y un solo intento por modelo: si Gemini tarda, caemos a la heurística (no colgar la urgencia).
+  const text = await geminiGenerate(
+    {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
+    },
+    { timeoutMs: 12000, attempts: 1 },
+  );
   const parsed = JSON.parse(text) as Omit<TriageResult, 'source'>;
   const level = (['RED', 'ORANGE', 'YELLOW', 'GREEN'] as const).includes(parsed.triageLevel)
     ? parsed.triageLevel
@@ -105,9 +92,9 @@ export function quickTriage(input: TriageInput): TriageResult {
 function heuristicTriage(input: TriageInput): TriageResult {
   const s = input.symptoms.toLowerCase();
   let level: TriageLevel = 'GREEN';
-  if (RED.some((k) => s.includes(k))) level = 'RED';
-  else if (ORANGE.some((k) => s.includes(k))) level = 'ORANGE';
-  else if (YELLOW.some((k) => s.includes(k))) level = 'YELLOW';
+  if (mentionsAny(s, RED)) level = 'RED';
+  else if (mentionsAny(s, ORANGE)) level = 'ORANGE';
+  else if (mentionsAny(s, YELLOW)) level = 'YELLOW';
 
   const firstAid: Record<TriageLevel, string> = {
     RED: 'Mantén las vías aéreas despejadas, no induzcas el vómito y traslada de inmediato a la clínica más cercana.',

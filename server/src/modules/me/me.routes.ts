@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { randomUUID } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/prisma';
@@ -17,6 +17,8 @@ import { issueReceipt, receiptNumber } from '../receipts/receipt.service';
 import { emergencyService } from '../emergencies/emergency.service';
 import { listPlans, selectPlanForVet, defaultPlan } from '../plans/plan.service';
 import { hashPassword, verifyPassword } from '../../utils/password';
+import { hashToken } from '../../utils/jwt';
+import { sendEmailChangeCodeEmail, sendEmailChangedNoticeEmail } from '../mail/mail.service';
 
 const router = Router();
 router.use(authenticate);
@@ -78,6 +80,61 @@ router.patch(
       data: req.body,
       select: { id: true, email: true, fullName: true, phone: true, avatarUrl: true, role: true },
     });
+    res.json(user);
+  }),
+);
+
+// POST /me/email/request -> pide cambiar el correo: envía un código de 6 dígitos al correo
+// NUEVO (prueba que es suyo). El cambio solo se aplica al confirmar el código.
+router.post(
+  '/email/request',
+  validate({ body: z.object({ newEmail: z.string().trim().toLowerCase().email().max(120) }) }),
+  asyncHandler(async (req, res) => {
+    const { newEmail } = req.body as { newEmail: string };
+    const me = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { id: true, email: true, fullName: true } });
+    if (!me) throw ApiError.notFound('Usuario no encontrado');
+    if (me.email.toLowerCase() === newEmail) throw ApiError.badRequest('Ese ya es tu correo actual.');
+    const taken = await prisma.user.findFirst({ where: { email: { equals: newEmail, mode: 'insensitive' } }, select: { id: true } });
+    if (taken) throw ApiError.conflict('Ese correo ya está registrado en otra cuenta.');
+
+    // Solo un código vivo por usuario
+    await prisma.emailChangeCode.updateMany({ where: { userId: me.id, usedAt: null }, data: { usedAt: new Date() } });
+    const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+    await prisma.emailChangeCode.create({
+      data: { userId: me.id, newEmail, codeHash: hashToken(code), expiresAt: new Date(Date.now() + 15 * 60_000) },
+    });
+    const sent = await sendEmailChangeCodeEmail(newEmail, me.fullName, code);
+    if (!sent) throw ApiError.badRequest('No pudimos enviar el código a ese correo. Intenta más tarde.');
+    res.status(204).end();
+  }),
+);
+
+// POST /me/email/confirm -> confirma el código y aplica el correo nuevo. Avisa al anterior.
+router.post(
+  '/email/confirm',
+  validate({ body: z.object({ code: z.string().trim().length(6) }) }),
+  asyncHandler(async (req, res) => {
+    const rec = await prisma.emailChangeCode.findFirst({
+      where: { userId: req.user!.id, usedAt: null, expiresAt: { gt: new Date() }, codeHash: hashToken(req.body.code) },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!rec) throw ApiError.badRequest('Código inválido o vencido');
+    const taken = await prisma.user.findFirst({
+      where: { email: { equals: rec.newEmail, mode: 'insensitive' }, id: { not: req.user!.id } },
+      select: { id: true },
+    });
+    if (taken) throw ApiError.conflict('Ese correo ya está registrado en otra cuenta.');
+
+    const before = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { email: true, fullName: true } });
+    const [user] = await prisma.$transaction([
+      prisma.user.update({
+        where: { id: req.user!.id },
+        data: { email: rec.newEmail },
+        select: { id: true, email: true, fullName: true, phone: true, avatarUrl: true, role: true },
+      }),
+      prisma.emailChangeCode.update({ where: { id: rec.id }, data: { usedAt: new Date() } }),
+    ]);
+    if (before) void sendEmailChangedNoticeEmail(before.email, before.fullName, rec.newEmail).catch(() => {});
     res.json(user);
   }),
 );
@@ -672,6 +729,67 @@ router.post(
     });
 
     res.status(201).json(result);
+  }),
+);
+
+// GET /me/appointments/:id -> detalle de una cita del dueño ("Ver Cita" en el calendario).
+// Va después de /appointments/next y /pending-review para no capturar esas rutas.
+router.get(
+  '/appointments/:id',
+  validate({ params: z.object({ id: z.string().uuid() }) }),
+  asyncHandler(async (req, res) => {
+    const appointment = await prisma.appointment.findFirst({
+      where: { id: req.params.id, bookedById: req.user!.id },
+      include: {
+        clinic: { select: { id: true, name: true, logoUrl: true, phone: true, address: true } },
+        service: { select: { name: true, category: true } },
+        pet: { select: { id: true, name: true, photoUrl: true } },
+        vet: { select: { user: { select: { fullName: true } } } },
+      },
+    });
+    if (!appointment) throw ApiError.notFound('Cita no encontrada');
+    res.json({ appointment });
+  }),
+);
+
+// POST /me/appointments/:id/cancel -> el dueño cancela su cita (solo pendientes/confirmadas
+// y que no hayan empezado). Avisa por push al equipo de la clínica.
+router.post(
+  '/appointments/:id/cancel',
+  validate({
+    params: z.object({ id: z.string().uuid() }),
+    body: z.object({ reason: z.string().trim().max(200).optional() }),
+  }),
+  asyncHandler(async (req, res) => {
+    const appt = await prisma.appointment.findFirst({
+      where: { id: req.params.id, bookedById: req.user!.id },
+      include: { pet: { select: { name: true } } },
+    });
+    if (!appt) throw ApiError.notFound('Cita no encontrada');
+    if (appt.status !== 'PENDING' && appt.status !== 'CONFIRMED') {
+      throw ApiError.badRequest('Esta cita ya no se puede cancelar.');
+    }
+
+    const reason = (req.body as { reason?: string }).reason;
+    const updated = await prisma.appointment.update({
+      where: { id: appt.id },
+      data: { status: 'CANCELLED', cancelReason: reason ? `Cancelada por el dueño: ${reason}` : 'Cancelada por el dueño' },
+    });
+
+    try {
+      const staff = await prisma.clinicStaff.findMany({ where: { clinicId: appt.clinicId, isActive: true }, select: { userId: true } });
+      const targets = [...new Set(staff.map((s) => s.userId))];
+      const fecha = new Intl.DateTimeFormat('es-VE', {
+        weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'America/Caracas',
+      }).format(appt.scheduledAt);
+      const title = 'Cita cancelada por el dueño';
+      const body = `${appt.pet.name} · ${appt.reason ?? 'Consulta'} · ${fecha}${appt.paidInApp ? ' · pagada en la app' : ''}`;
+      await Promise.all(targets.map((userId) => sendPush(userId, { title, body, data: { type: 'appointment', appointmentId: appt.id } })));
+    } catch (e) {
+      console.error('[appointments] push de cancelación falló', e);
+    }
+
+    res.json({ appointment: updated });
   }),
 );
 

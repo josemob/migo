@@ -188,10 +188,10 @@ export default function ClinicDetailScreen({ navigation, route }: any) {
             </View>
           </View>
           <View style={styles.stat}>
-            <View style={styles.statIcon}><TabIcon name="person" color={colors.brand} size={22} /></View>
-            <View>
+            <View style={styles.statIcon}><TabIcon name="pin" color={colors.brand} size={22} /></View>
+            <View style={{ flexShrink: 1 }}>
               <Text style={styles.statLabel}>Distancia</Text>
-              <Text style={styles.statValue}>{distanceKm != null ? `${distanceKm} Km` : 'n/d'}</Text>
+              <Text style={styles.statValue}>{distanceKm != null ? `${distanceKm} Km` : 'Sin ubicación'}</Text>
             </View>
           </View>
         </View>

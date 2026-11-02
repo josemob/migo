@@ -152,14 +152,22 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
   // Atajo "Registrar Vacuna o Desparasitación": va directo a la cartilla (antes caía en la
   // lista de mascotas, sin nada que registrar). Con varias mascotas, primero se elige cuál.
-  const openVaccineCard = () => {
+  // Con varias mascotas, primero se elige cuál (sirve para la cartilla y para el historial).
+  const withPet = (go: (p: Pet) => void) => {
     const list = pets.data?.data ?? [];
     if (list.length === 0) return navigation.navigate('RegisterPet');
-    if (list.length === 1) return navigation.navigate('VaccineCard', { id: list[0].id, name: list[0].name });
+    if (list.length === 1) return go(list[0]);
     appAlert('¿De qué mascota?', undefined, [
-      ...list.slice(0, 4).map((p) => ({ text: p.name, onPress: () => navigation.navigate('VaccineCard', { id: p.id, name: p.name }) })),
+      ...list.slice(0, 4).map((p) => ({ text: p.name, onPress: () => go(p) })),
       { text: 'Cancelar', style: 'cancel' as const },
     ]);
+  };
+  const onShortcut = (key: string) => {
+    if (key === 'vax') return withPet((p) => navigation.navigate('VaccineCard', { id: p.id, name: p.name }));
+    // "Compartir Historial Médico": abre la ficha y genera el PDF para compartir.
+    if (key === 'share') return withPet((p) => navigation.navigate('PetDetail', { id: p.id, name: p.name, autoExport: true }));
+    // "Agendar Recordatorio Clínico": la agenda de cuidados (citas, refuerzos y sugerencias).
+    navigation.navigate('Tabs', { screen: 'Citas' });
   };
 
   const petChips = pet
@@ -286,7 +294,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               </View>
               <Pressable style={styles.svcBtn} onPress={() => navigation.navigate(s.to, s.params)}>
                 <BtnIcon name={s.svg} />
-                <Text style={styles.svcBtnText}>{s.cta}</Text>
+                {/* Una sola línea: el botón mide 34 de alto y la 2ª línea quedaba cortada. */}
+                <Text style={styles.svcBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={1.15}>{s.cta}</Text>
               </Pressable>
             </View>
           ))}
@@ -330,17 +339,12 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             <Pressable
               key={s.key}
               style={styles.shortcut}
-              onPress={() => (s.key === 'vax' ? openVaccineCard() : appAlert('Migo', 'Función disponible próximamente.'))}
+              onPress={() => onShortcut(s.key)}
             >
               <View style={styles.shortcutIcon}>
                 <TabIcon name={s.icon} color={colors.brand} size={22} />
               </View>
               <Text style={styles.shortcutLabel}>{s.label}</Text>
-              <View style={styles.dotsMenu}>
-                <View style={styles.menuDot} />
-                <View style={styles.menuDot} />
-                <View style={styles.menuDot} />
-              </View>
             </Pressable>
           ))}
         </View>
@@ -404,7 +408,7 @@ const styles = StyleSheet.create({
   svcSub: { fontSize: 14, lineHeight: 16, fontWeight: '400', color: '#6F6F6F', textAlign: 'center' },
   svcTitle: { fontSize: 18, lineHeight: 20, fontWeight: '500', color: '#444444', textAlign: 'center' },
   svcBtn: { alignSelf: 'stretch', backgroundColor: colors.brand, height: 34, borderRadius: radius.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 18 },
-  svcBtnText: { fontSize: 16, lineHeight: 18, fontWeight: '500', color: colors.white },
+  svcBtnText: { flexShrink: 1, fontSize: 16, lineHeight: 18, fontWeight: '500', color: colors.white },
 
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginVertical: 14 },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.accent },
@@ -427,6 +431,4 @@ const styles = StyleSheet.create({
   shortcut: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.white, borderRadius: radius.lg, paddingVertical: 8, paddingLeft: 8, paddingRight: 14, boxShadow: cardShadow },
   shortcutIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(138,47,160,0.14)', alignItems: 'center', justifyContent: 'center' },
   shortcutLabel: { flex: 1, ...type.h4, color: '#444444' },
-  dotsMenu: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  menuDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.brand },
 });

@@ -116,7 +116,7 @@ export default function EmergencyClinicsScreen({ navigation }: { navigation: any
         </View>
       ) : (
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        <Muted>Selecciona la mascota y describe qué ocurre. Migo AI hará el triaje y alertará a las clínicas cercanas.</Muted>
+        <Muted>Selecciona la mascota y describe qué ocurre. Migo IA hará el triaje y alertará a las clínicas cercanas.</Muted>
 
         <Text style={styles.section}>Mascota</Text>
         {pets.isError ? (

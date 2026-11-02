@@ -1,4 +1,6 @@
 import { env } from '../../config/env';
+import { geminiGenerate } from '../../lib/gemini';
+import { mentions, mentionsAny } from '../../lib/textMatch';
 import type { ChatTurn } from './aiChat.service';
 
 // Estructura exacta solicitada para el resumen del chat con Migo AI
@@ -22,7 +24,7 @@ interface SummaryInput {
 const RESPONSE_SCHEMA = {
   type: 'OBJECT',
   properties: {
-    consultation_reason: { type: 'STRING' },
+    consultation_reason: { type: 'STRING', description: 'Motivo en 2 a 6 palabras, como título (ej. "Vómito y decaimiento"). Nunca copies el mensaje del dueño.' },
     symptoms: { type: 'ARRAY', items: { type: 'STRING' } },
     duration_of_symptoms: { type: 'STRING', nullable: true },
     perceived_urgency_level: { type: 'STRING', enum: ['CRITICA', 'MODERADA', 'BAJA'] },
@@ -77,28 +79,11 @@ Reglas:
 ${petLine}Conversación:
 ${transcript}`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent?key=${env.GEMINI_API_KEY}`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20000);
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        // maxOutputTokens alto: los modelos flash nuevos gastan tokens en "pensamiento"
-        generationConfig: { temperature: 0.2, maxOutputTokens: 2048, responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA },
-      }),
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timer);
-  }
-  if (!res.ok) throw new Error(`Gemini HTTP ${res.status}`);
-  const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-  const text = (data.candidates?.[0]?.content?.parts ?? []).map((x) => x.text ?? '').join('').trim();
-  if (!text) throw new Error('Gemini sin texto');
+  // maxOutputTokens alto: los modelos flash nuevos gastan tokens en "pensamiento"
+  const text = await geminiGenerate({
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.2, maxOutputTokens: 2048, responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA },
+  });
   return normalize(JSON.parse(text));
 }
 
@@ -111,7 +96,7 @@ function normalize(raw: Partial<PetChatSummary>): PetChatSummary {
     ? (raw.perceived_urgency_level as PetChatSummary['perceived_urgency_level'])
     : 'MODERADA';
   return {
-    consultation_reason: str(raw.consultation_reason, 'Consulta general'),
+    consultation_reason: clampTitle(str(raw.consultation_reason, 'Consulta general')),
     symptoms: arr(raw.symptoms),
     duration_of_symptoms: nullable(raw.duration_of_symptoms),
     perceived_urgency_level: urgency,
@@ -132,15 +117,14 @@ function heuristicExtract(input: SummaryInput): PetChatSummary {
   const aiText = input.messages.filter((m) => m.role === 'assistant').map((m) => m.text).join(' ');
   const low = userText.toLowerCase();
 
-  const symptoms = SYMPTOM_WORDS.filter((w) => low.includes(w));
+  const symptoms = SYMPTOM_WORDS.filter((w) => mentions(low, w));
   const urgency: PetChatSummary['perceived_urgency_level'] =
-    RED.some((k) => low.includes(k)) ? 'CRITICA' : ORANGE.some((k) => low.includes(k)) ? 'MODERADA' : 'BAJA';
+    mentionsAny(low, RED) ? 'CRITICA' : mentionsAny(low, ORANGE) ? 'MODERADA' : 'BAJA';
 
   const durMatch = low.match(/(desde|hace|por)\s+[^.,;]{2,40}/);
-  const firstUser = input.messages.find((m) => m.role === 'user')?.text.trim() ?? 'Consulta general';
 
   return {
-    consultation_reason: firstUser.slice(0, 200),
+    consultation_reason: shortReason(symptoms, urgency),
     symptoms: [...new Set(symptoms)],
     duration_of_symptoms: durMatch ? durMatch[0] : null,
     perceived_urgency_level: urgency,
@@ -154,4 +138,20 @@ function heuristicExtract(input: SummaryInput): PetChatSummary {
           : 'Observar la evolución y consultar si los síntomas persisten.',
     key_observations_for_vet: userText.slice(0, 300) || 'Interacción con Migo AI sin detalles clínicos.',
   };
+}
+
+// Título corto para el calendario/expediente (antes se usaba el mensaje crudo del dueño).
+function shortReason(symptoms: string[], urgency: PetChatSummary['perceived_urgency_level']): string {
+  const uniq = [...new Set(symptoms.map((w) => w.replace('vomito', 'vómito')))].slice(0, 2);
+  if (uniq.length) {
+    const list = uniq.join(' y ');
+    return list.charAt(0).toUpperCase() + list.slice(1);
+  }
+  return urgency === 'CRITICA' ? 'Posible urgencia' : 'Consulta veterinaria sugerida';
+}
+
+// Tope de largo por si el modelo devuelve una frase larga.
+function clampTitle(t: string): string {
+  const one = t.split(/[.\n]/)[0]!.trim();
+  return one.length > 48 ? one.slice(0, 47).trimEnd() + '…' : one;
 }

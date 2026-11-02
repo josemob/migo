@@ -68,7 +68,7 @@ export default function PanicScreen({ navigation }: { navigation: any }) {
   return (
     <Screen>
       <Text style={styles.title}>Activar Emergencia</Text>
-      <Muted>Selecciona la mascota y describe qué ocurre. Migo AI hará el triaje y alertará a las clínicas cercanas.</Muted>
+      <Muted>Selecciona la mascota y describe qué ocurre. Migo IA hará el triaje y alertará a las clínicas cercanas.</Muted>
 
       <Text style={styles.section}>Mascota</Text>
       <View style={{ gap: 8 }}>

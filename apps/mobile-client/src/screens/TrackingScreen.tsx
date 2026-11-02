@@ -96,7 +96,7 @@ export default function TrackingScreen({ route, navigation }: { route: any; navi
 
       {data.aiSummary && (
         <Card>
-          <Text style={styles.cardTitle}>🩺 Reporte de Migo AI</Text>
+          <Text style={styles.cardTitle}>🩺 Reporte de Migo IA</Text>
           <Text style={styles.body}>{data.aiSummary}</Text>
         </Card>
       )}

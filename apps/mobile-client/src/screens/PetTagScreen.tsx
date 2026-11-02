@@ -131,7 +131,9 @@ export default function PetTagScreen({ route, navigation }: { route: any; naviga
       file.create();
       file.write(svg);
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(file.uri, { mimeType: 'image/svg+xml', dialogTitle: `QR de ${petName} para grabado` });
+        // Como documento, no como imagen: con image/svg+xml Android lo ofrecía como foto y
+        // WhatsApp lo descartaba sin enviar nada (no acepta SVG como foto).
+        await Sharing.shareAsync(file.uri, { mimeType: 'application/octet-stream', dialogTitle: `QR de ${petName} para grabado`, UTI: 'public.svg-image' });
       } else {
         appAlert('Placa', `SVG guardado en: ${file.uri}`);
       }
@@ -195,7 +197,7 @@ export default function PetTagScreen({ route, navigation }: { route: any; naviga
         <Text style={styles.section}>Llévala al collar</Text>
         <View style={styles.card}>
           <Action icon="file" label={busy === 'pdf' ? 'Generando PDF…' : 'Imprimir placa'} hint="Medallas de 25, 30 y 35 mm" onPress={imprimir} disabled={!!busy} />
-          <Action icon="edit" label={busy === 'svg' ? 'Exportando…' : 'Archivo para grabado'} hint="SVG vectorial, para láser" onPress={exportarSvg} disabled={!!busy} border />
+          <Action icon="edit" label={busy === 'svg' ? 'Exportando…' : 'Archivo para grabado'} hint="SVG para láser · se envía como documento" onPress={exportarSvg} disabled={!!busy} border />
           <Action icon="share" label="Compartir enlace" hint={t.lostMode ? 'Para grupos y redes' : 'Su ficha pública'} onPress={compartirEnlace} border />
         </View>
 

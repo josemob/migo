@@ -11,6 +11,7 @@ import { editField } from '../lib/editField';
 import { pickPhotoAsDataUri } from '../lib/photo';
 import { Button } from '../components/ui';
 import { ChangePasswordModal } from '../components/ChangePasswordModal';
+import { ChangeEmailModal } from '../components/ChangeEmailModal';
 import { DeleteAccountModal } from '../components/DeleteAccountModal';
 import { TabIcon } from '../components/TabIcon';
 import { BackButton } from '../components/BackButton';
@@ -32,6 +33,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
   const [push, setPush] = useState(true);
   const [pwOpen, setPwOpen] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
 
   useEffect(() => { isBiometricEnabled().then(setFaceId).catch(() => {}); }, []);
   useEffect(() => { api<{ push: boolean }>('/me/notification-prefs').then((p) => setPush(p.push)).catch(() => {}); }, []);
@@ -85,6 +87,14 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
       },
     });
 
+  // "Editar Datos": nombre o correo (el correo se confirma con un código al correo nuevo).
+  const editData = () =>
+    appAlert('Editar datos', '¿Qué quieres cambiar?', [
+      { text: 'Nombre', onPress: editName },
+      { text: 'Correo', onPress: () => setEmailOpen(true) },
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
+
   const devReset = async () => {
     await AsyncStorage.multiRemove(['migo_onboarded', 'migo_pet_prompted']);
     await tokens.clear();
@@ -119,7 +129,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
           <View style={{ flex: 1 }}>
             <Text style={styles.name}>{user?.fullName}</Text>
             <Text style={styles.email}>{user?.email}</Text>
-            <Pressable style={styles.editData} onPress={editName}>
+            <Pressable style={styles.editData} onPress={editData}>
               <TabIcon name="edit" color={colors.brand} size={14} />
               <Text style={styles.editDataText}>Editar Datos</Text>
             </Pressable>
@@ -170,6 +180,7 @@ export default function ProfileScreen({ navigation }: { navigation: any }) {
         </View>
       </ScrollView>
       <ChangePasswordModal visible={pwOpen} onClose={() => setPwOpen(false)} />
+      <ChangeEmailModal visible={emailOpen} currentEmail={user?.email} onClose={() => setEmailOpen(false)} onChanged={refreshUser} />
       <DeleteAccountModal visible={delOpen} onClose={() => setDelOpen(false)} onDeleted={logout} />
     </SafeAreaView>
   );

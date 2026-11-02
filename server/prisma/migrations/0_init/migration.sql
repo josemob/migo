@@ -161,6 +161,19 @@ CREATE TABLE "PasswordResetCode" (
 );
 
 -- CreateTable
+CREATE TABLE "EmailChangeCode" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "newEmail" TEXT NOT NULL,
+    "codeHash" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "usedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "EmailChangeCode_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "StaffInvitation" (
     "id" TEXT NOT NULL,
     "clinicId" TEXT NOT NULL,
@@ -889,6 +902,9 @@ CREATE INDEX "PushToken_userId_idx" ON "PushToken"("userId");
 
 -- CreateIndex
 CREATE INDEX "PasswordResetCode_userId_idx" ON "PasswordResetCode"("userId");
+
+-- CreateIndex
+CREATE INDEX "EmailChangeCode_userId_idx" ON "EmailChangeCode"("userId");
 
 -- CreateIndex
 CREATE INDEX "StaffInvitation_userId_status_idx" ON "StaffInvitation"("userId", "status");
