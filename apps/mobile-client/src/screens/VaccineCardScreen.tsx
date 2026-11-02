@@ -4,6 +4,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { appAlert } from '../lib/dialog';
+import { useAndroidKeyboardHeight } from '../lib/keyboard';
 import { Loading } from '../components/ui';
 import { TabIcon } from '../components/TabIcon';
 import { BackButton } from '../components/BackButton';
@@ -210,6 +211,7 @@ export default function VaccineCardScreen({ route, navigation }: { route: any; n
 
 function AddVaxSheet({ visible, petId, species, onClose, onSaved }: { visible: boolean; petId: string; species: 'DOG' | 'CAT'; onClose: () => void; onSaved: () => void }) {
   const insets = useSafeAreaInsets();
+  const kbHeight = useAndroidKeyboardHeight();
   const [kind, setKind] = useState<Kind>('VACCINE');
   const [vaccineName, setName] = useState('');
   const [applied, setApplied] = useState(toDMY(new Date()));
@@ -253,8 +255,10 @@ function AddVaxSheet({ visible, petId, species, onClose, onSaved }: { visible: b
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <Pressable style={styles.backdrop} onPress={onClose}>
+      {/* KeyboardAvoidingView solo en iOS: en Android behavior="height" dentro del Modal
+          hacía que la hoja brincara sin parar; ahí se sube con el alto del teclado. */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <Pressable style={[styles.backdrop, { paddingBottom: kbHeight }]} onPress={onClose}>
           <Pressable style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]} onPress={(e) => e.stopPropagation()}>
             <View style={styles.handle} />
             <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 14 }}>

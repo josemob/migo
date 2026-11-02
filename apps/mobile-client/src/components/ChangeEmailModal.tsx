@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { api } from '../lib/api';
 import { appAlert } from '../lib/dialog';
+import { useAndroidKeyboardHeight } from '../lib/keyboard';
 import { Button, Input } from './ui';
 import { colors, radius } from '../theme';
 
@@ -15,6 +16,7 @@ export function ChangeEmailModal({ visible, currentEmail, onClose, onChanged }: 
   onClose: () => void;
   onChanged: () => void | Promise<void>;
 }) {
+  const kbHeight = useAndroidKeyboardHeight();
   const [step, setStep] = useState<'email' | 'code'>('email');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -61,8 +63,10 @@ export function ChangeEmailModal({ visible, currentEmail, onClose, onChanged }: 
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={close}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <View style={styles.backdrop}>
+      {/* KeyboardAvoidingView solo en iOS: en Android behavior="height" dentro del Modal
+          hacía que la hoja brincara sin parar; ahí se sube con el alto del teclado. */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={[styles.backdrop, { paddingBottom: kbHeight }]}>
           <View style={styles.sheet}>
             <Text style={styles.title}>Cambiar correo</Text>
             {step === 'email' ? (
