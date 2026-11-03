@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { Card, PageHeader, SectionTitle, Spinner, Badge, ErrorNote } from '../components/ui';
@@ -89,11 +89,10 @@ export default function Equipo() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['staff'] }); qc.invalidateQueries({ queryKey: ['shifts'] }); setEditing(null); },
     onError: (e) => alert(e instanceof Error ? e.message : 'No se pudo quitar del equipo.'),
   });
-  const confirmRemove = (m: Staff) => {
-    if (confirm(`${m.user.fullName} dejará de tener acceso al panel de la sucursal y quedará libre para unirse a otra clínica. Sus consultas firmadas se conservan.\n\n¿Quitar del equipo?`)) {
-      removeStaff.mutate(m.id);
-    }
-  };
+  // Confirmación dentro de la ventana (no window.confirm: hay navegadores embebidos que la
+  // bloquean y la dan por cancelada, y el botón parecía no hacer nada).
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
+  useEffect(() => { setConfirmingRemove(false); }, [editing?.id]);
 
   const validateCmv = useMutation({
     mutationFn: (nationalId: string) => api<{ found: boolean; message?: string }>('/staff/validate-cmv', { method: 'POST', body: { nationalId } }),
@@ -263,14 +262,33 @@ export default function Equipo() {
             )}
             {/* Quitar del equipo: aquí y no en cada fila, para que no se toque por accidente. */}
             <div className="mt-6 border-t border-slate-100 pt-4">
-              <button
-                className="w-full rounded-xl border border-red-300 px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
-                disabled={removeStaff.isPending}
-                onClick={() => confirmRemove(editing)}
-              >
-                {removeStaff.isPending ? 'Quitando…' : 'Quitar del equipo'}
-              </button>
-              <p className="mt-1 text-xs text-slate-500">Deja de pertenecer a la sucursal y libera un cupo. El historial clínico se conserva.</p>
+              {confirmingRemove ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+                  <p className="text-sm text-red-700">
+                    <b>{editing.user.fullName}</b> dejará de tener acceso al panel de la sucursal y quedará libre para unirse a otra clínica. Sus consultas firmadas se conservan.
+                  </p>
+                  <div className="mt-3 flex gap-2">
+                    <button className="btn-outline flex-1" onClick={() => setConfirmingRemove(false)}>Cancelar</button>
+                    <button
+                      className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                      disabled={removeStaff.isPending}
+                      onClick={() => removeStaff.mutate(editing.id)}
+                    >
+                      {removeStaff.isPending ? 'Quitando…' : 'Sí, quitar'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <button
+                    className="w-full rounded-xl border border-red-300 px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
+                    onClick={() => setConfirmingRemove(true)}
+                  >
+                    Quitar del equipo
+                  </button>
+                  <p className="mt-1 text-xs text-slate-500">Deja de pertenecer a la sucursal y libera un cupo. El historial clínico se conserva.</p>
+                </>
+              )}
             </div>
           </div>
         )}
