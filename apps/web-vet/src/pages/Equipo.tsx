@@ -84,6 +84,17 @@ export default function Equipo() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['staff'] }); setEditing(null); },
   });
 
+  const removeStaff = useMutation({
+    mutationFn: (id: string) => api(`/staff/${id}`, { method: 'DELETE' }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['staff'] }); qc.invalidateQueries({ queryKey: ['shifts'] }); setEditing(null); },
+    onError: (e) => alert(e instanceof Error ? e.message : 'No se pudo quitar del equipo.'),
+  });
+  const confirmRemove = (m: Staff) => {
+    if (confirm(`${m.user.fullName} dejará de tener acceso al panel de la sucursal y quedará libre para unirse a otra clínica. Sus consultas firmadas se conservan.\n\n¿Quitar del equipo?`)) {
+      removeStaff.mutate(m.id);
+    }
+  };
+
   const validateCmv = useMutation({
     mutationFn: (nationalId: string) => api<{ found: boolean; message?: string }>('/staff/validate-cmv', { method: 'POST', body: { nationalId } }),
     onSuccess: (r) => setCmvResult(r.found ? '✅ Profesional encontrado en el registro CMV.' : (r.message ?? 'No encontrado en el registro.')),
@@ -246,9 +257,21 @@ export default function Equipo() {
               <input type="checkbox" checked={editing.isActive} onChange={(e) => setEditing({ ...editing, isActive: e.target.checked })} />
               Activo en la sucursal
             </label>
+            <p className="mt-1 text-xs text-slate-500">Desmárcalo para pausar a alguien por un tiempo (vacaciones, permiso): sigue en tu equipo pero sin acceso.</p>
             {editing.position === 'VET' && editing.verificationStatus !== 'VERIFIED' && (
               <button className="btn-green mt-4 w-full" onClick={() => updateStaff.mutate({ id: editing.id, body: { verificationStatus: 'VERIFIED' } })}>✅ Marcar CMV Verificado</button>
             )}
+            {/* Quitar del equipo: aquí y no en cada fila, para que no se toque por accidente. */}
+            <div className="mt-6 border-t border-slate-100 pt-4">
+              <button
+                className="w-full rounded-xl border border-red-300 px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                disabled={removeStaff.isPending}
+                onClick={() => confirmRemove(editing)}
+              >
+                {removeStaff.isPending ? 'Quitando…' : 'Quitar del equipo'}
+              </button>
+              <p className="mt-1 text-xs text-slate-500">Deja de pertenecer a la sucursal y libera un cupo. El historial clínico se conserva.</p>
+            </div>
           </div>
         )}
       </Modal>

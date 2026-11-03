@@ -247,6 +247,46 @@ router.patch(
   }),
 );
 
+// DELETE /staff/:id -> quitar a alguien del equipo de la sucursal. Borra su ClinicStaff, así
+// queda libre para unirse a otra clínica o trabajar como independiente y libera un cupo.
+// El historial se conserva: los informes guardan el snapshot del firmante y las citas,
+// vacunas y récipes quedan sin vet asignado (relaciones opcionales). Las guardias se borran.
+router.delete(
+  '/:id',
+  requireRole('CLINIC_ADMIN', 'SUPER_ADMIN'),
+  validate({ params: z.object({ id: z.string().uuid() }) }),
+  asyncHandler(async (req, res) => {
+    const staff = await prisma.clinicStaff.findFirst({
+      where: { id: req.params.id, clinicId: req.clinicId! },
+      include: {
+        user: { select: { id: true, role: true } },
+        clinic: { select: { name: true, organization: { select: { ownerId: true } } } },
+      },
+    });
+    if (!staff) throw ApiError.notFound('Miembro del staff no encontrado');
+    if (staff.userId === req.user!.id) throw ApiError.badRequest('No puedes quitarte a ti mismo del equipo.');
+    if (staff.userId === staff.clinic.organization.ownerId) {
+      throw ApiError.badRequest('No se puede quitar al dueño de la clínica.');
+    }
+
+    await prisma.$transaction([
+      prisma.clinicStaff.delete({ where: { id: staff.id } }),
+      // Un admin de sucursal que sale del equipo no conserva permisos de administrador.
+      ...(staff.user.role === 'CLINIC_ADMIN'
+        ? [prisma.user.update({ where: { id: staff.userId }, data: { role: 'VET' } })]
+        : []),
+    ]);
+
+    void sendPush(staff.userId, {
+      title: 'Ya no formas parte del equipo',
+      body: `${staff.clinic.name} te quitó de su equipo en Migo.`,
+      data: { type: 'staff_removed' },
+    }).catch(() => {});
+
+    res.status(204).end();
+  }),
+);
+
 // PUT /staff/:id/shift -> asignar guardia del día
 router.put(
   '/:id/shift',
