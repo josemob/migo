@@ -56,7 +56,7 @@ export default function MyRecordsScreen({ navigation }: { navigation: any }) {
           <Pressable onPress={() => void q.refetch()}><Text style={{ color: colors.brand, fontWeight: '800', fontSize: 15 }}>Reintentar →</Text></Pressable>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 20, gap: 12, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 20, gap: 12, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
           {pendientes > 0 && (
             <View style={styles.banner}><Text style={styles.bannerTxt}>Tienes {pendientes} expediente{pendientes === 1 ? '' : 's'} sin firmar.</Text></View>
           )}

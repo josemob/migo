@@ -68,7 +68,7 @@ export default function AttendScreen({ route, navigation }: { route: any; naviga
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 20, gap: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           {(petName || ownerName) && (
             <Text style={styles.patient}>{petName ?? 'Paciente'}{ownerName ? ` · ${ownerName}` : ''}</Text>
           )}

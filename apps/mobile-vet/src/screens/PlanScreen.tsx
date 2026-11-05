@@ -47,12 +47,12 @@ export default function PlanScreen({ navigation }: { navigation: any }) {
         <Loading />
       ) : q.isError || !data ? (
         // Antes: spinner infinito cuando fallaba la carga.
-        <View style={{ padding: 20, gap: 12 }}>
+        <View style={{ paddingHorizontal: 16, paddingVertical: 20, gap: 12 }}>
           <Text style={styles.meta}>No pudimos cargar tu plan. Revisa tu conexión e intenta de nuevo.</Text>
           <Pressable onPress={() => void q.refetch()}><Text style={styles.sectionTitle}>Reintentar →</Text></Pressable>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 20, gap: 14, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
           {/* Plan actual */}
           {data.current && (
             <View style={[styles.card, styles.currentCard]}>

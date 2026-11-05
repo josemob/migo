@@ -68,12 +68,12 @@ export default function RecordDetailScreen({ route, navigation }: { route: any; 
         <Loading />
       ) : q.isError || !d ? (
         // Antes: spinner infinito cuando fallaba la carga.
-        <View style={{ padding: 20, gap: 12 }}>
+        <View style={{ paddingHorizontal: 16, paddingVertical: 20, gap: 12 }}>
           <Text style={styles.meta}>No pudimos cargar el expediente. Revisa tu conexión e intenta de nuevo.</Text>
           <Pressable onPress={() => void q.refetch()}><Text style={styles.signTitle}>Reintentar →</Text></Pressable>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 20, gap: 14, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
           {/* Cabecera */}
           <View style={styles.hero}>
             <Text style={styles.pet}>{d.pet.name}{d.pet.breed ? ` · ${d.pet.breed}` : ''}</Text>

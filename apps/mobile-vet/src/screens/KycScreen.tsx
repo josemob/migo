@@ -103,7 +103,7 @@ export default function KycScreen({ onSubmitted }: { onSubmitted: () => void }) 
         <Text style={styles.title}>Verificación de identidad</Text>
         <Pressable onPress={logout} hitSlop={10}><Text style={styles.logout}>Salir</Text></Pressable>
       </View>
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 20, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
         <Text style={styles.sub}>Para unirte a una clínica en Migo, verificamos tu identidad. Tus datos van cifrados y solo los revisa el equipo Migo.</Text>
 
         {/* Rol */}
@@ -172,7 +172,7 @@ function Capture({ label, hint, value, onPress, icon }: { label: string; hint: s
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
-  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
   title: { fontSize: 20, fontWeight: '900', color: colors.text },
   logout: { color: colors.muted, fontWeight: '700', fontSize: 14 },
   sub: { color: colors.muted, fontSize: 14, marginBottom: 8 },

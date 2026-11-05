@@ -40,7 +40,7 @@ export default function ClientsScreen({ navigation }: { navigation: any }) {
         <Text style={styles.title}>Clientes & Pacientes</Text>
       </View>
 
-      <View style={{ paddingHorizontal: 20 }}>
+      <View style={{ paddingHorizontal: 16 }}>
         <View style={styles.searchBox}>
           <TabIcon name="person" color={colors.muted} size={18} />
           <TextInput
@@ -61,7 +61,7 @@ export default function ClientsScreen({ navigation }: { navigation: any }) {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {term.length < 2 ? (
           <View style={styles.empty}><Text style={styles.emptyIcon}>🔎</Text><Text style={styles.emptyTxt}>Escribe al menos 2 caracteres para buscar.</Text></View>
         ) : isLoading || isFetching ? (
@@ -95,7 +95,7 @@ export default function ClientsScreen({ navigation }: { navigation: any }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
-  head: { paddingHorizontal: 20, paddingVertical: 14 },
+  head: { paddingHorizontal: 16, paddingVertical: 14 },
   title: { fontSize: 24, fontWeight: '900', color: colors.text },
   searchBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.white, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: colors.border },
   searchInput: { flex: 1, fontSize: 16, color: colors.text },

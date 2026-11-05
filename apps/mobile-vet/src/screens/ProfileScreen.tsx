@@ -38,7 +38,7 @@ export default function ProfileScreen() {
   };
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={{ padding: 20, gap: 18 }}>
+      <View style={{ paddingHorizontal: 16, paddingVertical: 20, gap: 18 }}>
         <Text style={styles.title}>Mi Perfil</Text>
         <View style={styles.card}>
           <Pressable onPress={changePhoto} style={styles.avatarWrap} hitSlop={6}>

@@ -90,7 +90,7 @@ export default function PatientDetailScreen({ navigation, route }: any) {
         {isLoading ? (
           <Loading />
         ) : (
-          <View style={{ padding: 20, gap: 12 }}>
+          <View style={{ paddingHorizontal: 16, paddingVertical: 20, gap: 12 }}>
             <Text style={styles.emptyTxt}>{error instanceof Error ? error.message : 'No pudimos cargar la ficha. Revisa tu conexión.'}</Text>
             <Button title="Reintentar" onPress={() => void refetch()} />
           </View>
@@ -119,7 +119,7 @@ export default function PatientDetailScreen({ navigation, route }: any) {
         <View style={{ width: 44 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 110 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 20, paddingBottom: 110 }} showsVerticalScrollIndicator={false}>
         {/* Cabecera */}
         <View style={styles.hero}>
           <Text style={{ fontSize: 52 }}>🐶</Text>
@@ -299,5 +299,5 @@ const styles = StyleSheet.create({
   visitVet: { fontSize: 12, color: colors.brand, marginTop: 2 },
   emptyTxt: { color: colors.muted, fontSize: 14 },
 
-  cta: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 20, backgroundColor: colors.canvas, borderTopWidth: 1, borderTopColor: colors.border },
+  cta: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingVertical: 20, backgroundColor: colors.canvas, borderTopWidth: 1, borderTopColor: colors.border },
 });

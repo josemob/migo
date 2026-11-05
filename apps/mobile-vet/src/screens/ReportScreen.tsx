@@ -66,7 +66,7 @@ export default function ReportScreen({ navigation, route }: any) {
         </View>
       ) : (
         <>
-          <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 20, paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
             <View style={styles.doc}>
               <View style={styles.docHead}>
                 <Text style={styles.docTitle}>Reporte de Consulta</Text>
@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
   title: { fontSize: 18, fontWeight: '800', color: colors.brand },
-  center: { padding: 20, gap: 12 },
+  center: { paddingHorizontal: 16, paddingVertical: 20, gap: 12 },
   centerTxt: { fontSize: 15, color: colors.muted, textAlign: 'center', marginBottom: 6 },
 
   doc: { backgroundColor: colors.white, borderRadius: radius.lg, padding: 20, boxShadow: cardShadow },
@@ -152,5 +152,5 @@ const styles = StyleSheet.create({
   signed: { marginTop: 18, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 14 },
   signedTxt: { fontSize: 13, color: colors.muted, lineHeight: 20 },
 
-  actions: { flexDirection: 'row', gap: 12, padding: 20, borderTopWidth: 1, borderTopColor: colors.border },
+  actions: { flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingVertical: 20, borderTopWidth: 1, borderTopColor: colors.border },
 });

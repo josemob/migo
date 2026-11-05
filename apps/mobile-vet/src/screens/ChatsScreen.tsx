@@ -60,7 +60,7 @@ export default function ChatsScreen({ navigation }: { navigation: any }) {
       <View style={styles.head}><Text style={styles.title}>Chats con Clientes</Text></View>
 
       {/* ScrollView: antes la lista no hacía scroll y con más de ~7 chats el resto quedaba inalcanzable */}
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
         {!ready || loading ? (
           <Text style={styles.muted}>Cargando conversaciones…</Text>
         ) : error ? (
@@ -116,7 +116,7 @@ export default function ChatsScreen({ navigation }: { navigation: any }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
-  head: { paddingHorizontal: 20, paddingVertical: 14 },
+  head: { paddingHorizontal: 16, paddingVertical: 14 },
   title: { fontSize: 24, fontWeight: '900', color: colors.text },
   muted: { color: colors.muted, fontSize: 14 },
   empty: { alignItems: 'center', gap: 10, paddingVertical: 40, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed', marginTop: 10 },

@@ -115,7 +115,7 @@ export default function AlertScreen({ navigation }: { navigation: any }) {
           <Text style={styles.emptyTxt}>No hay emergencias entrantes ahora mismo.</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 20, gap: 14, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
           {q.isError && <Text style={styles.offline}>⚠️ Sin conexión: mostrando la última información recibida.</Text>}
           {alerts.map((a) => {
             // La API puede omitir owner/allergies/conditions: guardas para no tumbar la pantalla.
@@ -176,7 +176,7 @@ export default function AlertScreen({ navigation }: { navigation: any }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
-  head: { padding: 20 },
+  head: { paddingHorizontal: 16, paddingVertical: 20 },
   title: { fontSize: 24, fontWeight: '900', color: colors.text },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 32 },
   icon: { fontSize: 40 },

@@ -163,7 +163,7 @@ export default function IndependentHomeScreen({
         <Pressable onPress={logout} hitSlop={10}><Text style={styles.logout}>Salir</Text></Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40, gap: 16 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 20, paddingBottom: insets.bottom + 40, gap: 16 }} showsVerticalScrollIndicator={false}>
         {/* Emergencias entrantes ruteadas por IA (Fase C) — prioridad arriba */}
         <IncomingEmergencies />
 
@@ -303,7 +303,7 @@ export default function IndependentHomeScreen({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
-  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
   brand: { fontSize: 22, fontWeight: '900', color: colors.brand },
   brandVet: { fontSize: 13 },
   headSub: { fontSize: 13, color: colors.muted, marginTop: 2 },

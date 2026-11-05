@@ -219,7 +219,7 @@ function AttachOption({ icon, onPress }: { icon: keyof typeof ATTACH_ICONS; onPr
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas, paddingBottom: 12 },
-  attachRow: { flexDirection: 'row', gap: 16, paddingTop: 12, paddingBottom: 14, paddingHorizontal: 20, backgroundColor: colors.canvas },
+  attachRow: { flexDirection: 'row', gap: 16, paddingTop: 12, paddingBottom: 14, paddingHorizontal: 16, backgroundColor: colors.canvas },
   attachOpt: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center' },
   uploading: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   uploadingCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.white, paddingHorizontal: 20, paddingVertical: 14, borderRadius: 16, boxShadow: cardShadow },
