@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Linking, Pressable, ScrollView, Share, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -49,10 +49,20 @@ const haceCuanto = (iso: string) => {
   return new Date(iso).toLocaleDateString('es-VE', { day: 'numeric', month: 'short' });
 };
 export default function PetTagScreen({ route, navigation }: { route: any; navigation: any }) {
-  const { id, name } = route.params ?? {};
+  // focus: 'reports' → viene de la card "¡Alguien encontró a…!" del inicio: baja directo a los avisos.
+  const { id, name, focus } = route.params ?? {};
   const qc = useQueryClient();
   const insets = useSafeAreaInsets();
   const [busy, setBusy] = useState<'pdf' | 'svg' | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const [reportsY, setReportsY] = useState<number | null>(null);
+  const focused = useRef(false);
+  useEffect(() => {
+    if (focus === 'reports' && reportsY != null && !focused.current) {
+      focused.current = true;
+      setTimeout(() => scrollRef.current?.scrollTo({ y: Math.max(0, reportsY - 12), animated: true }), 150);
+    }
+  }, [focus, reportsY]);
 
   // POST porque genera el código la primera vez; después devuelve siempre el mismo.
   const tag = useQuery({
@@ -171,7 +181,7 @@ export default function PetTagScreen({ route, navigation }: { route: any; naviga
     <SafeAreaView style={styles.safe} edges={['top']}>
       <Header title={`Placa de ${petName}`} onBack={() => navigation.goBack()} />
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 20, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollRef} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 20, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
         {/* La placa */}
         <View style={[styles.placa, t.lostMode && styles.placaPerdida]}>
           {t.lostMode && (
@@ -256,7 +266,7 @@ export default function PetTagScreen({ route, navigation }: { route: any; naviga
         </View>
 
         {/* Avisos recibidos */}
-        <Text style={styles.section}>Avisos recibidos</Text>
+        <Text style={styles.section} onLayout={(e) => setReportsY(e.nativeEvent.layout.y)}>Avisos recibidos</Text>
         <View style={styles.card}>
           {list.length === 0 ? (
             <Text style={[styles.muted, { padding: 16 }]}>

@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import {
   Dimensions,
   Image,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -26,7 +27,9 @@ const CARD_W = (W - 32 - CARD_GAP) / 2;
 // menos aire de la app (foto + nombre + cita + 3 chips) y a 1.3x ya se cortaba.
 const PET_CARD_MAX_SCALE = 1.2;
 
-interface Pet { id: string; name: string; alias?: string | null; breed?: string | null; photoUrl?: string | null; weightKg?: string | number | null; birthDate?: string | null; size?: string | null }
+interface Pet { id: string; name: string; alias?: string | null; breed?: string | null; photoUrl?: string | null; weightKg?: string | number | null; birthDate?: string | null; size?: string | null; lostMode?: boolean; lostSince?: string | null }
+// Aviso de quien escaneó la placa (mismo endpoint y caché que la pantalla de la placa)
+interface FoundReport { id: string; message?: string | null; contact?: string | null; lat?: number | null; lng?: number | null; createdAt: string }
 interface EmergencyMine { id: string; status: string }
 const ACTIVE = ['TRIAGING', 'BROADCASTING', 'ACCEPTED', 'EN_ROUTE'];
 
@@ -147,7 +150,9 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
   const firstName = user?.fullName?.split(' ')[0] ?? '';
   const avatarUrl = (user as { avatarUrl?: string } | null)?.avatarUrl;
-  const pet = pets.data?.data?.[0] ?? null;
+  // Si alguna mascota está extraviada, la card del inicio es la suya (aunque no sea la primera).
+  const petList = pets.data?.data ?? [];
+  const pet = petList.find((p) => p.lostMode) ?? petList[0] ?? null;
   const active = emergencies.data?.data?.find((e) => ACTIVE.includes(e.status));
 
   // Atajo "Registrar Vacuna o Desparasitación": va directo a la cartilla (antes caía en la
@@ -227,7 +232,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
         {/* Card de mascota: foto real si el dueño subió una; si no, la ilustración de su
             raza; si tampoco hay raza conocida, un placeholder. + próxima cita + chips */}
-        {pet && (
+        {pet?.lostMode && <LostPetCard pet={pet} navigation={navigation} />}
+        {pet && !pet.lostMode && (
           <View style={styles.petCard} onLayout={(e) => setPetCard({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
             <Image source={require('../assets/pet-card-bg.jpg')} style={StyleSheet.absoluteFill as any} resizeMode="cover" />
 
@@ -352,6 +358,101 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     </SafeAreaView>
   );
 }
+
+const haceCuanto = (iso: string) => {
+  const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (min < 1) return 'hace un momento';
+  if (min < 60) return `hace ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `hace ${h} h`;
+  return new Date(iso).toLocaleDateString('es-VE', { day: 'numeric', month: 'short' });
+};
+
+// Card del inicio cuando la mascota está en modo extraviado: roja (alerta). Sin avisos,
+// recuerda que Migo avisa al escanear la placa; con avisos, muestra el más reciente con
+// botones para ver la ubicación (Google Maps) y llamar a quien la encontró.
+function LostPetCard({ pet, navigation }: { pet: Pet; navigation: any }) {
+  const reports = useQuery({
+    queryKey: ['pet-found', pet.id],
+    queryFn: () => api<{ data: FoundReport[] }>(`/me/pets/${pet.id}/found-reports`),
+    refetchInterval: 30_000,
+  });
+  // Solo cuentan los avisos de esta pérdida (no los de una vez anterior).
+  const since = pet.lostSince ? new Date(pet.lostSince).getTime() : 0;
+  const list = (reports.data?.data ?? []).filter((r) => new Date(r.createdAt).getTime() >= since);
+  const last = list[0];
+  const lostLabel = pet.lostSince
+    ? `Extraviado desde el ${new Date(pet.lostSince).toLocaleDateString('es-VE', { day: 'numeric', month: 'short' })}`
+    : 'Extraviado';
+  const goTag = () => navigation.navigate('PetTag', { id: pet.id, name: pet.name, focus: last ? 'reports' : undefined });
+
+  return (
+    <Pressable style={lost.card} onPress={goTag}>
+      {pet.photoUrl ? (
+        <Image source={{ uri: pet.photoUrl }} style={lost.photo} resizeMode="cover" />
+      ) : breedImage(pet.breed) ? (
+        <View style={[lost.photo, lost.photoBg]}><Image source={breedImage(pet.breed)!} style={{ width: '100%', height: '100%' }} resizeMode="contain" /></View>
+      ) : (
+        <View style={[lost.photo, lost.photoBg]}><Text style={{ fontSize: 40 }}>🐶</Text></View>
+      )}
+
+      <View style={lost.body}>
+        <View style={lost.badge}><Text style={lost.badgeTxt} numberOfLines={1} maxFontSizeMultiplier={PET_CARD_MAX_SCALE}>⚠ {lostLabel}</Text></View>
+        {last ? (
+          <>
+            <Text style={lost.title} numberOfLines={2} maxFontSizeMultiplier={PET_CARD_MAX_SCALE}>¡Alguien encontró a {pet.name}!</Text>
+            <Text style={lost.msg} numberOfLines={2} maxFontSizeMultiplier={PET_CARD_MAX_SCALE}>
+              {haceCuanto(last.createdAt)}{last.message ? ` · “${last.message}”` : ''}
+            </Text>
+            {(last.lat != null && last.lng != null) || last.contact ? (
+              <View style={lost.actions}>
+                {last.lat != null && last.lng != null ? (
+                  <Pressable style={lost.action} hitSlop={4} onPress={() => void Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${last.lat},${last.lng}`)}>
+                    <TabIcon name="pin" color={colors.red} size={14} />
+                    <Text style={lost.actionTxt} maxFontSizeMultiplier={PET_CARD_MAX_SCALE}>Ver ubicación</Text>
+                  </Pressable>
+                ) : null}
+                {last.contact ? (
+                  <Pressable style={lost.action} hitSlop={4} onPress={() => void Linking.openURL(`tel:${last.contact!.replace(/[^\d+]/g, '')}`)}>
+                    <TabIcon name="phone" color={colors.red} size={14} />
+                    <Text style={lost.actionTxt} maxFontSizeMultiplier={PET_CARD_MAX_SCALE}>Llamar</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
+            {list.length > 1 && (
+              <Text style={lost.more} maxFontSizeMultiplier={PET_CARD_MAX_SCALE}>y {list.length - 1} {list.length - 1 === 1 ? 'aviso' : 'avisos'} más</Text>
+            )}
+          </>
+        ) : (
+          <>
+            <Text style={lost.title} numberOfLines={1} maxFontSizeMultiplier={PET_CARD_MAX_SCALE}>{pet.name}</Text>
+            <Text style={lost.msg} numberOfLines={3} maxFontSizeMultiplier={PET_CARD_MAX_SCALE}>Te avisamos apenas alguien escanee su placa.</Text>
+          </>
+        )}
+      </View>
+
+      <View style={lost.chevron}><Text style={lost.chevronTxt}>›</Text></View>
+    </Pressable>
+  );
+}
+
+const lost = StyleSheet.create({
+  card: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginBottom: 18, padding: 12, borderRadius: 24, backgroundColor: colors.red, boxShadow: cardShadow },
+  photo: { width: 96, height: 96, borderRadius: 14, backgroundColor: '#FFFFFF33', borderWidth: 2, borderColor: colors.white },
+  photoBg: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  body: { flex: 1, gap: 4 },
+  badge: { alignSelf: 'flex-start', backgroundColor: colors.white, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  badgeTxt: { color: colors.red, fontSize: 11, fontWeight: '700' },
+  title: { color: colors.white, fontSize: 18, fontWeight: '800', lineHeight: 22 },
+  msg: { color: colors.white, fontSize: 13, lineHeight: 18 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
+  action: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.white, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
+  actionTxt: { color: colors.red, fontSize: 12, fontWeight: '700' },
+  more: { color: colors.white, fontSize: 12, fontWeight: '600', opacity: 0.9 },
+  chevron: { width: 28, height: 28, borderRadius: 4, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
+  chevronTxt: { color: colors.red, fontSize: 20, fontWeight: '800', lineHeight: 22, marginTop: -1 },
+});
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
