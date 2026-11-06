@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import {
   Outfit_400Regular,
   Outfit_500Medium,
@@ -35,19 +35,34 @@ const WEIGHT_TO_FAMILY: Record<string, string> = {
   '900': 'Outfit_900Black',
 };
 
-function familyFor(style: unknown): string {
-  const flat = (StyleSheet.flatten(style as never) as { fontWeight?: string | number }) || {};
+type FlatText = { fontWeight?: string | number; fontFamily?: string };
+
+function familyFor(flat: FlatText): string {
   const w = flat.fontWeight != null ? String(flat.fontWeight) : '400';
   return WEIGHT_TO_FAMILY[w] ?? 'Outfit_400Regular';
 }
 
-type AnyComp = React.ComponentType<{ style?: unknown }> & { __outfit?: boolean; displayName?: string; name?: string };
+// Tope global del tamaño de letra del sistema. Con "letra enorme" (2.0×) los botones y
+// las etiquetas se partían o se cortaban. Hasta 1.3× la app respeta la preferencia del
+// usuario; por encima, se queda en 1.3×. Un componente puede pedir otro tope con su
+// propio maxFontSizeMultiplier.
+export const MAX_FONT_SCALE = 1.3;
+
+type ThemedProps = { style?: unknown; maxFontSizeMultiplier?: number | null };
+type AnyComp = React.ComponentType<ThemedProps> & { __outfit?: boolean; displayName?: string; name?: string };
 
 function makeThemed(Orig: AnyComp): AnyComp {
-  const Themed: AnyComp = (props: { style?: unknown }) => {
-    const fam = familyFor(props.style);
+  const Themed: AnyComp = (raw: ThemedProps) => {
+    const props = raw.maxFontSizeMultiplier === undefined ? { ...raw, maxFontSizeMultiplier: MAX_FONT_SCALE } : raw;
+    const flat = (StyleSheet.flatten(props.style as never) as FlatText) || {};
+    // Si el estilo ya trae su propia familia, se respeta tal cual.
+    if (flat.fontFamily) return React.createElement(Orig, props);
     // La familia va primero para que el estilo original conserve el resto de props.
-    return React.createElement(Orig, { ...props, style: [{ fontFamily: fam }, props.style] });
+    // En Android, familia de un solo peso + fontWeight 700 hace que RN busque la
+    // variante "bold" de esa familia, no la encuentre y caiga a Roboto Bold:
+    // el peso ya va en la familia, así que se neutraliza fontWeight.
+    const style = [{ fontFamily: familyFor(flat) }, props.style, Platform.OS === 'android' && { fontWeight: 'normal' as const }];
+    return React.createElement(Orig, { ...props, style });
   };
   Themed.__outfit = true;
   Themed.displayName = `Outfit(${Orig.displayName || Orig.name || 'Component'})`;
