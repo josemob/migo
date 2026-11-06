@@ -135,7 +135,8 @@ export default function LoginScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
-  center: { flex: 1, justifyContent: 'center', paddingHorizontal: 28, gap: 14 },
+  // Margen lateral 16, como el resto de la app (antes 28).
+  center: { flex: 1, justifyContent: 'center', paddingHorizontal: 16, gap: 14 },
   logoWrap: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 2 },
   logo: { fontSize: 44, fontWeight: '900', color: colors.brand },
   badge: { backgroundColor: colors.brand, borderRadius: radius.sm, paddingHorizontal: 8, paddingVertical: 3 },
