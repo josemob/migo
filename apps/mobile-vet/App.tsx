@@ -41,7 +41,7 @@ import ReportScreen from './src/screens/ReportScreen';
 import ChatThreadScreen from './src/screens/ChatThreadScreen';
 import PlanScreen from './src/screens/PlanScreen';
 import AttendScreen from './src/screens/AttendScreen';
-import MyRecordsScreen from './src/screens/MyRecordsScreen';
+import HistoryScreen from './src/screens/HistoryScreen';
 import AgendaScreen from './src/screens/AgendaScreen';
 import RecordDetailScreen from './src/screens/RecordDetailScreen';
 
@@ -130,7 +130,7 @@ function MainApp({ onBackToIndependent }: { onBackToIndependent?: () => void }) 
             <Stack.Screen name="ChatThread" component={ChatThreadScreen} />
             <Stack.Screen name="Plan" component={PlanScreen} />
             <Stack.Screen name="Attend" component={AttendScreen} />
-            <Stack.Screen name="MyRecords" component={MyRecordsScreen} />
+            <Stack.Screen name="History" component={HistoryScreen} />
             <Stack.Screen name="Agenda" component={AgendaScreen} />
             <Stack.Screen name="RecordDetail" component={RecordDetailScreen} />
           </Stack.Navigator>

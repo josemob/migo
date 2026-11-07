@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { validate } from '../../middleware/validate';
@@ -195,6 +196,78 @@ router.get(
       },
     });
     res.json({ data });
+  }),
+);
+
+// GET /patients/records/history -> "Historial de consultas" de la app Vet, paginado.
+//   search: mascota, dueño (nombre o cédula), motivo o diagnóstico
+//   signed: all | signed | unsigned   ·   period: month | 3m | all
+//   scope:  mine (default) | clinic — "clinic" solo para el admin de la sucursal
+//   offset: para "Cargar más" (de 20 en 20)
+const HISTORY_PAGE = 20;
+router.get(
+  '/records/history',
+  validate({
+    query: z.object({
+      search: z.string().trim().max(80).optional(),
+      signed: z.enum(['all', 'signed', 'unsigned']).default('all'),
+      period: z.enum(['month', '3m', 'all']).default('all'),
+      scope: z.enum(['mine', 'clinic']).default('mine'),
+      offset: z.coerce.number().int().min(0).default(0),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const { search, signed, period, scope, offset } = req.query as unknown as {
+      search?: string; signed: 'all' | 'signed' | 'unsigned'; period: 'month' | '3m' | 'all'; scope: 'mine' | 'clinic'; offset: number;
+    };
+    const isAdmin = req.user!.role === 'CLINIC_ADMIN' || req.user!.role === 'SUPER_ADMIN';
+    // Un vet sin permisos de admin siempre ve solo las suyas, aunque pida scope=clinic.
+    const onlyMine = !(isAdmin && scope === 'clinic');
+
+    const since =
+      period === 'month' ? new Date(Date.now() - 31 * 24 * 3600_000)
+      : period === '3m' ? new Date(Date.now() - 92 * 24 * 3600_000)
+      : undefined;
+    const q = search && search.length >= 2 ? search : undefined;
+    const where: Prisma.MedicalRecordWhereInput = {
+      clinicId: req.clinicId!,
+      ...(onlyMine && req.staffId ? { vetId: req.staffId } : {}),
+      ...(signed === 'signed' ? { signedAt: { not: null } } : signed === 'unsigned' ? { signedAt: null } : {}),
+      ...(since ? { visitedAt: { gte: since } } : {}),
+      ...(q
+        ? {
+            OR: [
+              { pet: { name: { contains: q, mode: 'insensitive' } } },
+              { pet: { owner: { fullName: { contains: q, mode: 'insensitive' } } } },
+              { pet: { owner: { nationalId: { contains: q, mode: 'insensitive' } } } },
+              { reason: { contains: q, mode: 'insensitive' } },
+              { diagnosis: { contains: q, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+
+    const rows = await prisma.medicalRecord.findMany({
+      where,
+      orderBy: { visitedAt: 'desc' },
+      skip: offset,
+      take: HISTORY_PAGE + 1, // uno de más para saber si hay otra página
+      select: {
+        id: true,
+        visitedAt: true,
+        reason: true,
+        diagnosis: true,
+        signedAt: true,
+        signedByName: true,
+        pet: { select: { name: true, species: true, owner: { select: { fullName: true } } } },
+        vet: { select: { user: { select: { fullName: true } } } },
+      },
+    });
+    res.json({
+      data: rows.slice(0, HISTORY_PAGE),
+      nextOffset: rows.length > HISTORY_PAGE ? offset + HISTORY_PAGE : null,
+      canSeeClinic: isAdmin,
+    });
   }),
 );
 

@@ -211,6 +211,13 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             <Text style={styles.quickSub}>Inicia receta rápida con dictado de voz</Text>
           </View>
         </Pressable>
+        <Pressable style={styles.quick} onPress={() => navigation.navigate('History')}>
+          <View style={styles.quickIcon}><TabIcon name="history" color={colors.brand} size={22} /></View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.quickTitle}>Historial de consultas</Text>
+            <Text style={styles.quickSub}>Busca consultas anteriores por mascota o dueño</Text>
+          </View>
+        </Pressable>
         <Pressable style={styles.quick} onPress={() => navigation.navigate('Chats')}>
           <View style={styles.quickIcon}><TabIcon name="chat" color={colors.brand} size={22} /></View>
           <View style={{ flex: 1 }}>

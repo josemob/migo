@@ -61,7 +61,7 @@ export default function ProfileScreen() {
         {backToIndependent && (
           <Button title="Mi panel de vet independiente" onPress={backToIndependent} />
         )}
-        <Button title="Mis expedientes" onPress={() => navigation.navigate('MyRecords')} />
+        <Button title="Historial de consultas" onPress={() => navigation.navigate('History')} />
         {isIndependent && (
           <Button title="Mi plan" onPress={() => navigation.navigate('Plan')} />
         )}
