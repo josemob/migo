@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { appAlert } from '../lib/dialog';
@@ -49,6 +49,7 @@ const monthLabel = (iso: string) => {
 
 export default function HistoryScreen({ navigation }: { navigation: any }) {
   const qc = useQueryClient();
+  const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
   const [search, setSearch] = useState('');
   const [signed, setSigned] = useState<Signed>('all');
@@ -148,7 +149,8 @@ export default function HistoryScreen({ navigation }: { navigation: any }) {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 40, gap: 12, flexGrow: 1 }}
+        // + alto de la barra de navegación del sistema: con 40 fijos la última tarjeta quedaba debajo
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: insets.bottom + 40, gap: 12, flexGrow: 1 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         refreshControl={refreshControl}

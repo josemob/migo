@@ -1,5 +1,5 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackButton } from '../components/BackButton';
 import { TabIcon } from '../components/TabIcon';
 import { Loading } from '../components/ui';
@@ -10,6 +10,7 @@ import { colors } from '../theme';
 // Agenda del vet ("Ver todo" del inicio): todas sus citas por atender, agrupadas por día,
 // con las atrasadas (días anteriores sin concluir) arriba.
 export default function AgendaScreen({ navigation }: { navigation: any }) {
+  const insets = useSafeAreaInsets();
   const { query, list, confirmComplete, completing } = useUpcomingAppts();
   const refreshControl = usePullRefresh(() => query.refetch());
   const groups = groupByDay(list);
@@ -22,7 +23,8 @@ export default function AgendaScreen({ navigation }: { navigation: any }) {
         <View style={{ width: 44 }} />
       </View>
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 40, flexGrow: 1 }}
+        // + alto de la barra de navegación del sistema: con 40 fijos la última tarjeta quedaba debajo
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: insets.bottom + 40, flexGrow: 1 }}
         showsVerticalScrollIndicator={false}
         refreshControl={refreshControl}
       >
