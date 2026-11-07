@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { usePullRefresh } from '../lib/refresh';
 import { api } from '../lib/api';
 import { appAlert } from '../lib/dialog';
 import { BackButton } from '../components/BackButton';
@@ -53,6 +54,7 @@ export default function PatientDetailScreen({ navigation, route }: any) {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
   const { data, isLoading, isError, error, refetch } = useQuery({ queryKey: ['patient', petId], queryFn: () => api<Ficha>(`/patients/${petId}`) });
+  const refreshControl = usePullRefresh(() => refetch());
 
   // Formulario "Registrar vacuna"
   const [vaxOpen, setVaxOpen] = useState(false);
@@ -119,7 +121,7 @@ export default function PatientDetailScreen({ navigation, route }: any) {
         <View style={{ width: 44 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 20, paddingBottom: 110 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 20, paddingBottom: 110 }} showsVerticalScrollIndicator={false} refreshControl={refreshControl}>
         {/* Cabecera */}
         <View style={styles.hero}>
           <Text style={{ fontSize: 52 }}>🐶</Text>

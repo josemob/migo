@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { AppointmentStatus } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { validate } from '../../middleware/validate';
@@ -27,17 +28,28 @@ router.get(
     query: z.object({
       from: z.coerce.date().optional(),
       to: z.coerce.date().optional(),
+      // Uno o varios estados separados por coma: "PENDING,CONFIRMED" (antes se aceptaba y se ignoraba)
       status: z.string().optional(),
       vetId: z.string().uuid().optional(),
+      // mine=1 -> solo las citas asignadas a quien consulta + las que aún no tienen vet (app Vet)
+      mine: z.enum(['1', 'true']).optional(),
     }),
   }),
   asyncHandler(async (req, res) => {
-    const { from, to, vetId } = req.query as { from?: Date; to?: Date; vetId?: string };
+    const { from, to, vetId, status, mine } = req.query as {
+      from?: Date; to?: Date; vetId?: string; status?: string; mine?: string;
+    };
+    const statuses = status
+      ?.split(',')
+      .map((s) => s.trim().toUpperCase())
+      .filter((s): s is AppointmentStatus => (Object.values(AppointmentStatus) as string[]).includes(s));
     const appointments = await prisma.appointment.findMany({
       where: {
         clinicId: req.clinicId!,
         vetId,
         scheduledAt: { gte: from, lte: to },
+        ...(statuses?.length ? { status: { in: statuses } } : {}),
+        ...(mine && req.staffId ? { OR: [{ vetId: req.staffId }, { vetId: null }] } : {}),
       },
       include: detailInclude,
       orderBy: { scheduledAt: 'asc' },

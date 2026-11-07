@@ -1,22 +1,15 @@
 import { useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
-import { appAlert } from '../lib/dialog';
 import { useAuth } from '../lib/auth';
 import { TabIcon } from '../components/TabIcon';
 import { Loading } from '../components/ui';
-import { cardShadow, colors, radius, type } from '../theme';
+import { ApptCard, DayHeader, groupByDay, useUpcomingAppts } from '../components/Appointments';
+import { usePullRefresh } from '../lib/refresh';
+import { cardShadow, colors, radius } from '../theme';
 
-interface Appt {
-  id: string;
-  scheduledAt: string;
-  status: string;
-  reason?: string | null;
-  pet: { id: string; name: string; species?: string; owner?: { fullName: string } | null };
-  service?: { name: string } | null;
-}
 interface EmgAlert {
   distanceKm?: string | number | null;
   emergency: {
@@ -32,15 +25,6 @@ interface EmgAlert {
   };
 }
 
-const timeLabel = (iso: string) => {
-  const d = new Date(iso);
-  let h = d.getHours();
-  const m = d.getMinutes().toString().padStart(2, '0');
-  const ap = h >= 12 ? 'PM' : 'AM';
-  h = h % 12 || 12;
-  return `${h.toString().padStart(2, '0')}:${m} ${ap}`;
-};
-
 // Etiqueta corta del turno para el chip "Turno: X"
 const SHIFT_LABEL: Record<string, string> = {
   MORNING: 'M',
@@ -49,16 +33,8 @@ const SHIFT_LABEL: Record<string, string> = {
   FULL_DAY: 'Completo',
 };
 
-const STATUS: Record<string, { label: string; bg: string; fg: string }> = {
-  CONFIRMED: { label: 'Confirmada', bg: colors.brand, fg: colors.white },
-  PENDING: { label: 'Pendiente', bg: '#FDEEC8', fg: colors.amber },
-  IN_PROGRESS: { label: 'En sala', bg: '#E7CFF1', fg: colors.brand },
-  COMPLETED: { label: 'Completada', bg: '#DFF3E6', fg: colors.green },
-};
-
 export default function HomeScreen({ navigation }: { navigation: any }) {
-  const { user } = useAuth();
-  const qc = useQueryClient();
+  const { user, refreshUser } = useAuth();
   const [available, setAvailable] = useState(true);
 
   const staff = user?.staffProfile;
@@ -69,34 +45,17 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const shiftLabel = staff?.currentShift ? SHIFT_LABEL[staff.currentShift] ?? staff.currentShift : null;
   const exp = staff?.experienceYears ?? null;
 
-  // Marcar una cita como concluida -> habilita la calificación del servicio en la app del dueño
-  const complete = useMutation({
-    mutationFn: (id: string) => api(`/appointments/${id}/status`, { method: 'POST', body: { status: 'COMPLETED' } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['vet-appts-today'] }),
-    onError: (e) => appAlert('No se pudo concluir', e instanceof Error ? e.message : 'Intenta de nuevo'),
-  });
-  const confirmComplete = (a: Appt) =>
-    appAlert('Concluir cita', `¿Marcar como concluida la cita de ${a.pet.name}? El dueño podrá calificar el servicio.`, [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Concluir', onPress: () => complete.mutate(a.id) },
-    ]);
-
-  const startToday = new Date(); startToday.setHours(0, 0, 0, 0);
-  const endToday = new Date(); endToday.setHours(23, 59, 59, 999);
-
-  const appts = useQuery({
-    queryKey: ['vet-appts-today'],
-    queryFn: () => api<{ data: Appt[] }>(`/appointments?from=${startToday.toISOString()}&to=${endToday.toISOString()}`),
-    refetchInterval: 30000,
-  });
+  // Próximas citas (las suyas + sin asignar, por atender, con las atrasadas): antes solo las de hoy.
+  const { query: appts, list, confirmComplete, completing } = useUpcomingAppts();
   const emergencies = useQuery({
     queryKey: ['vet-emergencies'],
     queryFn: () => api<{ data: EmgAlert[] }>('/emergencies/active'),
     refetchInterval: 15000,
   });
+  const refreshControl = usePullRefresh(() => Promise.all([appts.refetch(), emergencies.refetch(), refreshUser()]));
 
-  const list = (appts.data?.data ?? []).slice().sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
-  const pendientes = list.filter((a) => a.status === 'PENDING').length;
+  // En el inicio, las primeras 5; "Ver todo" abre la Agenda completa.
+  const preview = groupByDay(list.slice(0, 5));
   const emg = emergencies.data?.data?.[0] ?? null;
   const emgPet = emg?.emergency?.pet;
   const emgBreed = emgPet?.breed || emgPet?.species || null;
@@ -104,7 +63,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false} refreshControl={refreshControl}>
         {/* Header */}
         <View style={styles.header}>
           <Pressable style={styles.userRow} onPress={() => navigation.navigate('Perfil')}>
@@ -204,46 +163,43 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           </View>
         )}
 
-        {/* Citas de hoy */}
+        {/* Próximas citas */}
         <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>Citas de Hoy{pendientes ? ` (${pendientes} pendientes)` : ''}</Text>
-          <Pressable onPress={() => navigation.navigate('Clientes')}><Text style={styles.link}>Ver todo</Text></Pressable>
+          <Text style={styles.sectionTitle}>Próximas citas{list.length ? ` (${list.length})` : ''}</Text>
+          <Pressable onPress={() => navigation.navigate('Agenda')}><Text style={styles.link}>Ver todo</Text></Pressable>
         </View>
 
         {appts.isLoading ? (
           <Loading />
         ) : appts.isError ? (
           <View style={styles.empty}>
-            <Text style={styles.emptyTxt}>No pudimos cargar las citas de hoy.</Text>
+            <Text style={styles.emptyTxt}>No pudimos cargar tus citas.</Text>
             <Pressable onPress={() => void appts.refetch()}><Text style={styles.link}>Reintentar</Text></Pressable>
           </View>
         ) : list.length === 0 ? (
-          <View style={styles.empty}><TabIcon name="calendar" color="#C9BBD3" size={40} /><Text style={styles.emptyTxt}>No hay citas para hoy.</Text></View>
+          <View style={styles.empty}><TabIcon name="calendar" color="#C9BBD3" size={40} /><Text style={styles.emptyTxt}>No tienes citas por atender.</Text></View>
         ) : (
-          list.map((a) => {
-            const st = STATUS[a.status] ?? STATUS.PENDING;
-            return (
-              <Pressable key={a.id} style={styles.apptCard} onPress={() => navigation.navigate('PatientDetail', { petId: a.pet.id, name: a.pet.name })}>
-                <View style={styles.apptRow}>
-                  <View style={styles.apptLeft}>
-                    <Text style={styles.apptTime} numberOfLines={1}>
-                      ⏰ {timeLabel(a.scheduledAt)} - {a.service?.name ?? a.reason ?? 'Consulta'}
-                    </Text>
-                    <Text style={styles.apptOwner}>Dueño: {a.pet.owner?.fullName ?? '—'}</Text>
-                  </View>
-                  <View style={styles.apptRight}>
-                    <View style={styles.petPill}><Text style={styles.petPillTxt}>Paciente: {a.pet.name}</Text></View>
-                    <View style={[styles.badge, { backgroundColor: st.bg }]}><Text style={[styles.badgeTxt, { color: st.fg }]}>{st.label}</Text></View>
-                  </View>
-                </View>
-                {['PENDING', 'CONFIRMED', 'IN_PROGRESS'].includes(a.status) && (
-                  <Pressable style={styles.concludeBtn} onPress={() => confirmComplete(a)} disabled={complete.isPending}>
-                    <Text style={styles.concludeTxt}>✓ Marcar concluida</Text>
-                  </Pressable>
-                )}
+          <>
+            {preview.map((g) => (
+              <View key={g.title}>
+                <DayHeader title={g.title} overdue={g.overdue} />
+                {g.items.map((a) => (
+                  <ApptCard
+                    key={a.id}
+                    a={a}
+                    disabled={completing}
+                    onComplete={() => confirmComplete(a)}
+                    onOpen={() => navigation.navigate('PatientDetail', { petId: a.pet.id, name: a.pet.name })}
+                  />
+                ))}
+              </View>
+            ))}
+            {list.length > 5 && (
+              <Pressable style={styles.moreBtn} onPress={() => navigation.navigate('Agenda')}>
+                <Text style={styles.link}>Ver las {list.length - 5} restantes en la agenda →</Text>
               </Pressable>
-            );
-          })
+            )}
+          </>
         )}
 
         {/* Acciones rápidas */}
@@ -315,18 +271,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 18, fontWeight: '800', color: colors.text, marginTop: 18, marginBottom: 12 },
   link: { color: colors.brand, fontWeight: '700', fontSize: 14 },
 
-  apptCard: { backgroundColor: colors.white, borderRadius: radius.lg, padding: 16, marginBottom: 12, boxShadow: cardShadow, borderLeftWidth: 4, borderLeftColor: colors.brand },
-  apptRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
-  apptLeft: { flex: 1 },
-  apptTime: { fontSize: 15, fontWeight: '800', color: colors.text },
-  apptOwner: { fontSize: 14, color: colors.muted, marginTop: 6 },
-  apptRight: { alignItems: 'flex-end', gap: 6 },
-  petPill: { backgroundColor: colors.brandLight, borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 5 },
-  petPillTxt: { color: colors.brand, fontWeight: '700', fontSize: 12 },
-  badge: { borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 4 },
-  badgeTxt: { ...type.bodySmall, fontWeight: '700' },
-  concludeBtn: { marginTop: 12, borderWidth: 1.5, borderColor: colors.green, borderRadius: radius.md, paddingVertical: 10, alignItems: 'center' },
-  concludeTxt: { color: colors.green, fontWeight: '800', fontSize: 14 },
+  moreBtn: { alignItems: 'center', paddingVertical: 6, marginBottom: 6 },
 
   empty: { alignItems: 'center', gap: 8, paddingVertical: 30 },
   emptyIcon: { fontSize: 36 },

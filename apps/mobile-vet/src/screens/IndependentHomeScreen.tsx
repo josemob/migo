@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { usePullRefresh } from '../lib/refresh';
 import * as Location from 'expo-location';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -72,6 +73,12 @@ export default function IndependentHomeScreen({
     queryFn: () => api<{ data: Invitation[] }>('/staff-kyc/invitations'),
     refetchInterval: 20000,
   });
+  // Deslizar hacia abajo: perfil, teleconsultas, invitaciones y emergencias entrantes
+  // (IncomingEmergencies usa la clave ['my-emergencies']).
+  const qc = useQueryClient();
+  const refreshControl = usePullRefresh(() =>
+    Promise.all([profileQ.refetch(), teleQ.refetch(), invitesQ.refetch(), qc.invalidateQueries({ queryKey: ['my-emergencies'] })]),
+  );
 
   // Estado editable del perfil (se siembra cuando llega la data)
   const [experience, setExperience] = useState('');
@@ -163,7 +170,7 @@ export default function IndependentHomeScreen({
         <Pressable onPress={logout} hitSlop={10}><Text style={styles.logout}>Salir</Text></Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 20, paddingBottom: insets.bottom + 40, gap: 16 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 20, paddingBottom: insets.bottom + 40, gap: 16 }} showsVerticalScrollIndicator={false} refreshControl={refreshControl}>
         {/* Emergencias entrantes ruteadas por IA (Fase C) — prioridad arriba */}
         <IncomingEmergencies />
 

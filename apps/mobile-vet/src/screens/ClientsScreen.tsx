@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
+import { usePullRefresh } from '../lib/refresh';
 import { api } from '../lib/api';
 import { TabIcon } from '../components/TabIcon';
 import { Loading } from '../components/ui';
@@ -33,6 +34,8 @@ export default function ClientsScreen({ navigation }: { navigation: any }) {
     enabled: term.length >= 2,
   });
   const list = data?.data ?? [];
+  // Sin búsqueda activa no hay nada que refrescar
+  const refreshControl = usePullRefresh(async () => { if (term.length >= 2) await refetch(); });
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -61,7 +64,7 @@ export default function ClientsScreen({ navigation }: { navigation: any }) {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" refreshControl={refreshControl}>
         {term.length < 2 ? (
           <View style={styles.empty}><Text style={styles.emptyIcon}>🔎</Text><Text style={styles.emptyTxt}>Escribe al menos 2 caracteres para buscar.</Text></View>
         ) : isLoading || isFetching ? (

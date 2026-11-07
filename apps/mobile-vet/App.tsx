@@ -42,6 +42,7 @@ import ChatThreadScreen from './src/screens/ChatThreadScreen';
 import PlanScreen from './src/screens/PlanScreen';
 import AttendScreen from './src/screens/AttendScreen';
 import MyRecordsScreen from './src/screens/MyRecordsScreen';
+import AgendaScreen from './src/screens/AgendaScreen';
 import RecordDetailScreen from './src/screens/RecordDetailScreen';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
@@ -130,6 +131,7 @@ function MainApp({ onBackToIndependent }: { onBackToIndependent?: () => void }) 
             <Stack.Screen name="Plan" component={PlanScreen} />
             <Stack.Screen name="Attend" component={AttendScreen} />
             <Stack.Screen name="MyRecords" component={MyRecordsScreen} />
+            <Stack.Screen name="Agenda" component={AgendaScreen} />
             <Stack.Screen name="RecordDetail" component={RecordDetailScreen} />
           </Stack.Navigator>
         </NavigationContainer>

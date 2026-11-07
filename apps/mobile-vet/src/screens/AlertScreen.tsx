@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { Call } from '@stream-io/video-react-native-sdk';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { usePullRefresh } from '../lib/refresh';
 import { api } from '../lib/api';
 import { appAlert } from '../lib/dialog';
 import { useStream } from '../lib/stream';
@@ -42,6 +43,7 @@ export default function AlertScreen({ navigation }: { navigation: any }) {
     queryFn: () => api<{ data: ActiveAlert[] }>('/emergencies/active'),
     refetchInterval: 12000,
   });
+  const refreshControl = usePullRefresh(() => q.refetch());
 
   const accept = useMutation({
     mutationFn: (alertId: string) => api(`/emergencies/alerts/${alertId}/accept`, { method: 'POST' }),
@@ -115,7 +117,7 @@ export default function AlertScreen({ navigation }: { navigation: any }) {
           <Text style={styles.emptyTxt}>No hay emergencias entrantes ahora mismo.</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 20, gap: 14, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 20, gap: 14, paddingBottom: 40 }} showsVerticalScrollIndicator={false} refreshControl={refreshControl}>
           {q.isError && <Text style={styles.offline}>⚠️ Sin conexión: mostrando la última información recibida.</Text>}
           {alerts.map((a) => {
             // La API puede omitir owner/allergies/conditions: guardas para no tumbar la pantalla.

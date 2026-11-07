@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { Channel as StreamChannel } from 'stream-chat';
 import { useStream } from '../lib/stream';
+import { usePullRefresh } from '../lib/refresh';
 import { TabIcon } from '../components/TabIcon';
 import { cardShadow, colors, radius } from '../theme';
 
@@ -23,16 +24,29 @@ export default function ChatsScreen({ navigation }: { navigation: any }) {
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
 
+  const fetchChannels = () =>
+    chatClient!.queryChannels(
+      { type: 'messaging', members: { $in: [chatClient!.userID!] } },
+      { last_message_at: -1 },
+      { watch: true, state: true },
+    );
+  // Deslizar hacia abajo: vuelve a pedir las conversaciones
+  const refreshControl = usePullRefresh(async () => {
+    if (!ready || !chatClient?.userID) return;
+    try {
+      setChannels(await fetchChannels());
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudieron cargar las conversaciones.');
+    }
+  });
+
   useEffect(() => {
     if (!ready || !chatClient?.userID) return;
     let active = true;
     (async () => {
       try {
-        const chs = await chatClient.queryChannels(
-          { type: 'messaging', members: { $in: [chatClient.userID!] } },
-          { last_message_at: -1 },
-          { watch: true, state: true },
-        );
+        const chs = await fetchChannels();
         if (active) {
           setChannels(chs);
           setError(null);
@@ -60,7 +74,7 @@ export default function ChatsScreen({ navigation }: { navigation: any }) {
       <View style={styles.head}><Text style={styles.title}>Chats con Clientes</Text></View>
 
       {/* ScrollView: antes la lista no hacía scroll y con más de ~7 chats el resto quedaba inalcanzable */}
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40, flexGrow: 1 }} showsVerticalScrollIndicator={false} refreshControl={refreshControl}>
         {!ready || loading ? (
           <Text style={styles.muted}>Cargando conversaciones…</Text>
         ) : error ? (
