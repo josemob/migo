@@ -652,7 +652,7 @@ router.post(
           weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'America/Caracas',
         }).format(scheduledAt);
         const title = '🗓️ Nueva solicitud de cita';
-        const body = `${appt.pet.name} · ${derivedReason ?? 'Consulta'} · ${fecha}. Acéptala o recházala.`;
+        const body = `${appt.pet.name} · ${derivedReason ?? 'Consulta'} · ${fecha} — acéptala o recházala`;
         await Promise.all(targets.map((userId) => sendPush(userId, { title, body, data: { type: 'appointment-request', appointmentId: appt.id } })));
       }
     } catch (e) {

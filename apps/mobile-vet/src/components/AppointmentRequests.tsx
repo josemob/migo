@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../lib/api';
 import { appAlert } from '../lib/dialog';
 import { UPCOMING_KEY, type Appt } from './Appointments';
@@ -121,13 +122,14 @@ function useAndroidKeyboardHeight() {
 function RejectModal({ appt, onClose, onSubmit }: { appt: RequestAppt | null; onClose: () => void; onSubmit: (reason: string) => void }) {
   const [reason, setReason] = useState('');
   const kb = useAndroidKeyboardHeight();
+  const insets = useSafeAreaInsets(); // "Volver" quedaba pegado a la barra de navegación del sistema
   useEffect(() => { if (appt) setReason(''); }, [appt]);
   const ok = reason.trim().length >= 3;
   return (
     <Modal visible={!!appt} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Pressable style={[s.backdrop, { paddingBottom: kb }]} onPress={onClose}>
-          <Pressable style={s.sheet} onPress={() => {}}>
+          <Pressable style={[s.sheet, { paddingBottom: (kb ? 12 : insets.bottom) + 16 }]} onPress={() => {}}>
             <Text style={s.sheetTitle}>Rechazar solicitud</Text>
             {appt ? <Text style={s.sheetSub}>{appt.pet.name} · {whenLabel(appt.scheduledAt)}</Text> : null}
             <Text style={s.label}>Motivo (lo verá el dueño)</Text>

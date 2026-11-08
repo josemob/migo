@@ -127,11 +127,14 @@ export default function AppointmentDetailScreen({ route, navigation }: { route: 
             />
           ) : null}
 
-          <Button
-            title="Ver la clínica"
-            variant="outline"
-            onPress={() => navigation.navigate('ClinicDetail', { id: data.clinic.id, name: data.clinic.name })}
-          />
+          {/* Cancelada: "Elegir otro horario" ya lleva a la clínica */}
+          {data.status !== 'CANCELLED' ? (
+            <Button
+              title="Ver la clínica"
+              variant="outline"
+              onPress={() => navigation.navigate('ClinicDetail', { id: data.clinic.id, name: data.clinic.name })}
+            />
+          ) : null}
           {data.clinic.phone ? (
             <Button title="Llamar a la clínica" variant="outline" onPress={() => Linking.openURL(`tel:${data.clinic.phone}`).catch(() => {})} />
           ) : null}

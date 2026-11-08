@@ -233,16 +233,18 @@ router.post(
     const petName = updated.pet?.name ?? 'tu mascota';
     const when = formatWhen(updated.scheduledAt);
     if (ownerId) {
-      const reasonTxt = cancelReason ? ` Motivo: ${cancelReason}` : '';
+      // `when` termina en "a. m."/"p. m.": no se le pone punto detrás (quedaba "a. m..").
+      const reason = cancelReason ? (/[.!?]$/.test(cancelReason) ? cancelReason : `${cancelReason}.`) : null;
+      const reasonTxt = reason ? ` Motivo: ${reason}` : '';
       const NOTIF: Partial<Record<string, { title: string; body: string }>> = {
         CONFIRMED: {
           title: '¡Tu cita fue aceptada! ✅',
-          body: `${updated.clinic?.name ?? 'La clínica'} confirmó la cita de ${petName} · ${when}.`,
+          body: `${updated.clinic?.name ?? 'La clínica'} confirmó la cita de ${petName} para el ${when}`,
         },
         IN_PROGRESS: { title: 'En atención 🩺', body: `${petName} está siendo atendido(a) ahora.` },
         COMPLETED: { title: '¡Cita completada! 🎉', body: `La cita de ${petName} finalizó. Cuéntanos cómo te fue y califícala.` },
         CANCELLED: rejecting
-          ? { title: 'La clínica no pudo aceptar tu cita', body: `${petName} · ${when}.${reasonTxt} Puedes elegir otro horario.` }
+          ? { title: 'La clínica no pudo aceptar tu cita', body: `${petName} (${when}).${reasonTxt} Puedes elegir otro horario.` }
           : { title: 'Cita cancelada', body: `La cita de ${petName} (${when}) fue cancelada.${reasonTxt}` },
       };
       const n = NOTIF[next];
