@@ -3,6 +3,7 @@ import { env } from './config/env';
 import { prisma } from './config/prisma';
 import { expireStaleEmergencies } from './modules/emergencies/emergency.service';
 import { resetExpiredUnavailability } from './modules/clinics/availability.service';
+import { expirePendingAppointments } from './modules/appointments/appointment.service';
 
 const server = app.listen(env.PORT, () => {
   console.log(`🐾 Migo API escuchando en http://localhost:${env.PORT} (${env.NODE_ENV})`);
@@ -30,10 +31,21 @@ const availabilitySweep = setInterval(() => {
 }, 60_000);
 availabilitySweep.unref?.();
 
+// Barrido periódico: cancela las solicitudes de cita que nadie del equipo aceptó antes de su hora.
+const appointmentSweep = setInterval(() => {
+  expirePendingAppointments()
+    .then((n) => {
+      if (n > 0) console.log(`[appointments] ${n} solicitud(es) de cita vencidas canceladas`);
+    })
+    .catch((e) => console.error('[appointments] barrido solicitudes falló', e instanceof Error ? e.message : e));
+}, 60_000);
+appointmentSweep.unref?.();
+
 const shutdown = async (signal: string) => {
   console.log(`\n${signal} recibido, cerrando...`);
   clearInterval(emergencySweep);
   clearInterval(availabilitySweep);
+  clearInterval(appointmentSweep);
   server.close(async () => {
     await prisma.$disconnect();
     process.exit(0);

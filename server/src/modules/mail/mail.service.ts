@@ -102,24 +102,40 @@ export async function sendPasswordResetEmail(to: string, name: string, code: str
   });
 }
 
+/** Escapa texto que viene de usuarios (nombres, direcciones) antes de meterlo en el HTML. */
+function esc(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 export async function sendAppointmentConfirmedEmail(
   to: string,
   name: string,
-  d: { petName: string; clinicName: string; dateLabel: string; serviceName?: string | null },
+  d: {
+    petName: string; clinicName: string; dateLabel: string; serviceName?: string | null;
+    clinicAddress?: string | null; clinicPhone?: string | null; priceLabel?: string | null; vetName?: string | null;
+  },
 ) {
   const first = name?.split(' ')[0] || '';
+  const row = (label: string, value?: string | null, last = false) =>
+    value
+      ? `<div style="font-size:14px;color:#64748B">${label}</div><div style="font-weight:700;${last ? '' : 'margin-bottom:8px'}">${esc(value)}</div>`
+      : '';
   return sendEmail({
     to,
-    subject: `Cita confirmada en ${d.clinicName} ✅`,
-    html: layout('¡Tu cita está confirmada!',
-      p(`Hola${first ? ' ' + first : ''}, tu cita quedó confirmada. Estos son los detalles:`) +
+    subject: `Tu cita en ${d.clinicName} fue aceptada ✅`,
+    html: layout('¡Tu cita fue aceptada!',
+      p(`Hola${first ? ' ' + esc(first) : ''}, ${esc(d.clinicName)} aceptó tu solicitud. Este es el resumen de tu cita:`) +
       `<div style="background:#F5EBFA;border-radius:12px;padding:16px;margin:6px 0 12px">
-        <div style="font-size:14px;color:#64748B">Mascota</div><div style="font-weight:700;margin-bottom:8px">${d.petName}</div>
-        ${d.serviceName ? `<div style="font-size:14px;color:#64748B">Servicio</div><div style="font-weight:700;margin-bottom:8px">${d.serviceName}</div>` : ''}
-        <div style="font-size:14px;color:#64748B">Clínica</div><div style="font-weight:700;margin-bottom:8px">${d.clinicName}</div>
-        <div style="font-size:14px;color:#64748B">Fecha</div><div style="font-weight:700">${d.dateLabel}</div>
+        ${row('Fecha y hora', d.dateLabel)}
+        ${row('Mascota', d.petName)}
+        ${row('Servicio', d.serviceName)}
+        ${row('Precio', d.priceLabel)}
+        ${row('Te atiende', d.vetName)}
+        ${row('Clínica', d.clinicName)}
+        ${row('Dirección', d.clinicAddress)}
+        ${row('Teléfono', d.clinicPhone, true)}
       </div>` +
-      p('Te esperamos. Puedes ver o gestionar tu cita desde la app Migo.')),
+      p('Te esperamos. Si no puedes asistir, cancela la cita desde la app Migo para liberar el horario.')),
   });
 }
 

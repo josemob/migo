@@ -17,7 +17,7 @@ router.use(authenticate, withClinicContext);
 const detailInclude = {
   pet: { include: { owner: { select: { id: true, fullName: true, email: true, phone: true, nationalId: true } } } },
   service: true,
-  clinic: { select: { name: true } },
+  clinic: { select: { name: true, address: true, phone: true } },
   vet: { include: { user: { select: { fullName: true } } } },
 } as const;
 
@@ -155,25 +155,53 @@ router.post(
     });
     if (!appt) throw ApiError.notFound('Cita no encontrada');
 
+    const next = req.body.status as AppointmentStatus;
+    const cancelReason = (req.body.cancelReason as string | undefined)?.trim() || undefined;
+
+    // Ya la aceptó otro miembro del equipo (todo el equipo recibe la solicitud): mensaje claro.
+    if (next === 'CONFIRMED' && appt.status !== 'PENDING') {
+      throw ApiError.conflict(await alreadyHandledMessage(appt.id));
+    }
     const allowed = TRANSITIONS[appt.status] ?? [];
-    if (!allowed.includes(req.body.status)) {
-      throw ApiError.badRequest(`No se puede pasar de ${appt.status} a ${req.body.status}`);
+    if (!allowed.includes(next)) {
+      throw ApiError.badRequest(`No se puede pasar de ${appt.status} a ${next}`);
+    }
+    // Rechazar una solicitud exige un motivo: es lo que lee el dueño.
+    const rejecting = next === 'CANCELLED' && appt.status === 'PENDING';
+    if (rejecting && (!cancelReason || cancelReason.length < 3)) {
+      throw ApiError.badRequest('Escribe el motivo del rechazo para el dueño.');
+    }
+    // Aceptar bloquea el horario: no puede haber otra cita aceptada a la misma hora.
+    if (next === 'CONFIRMED') {
+      const clash = await prisma.appointment.findFirst({
+        where: {
+          clinicId: appt.clinicId,
+          scheduledAt: appt.scheduledAt,
+          status: { in: ['CONFIRMED', 'IN_PROGRESS'] },
+          id: { not: appt.id },
+        },
+        select: { id: true },
+      });
+      if (clash) throw ApiError.conflict('Ya hay otra cita aceptada a esa misma hora. Rechaza esta solicitud con el motivo.');
     }
 
     const updated = await prisma.$transaction(async (tx) => {
-      const result = await tx.appointment.update({
-        where: { id: appt.id },
+      // updateMany condicionado al estado leído: si dos personas del equipo aceptan a la vez,
+      // solo gana la primera (la segunda ve 0 filas y recibe "ya fue aceptada por…").
+      const { count } = await tx.appointment.updateMany({
+        where: { id: appt.id, status: appt.status },
         data: {
-          status: req.body.status,
-          cancelReason: req.body.cancelReason,
-          // Al concluir se registra qué profesional atendió (si no había uno asignado),
-          // para que la reseña del cliente cuente también para ese veterinario.
-          ...(req.body.status === 'COMPLETED' && !appt.vetId && req.staffId
+          status: next,
+          cancelReason,
+          // Quien acepta queda asignado. Al concluir se registra qué profesional atendió
+          // (si no había uno), para que la reseña cuente también para ese veterinario.
+          ...((next === 'CONFIRMED' || next === 'COMPLETED') && !appt.vetId && req.staffId
             ? { vetId: req.staffId }
             : {}),
         },
-        include: detailInclude,
       });
+      if (count === 0) return null;
+      const result = await tx.appointment.findUniqueOrThrow({ where: { id: appt.id }, include: detailInclude });
 
       // Al completar una cita pagada en la app, Migo registra su comisión
       if (req.body.status === 'COMPLETED' && appt.paidInApp && appt.priceUsd) {
@@ -197,36 +225,66 @@ router.post(
       }
       return result;
     });
+    // Otro miembro del equipo la movió entre la lectura y la escritura.
+    if (!updated) throw ApiError.conflict(await alreadyHandledMessage(appt.id));
 
     // Notifica al dueño el cambio de estado (no bloquea la respuesta)
     const ownerId = updated.pet?.owner?.id;
     const petName = updated.pet?.name ?? 'tu mascota';
+    const when = formatWhen(updated.scheduledAt);
     if (ownerId) {
+      const reasonTxt = cancelReason ? ` Motivo: ${cancelReason}` : '';
       const NOTIF: Partial<Record<string, { title: string; body: string }>> = {
-        CONFIRMED: { title: 'Cita confirmada ✅', body: `La cita de ${petName} fue confirmada por la clínica.` },
+        CONFIRMED: {
+          title: '¡Tu cita fue aceptada! ✅',
+          body: `${updated.clinic?.name ?? 'La clínica'} confirmó la cita de ${petName} · ${when}.`,
+        },
         IN_PROGRESS: { title: 'En atención 🩺', body: `${petName} está siendo atendido(a) ahora.` },
         COMPLETED: { title: '¡Cita completada! 🎉', body: `La cita de ${petName} finalizó. Cuéntanos cómo te fue y califícala.` },
-        CANCELLED: { title: 'Cita cancelada', body: `La cita de ${petName} fue cancelada.` },
+        CANCELLED: rejecting
+          ? { title: 'La clínica no pudo aceptar tu cita', body: `${petName} · ${when}.${reasonTxt} Puedes elegir otro horario.` }
+          : { title: 'Cita cancelada', body: `La cita de ${petName} (${when}) fue cancelada.${reasonTxt}` },
       };
-      const n = NOTIF[req.body.status];
-      if (n) void sendPush(ownerId, { ...n, data: { type: 'appointment', appointmentId: updated.id, status: req.body.status } });
+      const n = NOTIF[next];
+      if (n) void sendPush(ownerId, { ...n, data: { type: 'appointment', appointmentId: updated.id, status: next } });
     }
 
-    // Correo de confirmación de cita (además del push)
-    if (req.body.status === 'CONFIRMED' && updated.pet?.owner?.email) {
-      const dateLabel = new Date(updated.scheduledAt).toLocaleString('es-VE', {
-        timeZone: 'America/Caracas', dateStyle: 'long', timeStyle: 'short',
-      });
+    // Correo con el resumen de la cita aceptada (además del push y la ventana en la app)
+    if (next === 'CONFIRMED' && updated.pet?.owner?.email) {
       void sendAppointmentConfirmedEmail(updated.pet.owner.email, updated.pet.owner.fullName ?? '', {
         petName: updated.pet.name ?? 'tu mascota',
         clinicName: updated.clinic?.name ?? 'la clínica',
-        dateLabel,
-        serviceName: updated.service?.name ?? null,
+        clinicAddress: updated.clinic?.address ?? null,
+        clinicPhone: updated.clinic?.phone ?? null,
+        dateLabel: new Date(updated.scheduledAt).toLocaleString('es-VE', {
+          timeZone: 'America/Caracas', dateStyle: 'full', timeStyle: 'short',
+        }),
+        serviceName: updated.service?.name ?? updated.reason ?? null,
+        priceLabel: updated.priceUsd != null ? `$${Number(updated.priceUsd).toFixed(2)}` : null,
+        vetName: updated.vet?.user?.fullName ?? null,
       }).catch(() => {});
     }
 
     res.json(updated);
   }),
 );
+
+/** "vie 14 nov · 10:30 a. m." en hora de Venezuela. */
+function formatWhen(d: Date): string {
+  return new Intl.DateTimeFormat('es-VE', {
+    weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'America/Caracas',
+  }).format(d);
+}
+
+/** Mensaje para quien intenta aceptar/rechazar una solicitud que otro ya resolvió. */
+async function alreadyHandledMessage(id: string): Promise<string> {
+  const a = await prisma.appointment.findUnique({
+    where: { id },
+    select: { status: true, vet: { select: { user: { select: { fullName: true } } } } },
+  });
+  if (a?.status === 'CANCELLED') return 'Esta solicitud ya fue rechazada o cancelada.';
+  const who = a?.vet?.user?.fullName;
+  return who ? `Esta cita ya fue aceptada por ${who}.` : 'Esta cita ya fue aceptada por otro miembro del equipo.';
+}
 
 export default router;

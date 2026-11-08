@@ -603,6 +603,14 @@ router.post(
     // 4) No permitir reservar en el pasado
     if (scheduledAt.getTime() < Date.now() - 60_000) throw ApiError.badRequest('La fecha de la cita ya pasó.');
 
+    // 5) El horario no puede estar ya aceptado por la clínica para otra cita.
+    const taken = await prisma.appointment.findFirst({
+      where: { clinicId, scheduledAt, status: { in: ['CONFIRMED', 'IN_PROGRESS'] } },
+      select: { id: true },
+    });
+    if (taken) throw ApiError.conflict('Ese horario ya no está disponible. Elige otro.');
+
+    // La cita nace como SOLICITUD (PENDING): el equipo de la clínica la acepta o la rechaza.
     const appt = await prisma.appointment.create({
       data: {
         clinicId,
@@ -635,7 +643,7 @@ router.post(
       }).catch(() => {});
     }
 
-    // Notifica por push al equipo de la clínica (responsables de atender la cita).
+    // Notifica por push a TODO el equipo de la clínica: cualquiera puede aceptar la solicitud.
     try {
       const staff = await prisma.clinicStaff.findMany({ where: { clinicId, isActive: true }, select: { userId: true } });
       const targets = [...new Set(staff.map((s) => s.userId))];
@@ -643,9 +651,9 @@ router.post(
         const fecha = new Intl.DateTimeFormat('es-VE', {
           weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'America/Caracas',
         }).format(scheduledAt);
-        const title = '🗓️ Nueva cita agendada';
-        const body = `${appt.pet.name} · ${derivedReason ?? 'Consulta'} · ${fecha}`;
-        await Promise.all(targets.map((userId) => sendPush(userId, { title, body, data: { type: 'appointment', appointmentId: appt.id } })));
+        const title = '🗓️ Nueva solicitud de cita';
+        const body = `${appt.pet.name} · ${derivedReason ?? 'Consulta'} · ${fecha}. Acéptala o recházala.`;
+        await Promise.all(targets.map((userId) => sendPush(userId, { title, body, data: { type: 'appointment-request', appointmentId: appt.id } })));
       }
     } catch (e) {
       console.error('[appointments] push a la clínica falló', e);

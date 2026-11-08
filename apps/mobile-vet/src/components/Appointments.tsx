@@ -17,7 +17,8 @@ export interface Appt {
   service?: { name: string } | null;
 }
 
-const OPEN = 'PENDING,CONFIRMED,IN_PROGRESS';
+// Solo las ya aceptadas: las solicitudes (PENDING) van aparte, en "Solicitudes por aceptar".
+const OPEN = 'CONFIRMED,IN_PROGRESS';
 export const UPCOMING_KEY = ['vet-appts-upcoming'];
 
 export function useUpcomingAppts() {

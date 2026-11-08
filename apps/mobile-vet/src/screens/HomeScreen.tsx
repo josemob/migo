@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { AppointmentRequestsSection, REQUESTS_KEY } from '../components/AppointmentRequests';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { TabIcon } from '../components/TabIcon';
@@ -52,7 +53,10 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     queryFn: () => api<{ data: EmgAlert[] }>('/emergencies/active'),
     refetchInterval: 15000,
   });
-  const refreshControl = usePullRefresh(() => Promise.all([appts.refetch(), emergencies.refetch(), refreshUser()]));
+  const qc = useQueryClient();
+  const refreshControl = usePullRefresh(() =>
+    Promise.all([appts.refetch(), emergencies.refetch(), qc.invalidateQueries({ queryKey: REQUESTS_KEY }), refreshUser()]),
+  );
 
   // En el inicio, las primeras 5; "Ver todo" abre la Agenda completa.
   const preview = groupByDay(list.slice(0, 5));
@@ -162,6 +166,9 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             </Pressable>
           </View>
         )}
+
+        {/* Solicitudes de cita del dueño: cualquiera del equipo las acepta o rechaza */}
+        <AppointmentRequestsSection onOpenPet={(a) => navigation.navigate('PatientDetail', { petId: a.pet.id, name: a.pet.name })} />
 
         {/* Próximas citas */}
         <View style={styles.sectionRow}>

@@ -177,4 +177,24 @@ router.get(
   }),
 );
 
+// GET /clinics/:id/taken-slots?from=&to= -> horas ya ACEPTADAS por la clínica en ese rango.
+// La app del dueño las muestra como 'no disponible' al elegir día y hora. Las solicitudes
+// pendientes no bloquean: hasta que el equipo acepta, el horario sigue abierto.
+router.get(
+  '/:id/taken-slots',
+  validate({
+    params: z.object({ id: z.string().uuid() }),
+    query: z.object({ from: z.coerce.date(), to: z.coerce.date() }),
+  }),
+  asyncHandler(async (req, res) => {
+    const { from, to } = req.query as unknown as { from: Date; to: Date };
+    if (to.getTime() - from.getTime() > 31 * 24 * 3600 * 1000) throw ApiError.badRequest('Rango demasiado amplio.');
+    const rows = await prisma.appointment.findMany({
+      where: { clinicId: req.params.id, scheduledAt: { gte: from, lte: to }, status: { in: ['CONFIRMED', 'IN_PROGRESS'] } },
+      select: { scheduledAt: true },
+    });
+    res.json({ taken: rows.map((r) => r.scheduledAt.toISOString()) });
+  }),
+);
+
 export default router;

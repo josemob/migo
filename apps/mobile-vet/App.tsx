@@ -23,6 +23,7 @@ import { DialogHost } from './src/lib/dialog';
 import { Button, Loading, Muted } from './src/components/ui';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { VetTabBar } from './src/components/VetTabBar';
+import { REQUESTS_KEY } from './src/components/AppointmentRequests';
 import { colors } from './src/theme';
 
 import LoginScreen from './src/screens/LoginScreen';
@@ -99,20 +100,33 @@ function MainApp({ onBackToIndependent }: { onBackToIndependent?: () => void }) 
       if (navigationRef.isReady()) (navigationRef as never as { navigate: (n: string) => void }).navigate('Alerta');
       else if (attempt < 20) setTimeout(() => goToAlerta(attempt + 1), 300);
     };
+    // Solicitud de cita de un dueño → Inicio, donde están "Solicitudes por aceptar".
+    const goToHome = (attempt = 0) => {
+      if (navigationRef.isReady()) (navigationRef as never as { navigate: (n: string, p?: object) => void }).navigate('Tabs', { screen: 'Home' });
+      else if (attempt < 20) setTimeout(() => goToHome(attempt + 1), 300);
+    };
+    const handle = (data?: { type?: string }) => {
+      if (data?.type === 'emergency') goToAlerta();
+      if (data?.type === 'appointment-request') {
+        void queryClient.invalidateQueries({ queryKey: REQUESTS_KEY });
+        goToHome();
+      }
+    };
     try {
       // Tap con la app abierta / en segundo plano
-      const sub = Notifications.addNotificationResponseReceivedListener((resp) => {
-        const data = resp.notification.request.content.data as { type?: string };
-        if (data?.type === 'emergency') goToAlerta();
+      const sub = Notifications.addNotificationResponseReceivedListener((resp) =>
+        handle(resp.notification.request.content.data as { type?: string }),
+      );
+      // Push recibida con la app abierta: refresca las solicitudes sin esperar al sondeo.
+      const recv = Notifications.addNotificationReceivedListener((n) => {
+        const data = n.request.content.data as { type?: string } | undefined;
+        if (data?.type === 'appointment-request') void queryClient.invalidateQueries({ queryKey: REQUESTS_KEY });
       });
       // Tap que abrió la app desde estado cerrado (cold start)
       Notifications.getLastNotificationResponseAsync()
-        .then((resp) => {
-          const data = resp?.notification.request.content.data as { type?: string } | undefined;
-          if (data?.type === 'emergency') goToAlerta();
-        })
+        .then((resp) => handle(resp?.notification.request.content.data as { type?: string } | undefined))
         .catch(() => {});
-      return () => sub.remove();
+      return () => { sub.remove(); recv.remove(); };
     } catch (e) {
       console.log('[push] listener no disponible:', e instanceof Error ? e.message : e);
     }

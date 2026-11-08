@@ -14,7 +14,17 @@ interface Appt {
   pet: { name: string; breed?: string; weightKg?: string; photoUrl?: string; owner: { fullName: string } };
   service?: { name: string; category: string };
   vet?: { user: { fullName: string } };
+  cancelReason?: string | null;
 }
+
+const STATUS: Record<string, { label: string; tone: string }> = {
+  PENDING: { label: 'Por aceptar', tone: 'amber' },
+  CONFIRMED: { label: 'Confirmada', tone: 'purple' },
+  IN_PROGRESS: { label: 'En sala', tone: 'blue' },
+  COMPLETED: { label: 'Completada', tone: 'green' },
+  CANCELLED: { label: 'Cancelada', tone: 'red' },
+  NO_SHOW: { label: 'No asistió', tone: 'slate' },
+};
 
 const categoryColor: Record<string, string> = {
   CONSULTATION: 'bg-green-100 text-green-800 border-green-200',
@@ -45,10 +55,19 @@ export default function Agenda() {
       api<{ data: Appt[] }>(`/appointments?from=${from.toISOString()}&to=${to.toISOString()}`),
   });
 
+  // Rechazo de una solicitud: el motivo es obligatorio (lo recibe el dueño por notificación).
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+
   const mutate = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) =>
-      api(`/appointments/${id}/status`, { method: 'POST', body: { status } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
+    mutationFn: ({ id, status, cancelReason }: { id: string; status: string; cancelReason?: string }) =>
+      api(`/appointments/${id}/status`, { method: 'POST', body: { status, cancelReason } }),
+    onSuccess: () => {
+      setRejecting(false);
+      setRejectReason('');
+    },
+    // También al fallar: p. ej. otro miembro del equipo ya la aceptó → se refresca el estado.
+    onSettled: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
   });
 
   const days = Array.from({ length: 7 }, (_, i) => new Date(weekBase.getTime() + i * 86400000));
@@ -81,13 +100,18 @@ export default function Agenda() {
                   {byDay(d).map((a) => (
                     <button
                       key={a.id}
-                      onClick={() => setSelected(a.id)}
+                      onClick={() => {
+                        setSelected(a.id);
+                        setRejecting(false);
+                        mutate.reset();
+                      }}
                       className={`w-full rounded-lg border px-2 py-1.5 text-left text-[11px] font-semibold leading-tight ${
                         categoryColor[a.service?.category ?? ''] ?? 'bg-slate-100 text-slate-700 border-slate-200'
                       } ${selected === a.id ? 'ring-2 ring-migo-purple' : ''}`}
                     >
                       {time(a.scheduledAt)}
-                      <div className="truncate font-bold">{a.reason ?? a.pet.name}</div>
+                      {a.status === 'PENDING' && <span className="ml-1 rounded bg-amber-200 px-1 text-[10px] text-amber-800">Por aceptar</span>}
+                      <div className={`truncate font-bold ${a.status === 'CANCELLED' ? 'line-through opacity-60' : ''}`}>{a.reason ?? a.pet.name}</div>
                     </button>
                   ))}
                 </div>
@@ -115,8 +139,11 @@ export default function Agenda() {
                 <Row label="Propietario" value={sel.pet.owner.fullName} />
                 <Row label="Motivo" value={sel.reason ?? '—'} />
                 <Row label="Veterinario" value={sel.vet?.user.fullName ?? 'Sin asignar'} />
-                <Row label="Estado" value={<Badge tone="purple">{sel.status}</Badge>} />
+                <Row label="Estado" value={<Badge tone={STATUS[sel.status]?.tone ?? 'slate'}>{STATUS[sel.status]?.label ?? sel.status}</Badge>} />
+                {sel.status === 'CANCELLED' && sel.cancelReason && <Row label="Motivo del rechazo" value={sel.cancelReason} />}
               </dl>
+
+              {mutate.error && <div className="mb-3"><ErrorNote error={mutate.error} /></div>}
 
               <div className="space-y-2">
                 {sel.status === 'CONFIRMED' && (
@@ -127,13 +154,47 @@ export default function Agenda() {
                     <Icon name="bolt" className="h-4 w-4" /> Iniciar Atención (En Sala)
                   </button>
                 )}
-                {sel.status === 'PENDING' && (
-                  <button
-                    className="btn-primary w-full"
-                    onClick={() => mutate.mutate({ id: sel.id, status: 'CONFIRMED' })}
-                  >
-                    Confirmar Turno
-                  </button>
+                {sel.status === 'PENDING' && !rejecting && (
+                  <>
+                    <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                      Solicitud del dueño. Al aceptarla queda asignada a ti y el dueño recibe la confirmación con el resumen.
+                    </p>
+                    <button
+                      className="btn-primary w-full"
+                      disabled={mutate.isPending}
+                      onClick={() => mutate.mutate({ id: sel.id, status: 'CONFIRMED' })}
+                    >
+                      <Icon name="check" className="h-4 w-4" /> Aceptar Cita
+                    </button>
+                    <button
+                      className="btn-outline w-full !border-red-300 !text-red-600"
+                      disabled={mutate.isPending}
+                      onClick={() => setRejecting(true)}
+                    >
+                      Rechazar
+                    </button>
+                  </>
+                )}
+                {sel.status === 'PENDING' && rejecting && (
+                  <div className="space-y-2 rounded-xl border border-red-200 p-3">
+                    <label className="block text-xs font-semibold text-slate-500">Motivo del rechazo (lo verá el dueño)</label>
+                    <textarea
+                      className="w-full rounded-lg border border-slate-200 p-2 text-sm"
+                      rows={3}
+                      maxLength={200}
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      placeholder="Ej.: Ese horario ya no está disponible"
+                    />
+                    <button
+                      className="btn-primary w-full !bg-red-600"
+                      disabled={mutate.isPending || rejectReason.trim().length < 3}
+                      onClick={() => mutate.mutate({ id: sel.id, status: 'CANCELLED', cancelReason: rejectReason.trim() })}
+                    >
+                      Rechazar y avisar al dueño
+                    </button>
+                    <button className="btn-outline w-full" onClick={() => setRejecting(false)}>Volver</button>
+                  </div>
                 )}
                 {sel.status === 'IN_PROGRESS' && (
                   <button

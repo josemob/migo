@@ -19,6 +19,7 @@ import { AuthProvider, useAuth } from './src/lib/auth';
 import { StreamProvider } from './src/lib/stream';
 import { api } from './src/lib/api';
 import { DialogHost } from './src/lib/dialog';
+import { AppointmentAcceptedModal } from './src/components/AppointmentAcceptedModal';
 import { EditFieldHost } from './src/lib/editField';
 import { Loading } from './src/components/ui';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
@@ -151,6 +152,14 @@ function MainApp() {
         <Stack.Screen name="Rating" component={RatingScreen} options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="AppointmentDetail" component={AppointmentDetailScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
+      {/* "¡Tu cita fue aceptada!" con el resumen, cuando la clínica acepta una solicitud */}
+      <AppointmentAcceptedModal
+        onOpen={(id) => {
+          if (navigationRef.isReady()) {
+            (navigationRef as never as { navigate: (n: string, p: object) => void }).navigate('AppointmentDetail', { id });
+          }
+        }}
+      />
     </NavigationContainer>
   );
 }

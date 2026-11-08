@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { appAlert } from '../lib/dialog';
 import { Loading, Muted } from '../components/ui';
@@ -14,14 +14,15 @@ interface Service { id: string; name: string; category: string; priceUsd: string
 const DOW = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
-// Horarios de muestra (el 01:00 PM aparece ocupado)
+// Horarios de la reserva. Los que la clínica ya ACEPTÓ para otra cita salen como no disponibles
+// (GET /clinics/:id/taken-slots); el resto se pide como solicitud que el equipo acepta o rechaza.
 const SLOTS = [
-  { label: '09:00 AM', h: 9, m: 0, off: false },
-  { label: '10:00 AM', h: 10, m: 0, off: false },
-  { label: '11:30 AM', h: 11, m: 30, off: false },
-  { label: '01:00 PM', h: 13, m: 0, off: true },
-  { label: '03:00 PM', h: 15, m: 0, off: false },
-  { label: '04:30 PM', h: 16, m: 30, off: false },
+  { label: '09:00 AM', h: 9, m: 0 },
+  { label: '10:00 AM', h: 10, m: 0 },
+  { label: '11:30 AM', h: 11, m: 30 },
+  { label: '01:00 PM', h: 13, m: 0 },
+  { label: '03:00 PM', h: 15, m: 0 },
+  { label: '04:30 PM', h: 16, m: 30 },
 ];
 
 // Emoji según la categoría del servicio (antes siempre ✂️, también en consultas médicas).
@@ -42,6 +43,7 @@ export default function BookAppointmentScreen({ navigation, route }: any) {
   const [dayIdx, setDayIdx] = useState(0);
   const [slotIdx, setSlotIdx] = useState<number | null>(null);
   const [booking, setBooking] = useState(false);
+  const qc = useQueryClient();
 
   const petList = pets.data?.data ?? [];
   useEffect(() => {
@@ -58,6 +60,18 @@ export default function BookAppointmentScreen({ navigation, route }: any) {
       return d;
     });
   }, []);
+
+  // Horas ya aceptadas por la clínica en los próximos 6 días (se marcan como no disponibles).
+  const takenQ = useQuery({
+    queryKey: ['taken-slots', clinicId],
+    queryFn: () => {
+      const from = days[0]!;
+      const to = new Date(days[days.length - 1]!);
+      to.setDate(to.getDate() + 1);
+      return api<{ taken: string[] }>(`/clinics/${clinicId}/taken-slots?from=${from.toISOString()}&to=${to.toISOString()}`);
+    },
+  });
+  const taken = useMemo(() => new Set((takenQ.data?.taken ?? []).map((t) => new Date(t).getTime())), [takenQ.data]);
 
   if (pets.isLoading) return <Loading />;
 
@@ -78,11 +92,17 @@ export default function BookAppointmentScreen({ navigation, route }: any) {
         method: 'POST',
         body: { clinicId, petId: pet.id, serviceId: service.id, scheduledAt: when.toISOString(), paid: false },
       });
-      appAlert('¡Cita agendada! 🐾', `${service.name} en ${clinicName} · ${DOW[selectedDay.getDay()]} ${selectedDay.getDate()}, ${slot.label}.`, [
-        { text: 'Listo', onPress: () => navigation.navigate('Tabs', { screen: 'Home' }) },
-      ]);
+      void qc.invalidateQueries();
+      // La cita queda como SOLICITUD: la clínica la acepta o la rechaza y le avisamos al dueño.
+      appAlert(
+        'Solicitud enviada 🐾',
+        `Le pedimos a ${clinicName} que confirme ${service.name} el ${DOW[selectedDay.getDay()]} ${selectedDay.getDate()} a las ${slot.label}. Te avisaremos apenas la acepten.`,
+        [{ text: 'Entendido', onPress: () => navigation.navigate('Tabs', { screen: 'Home' }) }],
+      );
     } catch (e) {
-      appAlert('No se pudo agendar', e instanceof Error ? e.message : 'Intenta de nuevo.');
+      void takenQ.refetch();
+      setSlotIdx(null);
+      appAlert('No se pudo enviar la solicitud', e instanceof Error ? e.message : 'Intenta de nuevo.');
     } finally {
       setBooking(false);
     }
@@ -156,7 +176,7 @@ export default function BookAppointmentScreen({ navigation, route }: any) {
             const slotDate = new Date(selectedDay);
             slotDate.setHours(s.h, s.m, 0, 0);
             const past = slotDate.getTime() <= Date.now();
-            const disabled = s.off || past;
+            const disabled = taken.has(slotDate.getTime()) || past;
             const on = slotIdx === i;
             const kind = disabled ? 'x' : s.h < 12 ? 'sunrise' : 'sun';
             const iconColor = disabled ? '#9CA3AF' : on ? colors.brand : '#6B7280';
@@ -184,7 +204,7 @@ export default function BookAppointmentScreen({ navigation, route }: any) {
           style={[styles.cta, (!canConfirm || booking) && { opacity: 0.4 }]}
         >
           <Text style={styles.ctaText}>
-            {booking ? 'Agendando…' : slot ? `Confirmar Reserva · ${DOW[selectedDay.getDay()]} ${selectedDay.getDate()}, ${slot.label}` : 'Selecciona un horario'}
+            {booking ? 'Enviando solicitud…' : slot ? `Solicitar cita ·${DOW[selectedDay.getDay()]} ${selectedDay.getDate()}, ${slot.label}` : 'Selecciona un horario'}
           </Text>
         </Pressable>
       </View>

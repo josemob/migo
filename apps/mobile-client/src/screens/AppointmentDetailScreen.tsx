@@ -113,6 +113,20 @@ export default function AppointmentDetailScreen({ route, navigation }: { route: 
             {data.status === 'CANCELLED' && data.cancelReason ? <Row label="Motivo" value={data.cancelReason} /> : null}
           </View>
 
+          {data.status === 'PENDING' ? (
+            <View style={styles.note}>
+              <Text style={styles.noteTxt}>
+                Tu solicitud está esperando que {data.clinic.name} la acepte. Te avisaremos por notificación y correo apenas la confirmen.
+              </Text>
+            </View>
+          ) : null}
+          {data.status === 'CANCELLED' ? (
+            <Button
+              title="Elegir otro horario"
+              onPress={() => navigation.navigate('ClinicDetail', { id: data.clinic.id, name: data.clinic.name })}
+            />
+          ) : null}
+
           <Button
             title="Ver la clínica"
             variant="outline"
@@ -147,6 +161,8 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8 },
   headerTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '800', color: colors.text },
   card: { backgroundColor: colors.white, borderRadius: radius.lg, padding: 16, boxShadow: cardShadow },
+  note: { backgroundColor: '#FFF7E6', borderRadius: radius.lg, padding: 14, borderWidth: 1, borderColor: '#F5DDA8' },
+  noteTxt: { fontSize: 14, color: colors.text, lineHeight: 20 },
   topRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
   title: { flex: 1, fontSize: 18, fontWeight: '900', color: colors.text },
   when: { fontSize: 15, fontWeight: '700', color: colors.brand, marginTop: 8 },
