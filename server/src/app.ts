@@ -21,6 +21,7 @@ import staffKycRoutes from './modules/staffKyc/staffKyc.routes';
 import streamWebhookRoutes from './modules/webhooks/stream.webhook.routes';
 import geocodeRoutes from './modules/geocode/geocode.routes';
 import publicPetsRoutes from './modules/publicPets/publicPets.routes';
+import notificationsRoutes from './modules/notifications/notifications.routes';
 
 export const app = express();
 
@@ -69,6 +70,7 @@ api.use('/clinic', clinicRoutes);
 api.use('/finance', financeRoutes);
 // App Cliente (B2C)
 api.use('/me', meRoutes);
+api.use('/notifications', notificationsRoutes); // bandeja de la campana (cliente y vet)
 api.use('/clinics', directoryRoutes);
 // Super Admin (MIGO Sistema Operativo)
 api.use('/admin', adminRoutes);

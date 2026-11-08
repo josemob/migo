@@ -137,6 +137,20 @@ CREATE TABLE "RefreshToken" (
 );
 
 -- CreateTable
+CREATE TABLE "Notification" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "body" TEXT NOT NULL,
+    "type" TEXT,
+    "data" JSONB,
+    "readAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Notification_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "PushToken" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -895,6 +909,12 @@ CREATE UNIQUE INDEX "RefreshToken_tokenHash_key" ON "RefreshToken"("tokenHash");
 CREATE INDEX "RefreshToken_userId_idx" ON "RefreshToken"("userId");
 
 -- CreateIndex
+CREATE INDEX "Notification_userId_createdAt_idx" ON "Notification"("userId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "Notification_userId_readAt_idx" ON "Notification"("userId", "readAt");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "PushToken_token_key" ON "PushToken"("token");
 
 -- CreateIndex
@@ -1151,6 +1171,9 @@ CREATE INDEX "AuditLog_actorId_idx" ON "AuditLog"("actorId");
 
 -- AddForeignKey
 ALTER TABLE "RefreshToken" ADD CONSTRAINT "RefreshToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Notification" ADD CONSTRAINT "Notification_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "PushToken" ADD CONSTRAINT "PushToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

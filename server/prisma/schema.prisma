@@ -266,6 +266,7 @@ model User {
   subscriptions      Subscription[]
   refreshTokens      RefreshToken[]
   pushTokens         PushToken[]
+  notifications      Notification[]
   staffKyc           StaffKyc?
   staffInvitations   StaffInvitation[]
   auditLogsActor     AuditLog[]        @relation("AuditActor")
@@ -291,6 +292,23 @@ model RefreshToken {
 }
 
 // Tokens de Expo Push para notificaciones (uno por device/instalación)
+// Bandeja de notificaciones (campana de la app): cada push que envía Migo se guarda aquí,
+// con su estado de leída, para mostrar el contador y el historial.
+model Notification {
+  id        String    @id @default(uuid())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  title     String
+  body      String
+  type      String? // "appointment", "appointment-request", "PET_FOUND", "emergency"…
+  data      Json?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+}
+
 model PushToken {
   id        String   @id @default(uuid())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -1,4 +1,5 @@
 import { Expo, type ExpoPushMessage } from 'expo-server-sdk';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 
 const expo = new Expo();
@@ -28,6 +29,22 @@ interface PushPayload {
  * Nunca lanza: si Expo/FCM falla, se registra el error pero no rompe el flujo.
  */
 export async function sendPush(userId: string, payload: PushPayload) {
+  // Bandeja de la campana: se guarda siempre (aunque el usuario tenga las push apagadas
+  // o no tenga el teléfono registrado), para que la vea al abrir la app.
+  try {
+    const type = typeof payload.data?.type === 'string' ? payload.data.type : null;
+    await prisma.notification.create({
+      data: {
+        userId,
+        title: payload.title,
+        body: payload.body,
+        type,
+        data: (payload.data ?? undefined) as Prisma.InputJsonValue | undefined,
+      },
+    });
+  } catch (e) {
+    console.error('[push] no se pudo guardar en la bandeja', e instanceof Error ? e.message : e);
+  }
   try {
     // Respeta la preferencia del usuario: si desactivó las push, no se le envían.
     const pref = await prisma.user.findUnique({ where: { id: userId }, select: { notifyPush: true } });
