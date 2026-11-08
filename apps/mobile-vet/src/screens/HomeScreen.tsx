@@ -3,7 +3,7 @@ import { Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 're
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AppointmentRequestsSection, REQUESTS_KEY } from '../components/AppointmentRequests';
-import { NotificationBell } from '../components/NotificationBell';
+import { NotificationPill } from '../components/NotificationBell';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { TabIcon } from '../components/TabIcon';
@@ -77,9 +77,12 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             ) : (
               <View style={[styles.avatarSm, styles.avatarPh]}><Text style={styles.avatarTxtSm}>{firstName[0] ?? 'D'}</Text></View>
             )}
-            <View>
-              <Text style={styles.welcome}>Bienvenido de vuelta</Text>
-              <Text style={styles.hi}>¡Hola, Dr. {firstName || 'Doctor'}!</Text>
+            {/* flex + minWidth 0: con letra grande, el saludo cede espacio en vez de quedar debajo de "Disponible" */}
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.welcome} numberOfLines={1}>Bienvenido de vuelta</Text>
+              <Text style={styles.hi} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                ¡Hola, Dr. {firstName || 'Doctor'}!
+              </Text>
             </View>
           </Pressable>
           <Pressable
@@ -97,7 +100,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               style={styles.availSwitch}
             />
           </Pressable>
-          <NotificationBell style={styles.bell} onPress={() => navigation.navigate('Notificaciones')} />
         </View>
 
         {/* Tarjeta de perfil profesional */}
@@ -136,6 +138,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 {isVerified ? '✓ Verificado' : 'Sin verificar'}
               </Text>
             </View>
+            <NotificationPill onPress={() => navigation.navigate('Notificaciones')} />
           </View>
         </Pressable>
 
@@ -242,8 +245,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
-  userRow: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  bell: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F1ECF5', alignItems: 'center', justifyContent: 'center', marginLeft: 8 },
+  userRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, marginRight: 8 },
   avatarSm: { width: 44, height: 44, borderRadius: 22 },
   avatarPh: { backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
   avatarTxtSm: { color: colors.white, fontSize: 18, fontWeight: '800' },
@@ -267,10 +269,11 @@ const styles = StyleSheet.create({
   specLabel: { fontSize: 13, color: colors.muted, marginTop: 4 },
   specValue: { fontSize: 14, fontWeight: '600', color: colors.text },
   profileArrow: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
-  chipOutline: { backgroundColor: colors.white, borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 5 },
+  // Una sola fila (Exp · Verificado · Notificaciones): sin wrap, padding de 10 para que quepa en 360 dp
+  chipRow: { flexDirection: 'row', flexWrap: 'nowrap', gap: 6, marginTop: 14 },
+  chipOutline: { backgroundColor: colors.white, borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 5 },
   chipOutlineTxt: { color: colors.brand, fontWeight: '700', fontSize: 12 },
-  chipVerified: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#DFF3E6', borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 5 },
+  chipVerified: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#DFF3E6', borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 5 },
   chipVerifiedTxt: { color: colors.green, fontWeight: '800', fontSize: 12 },
   chipPending: { backgroundColor: '#FDEEC8' },
   chipPendingTxt: { color: colors.amber },
