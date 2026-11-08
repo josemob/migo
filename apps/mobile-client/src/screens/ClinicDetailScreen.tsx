@@ -122,12 +122,14 @@ export default function ClinicDetailScreen({ navigation, route }: any) {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 20, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
+      {/* Fondo blanco explícito: sin él, en algunos Samsung con tema oscuro la zona bajo el mapa se veía negra */}
+      <ScrollView style={{ backgroundColor: colors.white }} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 20, paddingBottom: insets.bottom + 40, backgroundColor: colors.white }} showsVerticalScrollIndicator={false}>
         {/* Mapa real (con marcador de la clínica). Sin API key válida → pin placeholder. */}
         <View style={styles.map}>
           {showMap ? (
             <View style={StyleSheet.absoluteFill} pointerEvents="none">
-              <MapLibreMap style={StyleSheet.absoluteFill} mapStyle={OPENFREEMAP_STYLE}>
+              {/* androidView="texture": con GLSurfaceView (por defecto) algunos Samsung dejaban negra la zona bajo el mapa */}
+              <MapLibreMap style={StyleSheet.absoluteFill} mapStyle={OPENFREEMAP_STYLE} androidView="texture">
                 <Camera initialViewState={{ center: [lng, lat], zoom: 14 }} />
                 <MapMarker id="clinic" lngLat={[lng, lat]}>
                   <View style={styles.pin}>
@@ -299,7 +301,7 @@ export default function ClinicDetailScreen({ navigation, route }: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.canvas },
+  safe: { flex: 1, backgroundColor: colors.white },
   topbar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
   back: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', boxShadow: cardShadow },
   backArrow: { fontSize: 30, color: colors.brand, marginTop: -4, fontWeight: '700' },

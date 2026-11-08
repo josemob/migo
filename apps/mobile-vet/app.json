@@ -19,7 +19,7 @@
     },
     "android": {
       "package": "com.migo.vet",
-      "versionCode": 3,
+      "versionCode": 4,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#7F398A",
@@ -77,7 +77,8 @@
       "expo-font",
       "expo-web-browser",
       "@react-native-google-signin/google-signin",
-      "expo-secure-store"
+      "expo-secure-store",
+      "./plugins/withNoForceDark"
     ],
     "owner": "mob_jm",
     "extra": {

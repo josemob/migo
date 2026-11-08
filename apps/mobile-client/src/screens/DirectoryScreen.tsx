@@ -124,7 +124,7 @@ export default function DirectoryScreen({ navigation, route }: any) {
 
       {/* Mapa con pines */}
       <View style={styles.map}>
-        <MapLibreMap style={StyleSheet.absoluteFill} mapStyle={OPENFREEMAP_STYLE}>
+        <MapLibreMap style={StyleSheet.absoluteFill} mapStyle={OPENFREEMAP_STYLE} androidView="texture">
           {/* key = centro+zoom: recentra y reajusta el encuadre al cambiar de categoría/resultados */}
           <Camera key={`${center[0].toFixed(3)}_${center[1].toFixed(3)}_${zoom.toFixed(2)}`} initialViewState={{ center, zoom }} />
           {coords && (
