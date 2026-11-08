@@ -33,7 +33,9 @@ export async function sendPush(userId: string, payload: PushPayload) {
   // o no tenga el teléfono registrado), para que la vea al abrir la app.
   try {
     const type = typeof payload.data?.type === 'string' ? payload.data.type : null;
-    await prisma.notification.create({
+    // Los mensajes de chat NO van a la campana: tienen su propio contador en la pestaña Chats
+    // y llenarían la bandeja con cada mensaje.
+    if (type !== 'chat') await prisma.notification.create({
       data: {
         userId,
         title: payload.title,

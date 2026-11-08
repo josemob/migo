@@ -3,6 +3,7 @@ import { Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 're
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AppointmentRequestsSection, REQUESTS_KEY } from '../components/AppointmentRequests';
+import { NotificationBell } from '../components/NotificationBell';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { TabIcon } from '../components/TabIcon';
@@ -96,6 +97,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               style={styles.availSwitch}
             />
           </Pressable>
+          <NotificationBell style={styles.bell} onPress={() => navigation.navigate('Notificaciones')} />
         </View>
 
         {/* Tarjeta de perfil profesional */}
@@ -241,6 +243,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
   userRow: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  bell: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F1ECF5', alignItems: 'center', justifyContent: 'center', marginLeft: 8 },
   avatarSm: { width: 44, height: 44, borderRadius: 22 },
   avatarPh: { backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
   avatarTxtSm: { color: colors.white, fontSize: 18, fontWeight: '800' },

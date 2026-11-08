@@ -45,6 +45,7 @@ import AttendScreen from './src/screens/AttendScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import AgendaScreen from './src/screens/AgendaScreen';
 import RecordDetailScreen from './src/screens/RecordDetailScreen';
+import NotificationsScreen from './src/screens/NotificationsScreen';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
 
@@ -147,6 +148,7 @@ function MainApp({ onBackToIndependent }: { onBackToIndependent?: () => void }) 
             <Stack.Screen name="History" component={HistoryScreen} />
             <Stack.Screen name="Agenda" component={AgendaScreen} />
             <Stack.Screen name="RecordDetail" component={RecordDetailScreen} />
+            <Stack.Screen name="Notificaciones" component={NotificationsScreen} />
           </Stack.Navigator>
         </NavigationContainer>
       </IndependentBackContext.Provider>

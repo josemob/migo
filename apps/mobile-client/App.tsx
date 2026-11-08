@@ -52,6 +52,7 @@ import RecordDetailScreen from './src/screens/RecordDetailScreen';
 import VaccineCardScreen from './src/screens/VaccineCardScreen';
 import PetTagScreen from './src/screens/PetTagScreen';
 import AppointmentDetailScreen from './src/screens/AppointmentDetailScreen';
+import NotificationsScreen from './src/screens/NotificationsScreen';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } });
 
@@ -151,6 +152,7 @@ function MainApp() {
         <Stack.Screen name="ClinicChat" component={ClinicChatScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Rating" component={RatingScreen} options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="AppointmentDetail" component={AppointmentDetailScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Notificaciones" component={NotificationsScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
       {/* "¡Tu cita fue aceptada!" con el resumen, cuando la clínica acepta una solicitud */}
       <AppointmentAcceptedModal

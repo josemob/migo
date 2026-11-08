@@ -17,6 +17,7 @@ import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { breedImage } from '../lib/breeds';
 import { TabIcon } from '../components/TabIcon';
+import { NotificationBell } from '../components/NotificationBell';
 import { cardShadow, colors, control, radius, type } from '../theme';
 
 const { width: W } = Dimensions.get('window');
@@ -201,9 +202,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               <Text style={styles.hiSub}>¿Qué quieres hacer hoy?</Text>
             </View>
           </Pressable>
-          <Pressable style={styles.bell} onPress={() => appAlert('Notificaciones', 'Sin novedades por ahora.')}>
-            <TabIcon name="bell" color={colors.brand} size={24} />
-          </Pressable>
+          <NotificationBell style={styles.bell} onPress={() => navigation.navigate('Notificaciones')} />
         </View>
 
         {/* Califica tu cita (aparece si hay una cita completada sin calificar) */}
