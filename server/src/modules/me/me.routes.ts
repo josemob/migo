@@ -417,9 +417,12 @@ router.get(
 // POST /me/push-token -> registra el Expo push token del device
 router.post(
   '/push-token',
-  validate({ body: z.object({ token: z.string().min(1), platform: z.string().optional() }) }),
+  validate({
+    body: z.object({ token: z.string().min(1), platform: z.string().optional(), app: z.enum(['client', 'vet']).optional() }),
+  }),
   asyncHandler(async (req, res) => {
-    await registerPushToken(req.user!.id, req.body.token, req.body.platform);
+    // app: desde qué app se registró el teléfono (las versiones viejas no lo mandan).
+    await registerPushToken(req.user!.id, req.body.token, req.body.platform, req.body.app);
     res.status(204).end();
   }),
 );
@@ -429,7 +432,7 @@ router.delete(
   '/push-token',
   validate({ body: z.object({ token: z.string().min(1) }) }),
   asyncHandler(async (req, res) => {
-    await removePushToken(req.body.token);
+    await removePushToken(req.body.token, req.user!.id);
     res.status(204).end();
   }),
 );
@@ -792,7 +795,8 @@ router.post(
       }).format(appt.scheduledAt);
       const title = 'Cita cancelada por el dueño';
       const body = `${appt.pet.name} · ${appt.reason ?? 'Consulta'} · ${fecha}${appt.paidInApp ? ' · pagada en la app' : ''}`;
-      await Promise.all(targets.map((userId) => sendPush(userId, { title, body, data: { type: 'appointment', appointmentId: appt.id } })));
+      // Al equipo de la clínica: va a Migo Vet (el tipo 'appointment' por defecto es del dueño).
+      await Promise.all(targets.map((userId) => sendPush(userId, { title, body, data: { type: 'appointment', appointmentId: appt.id } }, { app: 'vet' })));
     } catch (e) {
       console.error('[appointments] push de cancelación falló', e);
     }

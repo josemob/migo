@@ -133,6 +133,8 @@ export async function api<T = unknown>(path: string, opts: Options = {}): Promis
   const headers: Record<string, string> = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (auth && accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  // Qué app hace la petición: la campana solo muestra los avisos de esta app.
+  headers['X-Migo-App'] = 'client';
 
   // Timeout: si el backend no responde, falla en vez de colgarse para siempre.
   // 60s para tolerar el "cold start" del plan free de Render (~30-60s al despertar).

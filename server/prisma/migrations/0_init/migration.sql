@@ -144,6 +144,7 @@ CREATE TABLE "Notification" (
     "body" TEXT NOT NULL,
     "type" TEXT,
     "data" JSONB,
+    "app" TEXT,
     "readAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -156,6 +157,7 @@ CREATE TABLE "PushToken" (
     "userId" TEXT NOT NULL,
     "token" TEXT NOT NULL,
     "platform" TEXT,
+    "app" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

@@ -302,6 +302,7 @@ model Notification {
   body      String
   type      String? // "appointment", "appointment-request", "PET_FOUND", "emergency"…
   data      Json?
+  app       String? // destino: "client" | "vet"; null = ambas apps
   readAt    DateTime?
   createdAt DateTime  @default(now())
 
@@ -315,6 +316,7 @@ model PushToken {
   userId    String
   token     String   @unique // ExponentPushToken[xxx]
   platform  String? // "ios" | "android"
+  app       String? // "client" (Migo) | "vet" (Migo Vet); null = app vieja que no lo informaba
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

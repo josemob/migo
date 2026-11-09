@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ApiError, api, onUnauthorized, tokens } from './api';
+import { unregisterPush } from './push';
 import { appAlert } from './dialog';
 import {
   getBiometricToken,
@@ -173,6 +174,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    // Primero da de baja este teléfono de los avisos de la cuenta (necesita la sesión activa).
+    await unregisterPush();
     // No revocamos el refresh en el servidor para que el login biométrico siga sirviendo.
     await tokens.clear();
     await AsyncStorage.removeItem(USER_CACHE).catch(() => {});

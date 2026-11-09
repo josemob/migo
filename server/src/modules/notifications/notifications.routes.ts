@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import { Router, type Request } from 'express';
+import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../../config/prisma';
 import { asyncHandler } from '../../utils/asyncHandler';
@@ -10,11 +11,20 @@ import { authenticate } from '../../middleware/auth';
 const router = Router();
 router.use(authenticate);
 
+/**
+ * Filtro por app: cada app manda X-Migo-App ("client" | "vet") y solo ve sus avisos más los
+ * comunes (app null). Sin el header (versiones viejas) se ve todo, como antes.
+ */
+function appScope(req: Request): Prisma.NotificationWhereInput {
+  const h = String(req.headers['x-migo-app'] ?? '').toLowerCase();
+  return h === 'client' || h === 'vet' ? { OR: [{ app: h }, { app: null }] } : {};
+}
+
 // GET /notifications/unread-count -> { count } (globo rojo de la campana)
 router.get(
   '/unread-count',
   asyncHandler(async (req, res) => {
-    const count = await prisma.notification.count({ where: { userId: req.user!.id, readAt: null } });
+    const count = await prisma.notification.count({ where: { userId: req.user!.id, readAt: null, ...appScope(req) } });
     res.json({ count });
   }),
 );
@@ -26,13 +36,13 @@ router.get(
   asyncHandler(async (req, res) => {
     const { before } = req.query as unknown as { before?: Date };
     const rows = await prisma.notification.findMany({
-      where: { userId: req.user!.id, ...(before ? { createdAt: { lt: before } } : {}) },
+      where: { userId: req.user!.id, ...appScope(req), ...(before ? { createdAt: { lt: before } } : {}) },
       orderBy: { createdAt: 'desc' },
       take: 31,
       select: { id: true, title: true, body: true, type: true, data: true, readAt: true, createdAt: true },
     });
     const page = rows.slice(0, 30);
-    const unread = await prisma.notification.count({ where: { userId: req.user!.id, readAt: null } });
+    const unread = await prisma.notification.count({ where: { userId: req.user!.id, readAt: null, ...appScope(req) } });
     res.json({ data: page, nextBefore: rows.length > 30 ? page[page.length - 1]!.createdAt.toISOString() : null, unread });
   }),
 );
@@ -41,7 +51,7 @@ router.get(
 router.post(
   '/read-all',
   asyncHandler(async (req, res) => {
-    await prisma.notification.updateMany({ where: { userId: req.user!.id, readAt: null }, data: { readAt: new Date() } });
+    await prisma.notification.updateMany({ where: { userId: req.user!.id, readAt: null, ...appScope(req) }, data: { readAt: new Date() } });
     res.status(204).end();
   }),
 );

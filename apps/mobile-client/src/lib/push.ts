@@ -19,6 +19,13 @@ try {
   console.log('[push] setNotificationHandler no disponible:', e instanceof Error ? e.message : e);
 }
 
+// Qué app es esta: el backend solo le manda a cada teléfono los avisos de su app
+// (p. ej. las emergencias van a Migo Vet, nunca a Migo cliente aunque sea la misma cuenta).
+export const PUSH_APP = 'client' as const;
+
+// Último token registrado, para darlo de baja al cerrar sesión.
+let registeredToken: string | null = null;
+
 function getProjectId(): string | undefined {
   const extra = (Constants.expoConfig?.extra ?? {}) as { eas?: { projectId?: string } };
   return extra.eas?.projectId ?? (Constants as unknown as { easConfig?: { projectId?: string } }).easConfig?.projectId;
@@ -53,8 +60,27 @@ export async function registerForPush(): Promise<void> {
     const token = tokenResp.data;
     if (!token) return;
 
-    await api('/me/push-token', { method: 'POST', body: { token, platform: Platform.OS } });
+    await api('/me/push-token', { method: 'POST', body: { token, platform: Platform.OS, app: PUSH_APP } });
+    registeredToken = token;
   } catch (e) {
     console.log('[push] registro omitido:', e instanceof Error ? e.message : e);
   }
+}
+
+/**
+ * Da de baja el token de este teléfono (al cerrar sesión). Antes no se hacía y el teléfono
+ * seguía recibiendo los avisos de la cuenta anterior. Silencioso: si falla, no bloquea el logout.
+ */
+export async function unregisterPush(): Promise<void> {
+  try {
+    let token = registeredToken;
+    if (!token) {
+      const projectId = getProjectId();
+      token = (await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined)).data;
+    }
+    if (token) await api('/me/push-token', { method: 'DELETE', body: { token } });
+  } catch (e) {
+    console.log('[push] baja omitida:', e instanceof Error ? e.message : e);
+  }
+  registeredToken = null;
 }

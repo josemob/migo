@@ -4,18 +4,36 @@ import { prisma } from '../../config/prisma';
 
 const expo = new Expo();
 
-/** Registra (o actualiza) un Expo push token para un usuario. */
-export async function registerPushToken(userId: string, token: string, platform?: string) {
+/** App que recibe el aviso: Migo (dueños) o Migo Vet (profesionales). */
+export type PushApp = 'client' | 'vet';
+
+/**
+ * Destino por tipo de aviso. Una misma cuenta puede estar abierta en las dos apps (p. ej. un
+ * tester con el mismo Gmail): sin esto, una emergencia para el vet también le sonaba en Migo
+ * cliente. null = ambas apps (chat, avisos del administrador).
+ */
+const APP_BY_TYPE: Record<string, PushApp> = {
+  emergency: 'vet',
+  'appointment-request': 'vet',
+  staff_invite: 'vet',
+  staff_removed: 'vet',
+  appointment: 'client', // al dueño; el aviso al equipo cuando el dueño cancela pasa { app: 'vet' }
+  PET_FOUND: 'client',
+};
+
+/** Registra (o actualiza) un Expo push token para un usuario y la app desde la que se registró. */
+export async function registerPushToken(userId: string, token: string, platform?: string, app?: PushApp) {
   if (!Expo.isExpoPushToken(token)) return;
   await prisma.pushToken.upsert({
     where: { token },
-    create: { userId, token, platform },
-    update: { userId, platform },
+    create: { userId, token, platform, app },
+    update: { userId, platform, ...(app ? { app } : {}) },
   });
 }
 
-export async function removePushToken(token: string) {
-  await prisma.pushToken.deleteMany({ where: { token } });
+/** Baja de un token (al cerrar sesión). Solo el dueño del token puede darlo de baja. */
+export async function removePushToken(token: string, userId: string) {
+  await prisma.pushToken.deleteMany({ where: { token, userId } });
 }
 
 interface PushPayload {
@@ -28,11 +46,12 @@ interface PushPayload {
  * Envía una notificación push a todos los devices de un usuario.
  * Nunca lanza: si Expo/FCM falla, se registra el error pero no rompe el flujo.
  */
-export async function sendPush(userId: string, payload: PushPayload) {
+export async function sendPush(userId: string, payload: PushPayload, opts: { app?: PushApp | null } = {}) {
+  const type = typeof payload.data?.type === 'string' ? payload.data.type : null;
+  const app: PushApp | null = opts.app !== undefined ? opts.app : (type ? APP_BY_TYPE[type] ?? null : null);
   // Bandeja de la campana: se guarda siempre (aunque el usuario tenga las push apagadas
   // o no tenga el teléfono registrado), para que la vea al abrir la app.
   try {
-    const type = typeof payload.data?.type === 'string' ? payload.data.type : null;
     // Los mensajes de chat NO van a la campana: tienen su propio contador en la pestaña Chats
     // y llenarían la bandeja con cada mensaje.
     if (type !== 'chat') await prisma.notification.create({
@@ -41,6 +60,7 @@ export async function sendPush(userId: string, payload: PushPayload) {
         title: payload.title,
         body: payload.body,
         type,
+        app,
         data: (payload.data ?? undefined) as Prisma.InputJsonValue | undefined,
       },
     });
@@ -51,7 +71,12 @@ export async function sendPush(userId: string, payload: PushPayload) {
     // Respeta la preferencia del usuario: si desactivó las push, no se le envían.
     const pref = await prisma.user.findUnique({ where: { id: userId }, select: { notifyPush: true } });
     if (pref && !pref.notifyPush) return;
-    const tokens = await prisma.pushToken.findMany({ where: { userId }, select: { token: true } });
+    // Solo los teléfonos de la app destino. Los tokens sin app (versiones viejas que no lo
+    // informaban) siguen recibiendo todo, para no cortarle las emergencias a un Migo Vet viejo.
+    const tokens = await prisma.pushToken.findMany({
+      where: { userId, ...(app ? { OR: [{ app }, { app: null }] } : {}) },
+      select: { token: true },
+    });
     const messages: ExpoPushMessage[] = tokens
       .map((t) => t.token)
       .filter((t) => Expo.isExpoPushToken(t))
