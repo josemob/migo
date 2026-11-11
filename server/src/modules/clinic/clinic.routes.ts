@@ -9,6 +9,8 @@ import { ApiError } from '../../utils/ApiError';
 import { randomUUID } from 'node:crypto';
 import { createStreamCredentials, streamConfigured, clinicStreamUserId, createRingingCall } from '../stream/stream.service';
 import { listPlans, defaultPlan, selectPlanForClinic } from '../plans/plan.service';
+import { normalizeRif, notifyAdminsOfClinicRequest } from '../auth/auth.service';
+import { docDataUri } from '../../utils/docDataUri';
 
 const router = Router();
 router.use(authenticate, withClinicContext);
@@ -33,6 +35,79 @@ router.post('/plan/select',
     res.json({ ok: true, applied: r.applied });
   }));
 
+// ── Verificación del establecimiento (autoregistro) ─────────────────────
+// GET /clinic/verification -> estado de la revisión del Super Admin (banner "en revisión")
+router.get('/verification', asyncHandler(async (req, res) => {
+  const clinic = await prisma.clinic.findUnique({
+    where: { id: req.clinicId! },
+    select: {
+      verificationStatus: true, verifiedAt: true, rejectionReason: true, radarSuspended: true,
+      organization: { select: { rif: true, rifDocUrl: true, sanitaryPermitUrl: true } },
+    },
+  });
+  if (!clinic) throw ApiError.notFound('Sucursal no encontrada');
+  res.json({
+    status: clinic.verificationStatus,
+    verifiedAt: clinic.verifiedAt,
+    rejectionReason: clinic.rejectionReason,
+    suspended: clinic.radarSuspended,
+    rif: clinic.organization.rif,
+    hasRifDoc: !!clinic.organization.rifDocUrl,
+    hasSanitaryPermit: !!clinic.organization.sanitaryPermitUrl,
+  });
+}));
+
+// POST /clinic/verification -> la clínica corrige/sube documentos y vuelve a pedir revisión
+router.post('/verification',
+  requireRole('CLINIC_ADMIN', 'SUPER_ADMIN'),
+  validate({
+    body: z.object({
+      rif: z.string().trim().optional(),
+      rifDocUrl: docDataUri.optional(),
+      sanitaryPermitUrl: docDataUri.optional(),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const clinic = await prisma.clinic.findUnique({
+      where: { id: req.clinicId! },
+      select: {
+        id: true, name: true, city: true, verificationStatus: true, organizationId: true,
+        organization: { select: { name: true, rif: true, rifDocUrl: true, owner: { select: { fullName: true, email: true } } } },
+      },
+    });
+    if (!clinic) throw ApiError.notFound('Sucursal no encontrada');
+    if (clinic.verificationStatus === 'VERIFIED') throw ApiError.conflict('Tu clínica ya está verificada.');
+
+    const body = req.body as { rif?: string; rifDocUrl?: string; sanitaryPermitUrl?: string };
+    let rif = clinic.organization.rif;
+    if (body.rif) {
+      rif = normalizeRif(body.rif);
+      if (!rif) throw ApiError.badRequest('El RIF no tiene un formato válido (ej. J-12345678-9)');
+      const taken = await prisma.organization.findFirst({ where: { rif, id: { not: clinic.organizationId } }, select: { id: true } });
+      if (taken) throw ApiError.conflict('Ya existe otra empresa registrada con ese RIF.');
+    }
+    if (!body.rifDocUrl && !clinic.organization.rifDocUrl) throw ApiError.badRequest('Sube la foto o el PDF del RIF.');
+
+    await prisma.$transaction([
+      prisma.organization.update({
+        where: { id: clinic.organizationId },
+        data: {
+          rif,
+          ...(body.rifDocUrl ? { rifDocUrl: body.rifDocUrl } : {}),
+          ...(body.sanitaryPermitUrl ? { sanitaryPermitUrl: body.sanitaryPermitUrl } : {}),
+        },
+      }),
+      prisma.clinic.update({ where: { id: clinic.id }, data: { verificationStatus: 'PENDING', rejectionReason: null } }),
+    ]);
+
+    void notifyAdminsOfClinicRequest({
+      clinicName: clinic.name, orgName: clinic.organization.name, rif: rif ?? '—', city: clinic.city,
+      ownerName: clinic.organization.owner.fullName, ownerEmail: clinic.organization.owner.email,
+    }).catch(() => {});
+    res.json({ ok: true, status: 'PENDING' });
+  }),
+);
+
 // GET /clinic -> perfil de la sucursal + comercio + horarios + cuenta de liquidación
 router.get(
   '/',
@@ -40,7 +115,13 @@ router.get(
     const clinic = await prisma.clinic.findUnique({
       where: { id: req.clinicId! },
       include: {
-        organization: true,
+        // Sin los documentos (data URI): esos solo los ve el Super Admin.
+        organization: {
+          select: {
+            id: true, ownerId: true, name: true, legalName: true, rif: true, email: true, phone: true,
+            logoUrl: true, verificationStatus: true, verifiedAt: true, createdAt: true, updatedAt: true,
+          },
+        },
         hours: { orderBy: { dayOfWeek: 'asc' } },
         settlementAccount: true,
       },

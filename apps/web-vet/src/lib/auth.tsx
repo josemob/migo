@@ -24,6 +24,8 @@ interface AuthCtx {
   user: AuthUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  /** Autoregistro de clínica: crea la cuenta y deja la sesión iniciada (en revisión). */
+  registerClinic: (payload: Record<string, unknown>) => Promise<void>;
   logout: () => void;
 }
 
@@ -61,6 +63,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(await api<AuthUser>('/auth/me'));
   };
 
+  const registerClinic = async (payload: Record<string, unknown>) => {
+    const res = await api<{ accessToken: string; refreshToken: string }>('/auth/register-clinic', {
+      method: 'POST',
+      body: payload,
+      auth: false,
+    });
+    tokens.set(res.accessToken, res.refreshToken);
+    setUser(await api<AuthUser>('/auth/me'));
+  };
+
   const logout = () => {
     const refresh = tokens.refresh;
     if (refresh) void api('/auth/logout', { method: 'POST', body: { refreshToken: refresh }, auth: false }).catch(() => {});
@@ -68,5 +80,5 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
-  return <Ctx.Provider value={{ user, loading, login, logout }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ user, loading, login, registerClinic, logout }}>{children}</Ctx.Provider>;
 }

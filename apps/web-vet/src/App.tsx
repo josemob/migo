@@ -3,6 +3,7 @@ import { useAuth, isStaff, isClinicAdmin } from './lib/auth';
 import { Layout } from './components/Layout';
 import { Spinner } from './components/ui';
 import Login from './pages/Login';
+import Registro from './pages/Registro';
 import Dashboard from './pages/Dashboard';
 import Agenda from './pages/Agenda';
 import Urgencias from './pages/Urgencias';
@@ -41,6 +42,7 @@ export default function App() {
     return (
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/registro" element={<Registro />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );

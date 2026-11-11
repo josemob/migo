@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { MigoLogo } from '../components/MigoLogo';
 import { Icon } from '../components/Icon';
@@ -87,6 +88,13 @@ export default function Login() {
               Acceso exclusivo para el equipo de clínicas afiliadas a Migo.
             </p>
           </form>
+
+          <div className="mt-10 border-t border-slate-100 pt-6 text-sm text-slate-500">
+            ¿Tu clínica aún no está en Migo?{' '}
+            <Link to="/registro" className="font-bold text-migo-purple hover:underline">
+              Regístrala aquí
+            </Link>
+          </div>
         </div>
       </div>
 

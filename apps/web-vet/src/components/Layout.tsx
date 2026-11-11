@@ -5,6 +5,7 @@ import { useEmergencyStream } from '../lib/useEmergencyStream';
 import { playAlarm } from '../lib/alarm';
 import { Icon, type IconName } from './Icon';
 import { MigoLogo } from './MigoLogo';
+import { VerificationBanner } from './Verification';
 
 const NAV: {
   section: string;
@@ -148,7 +149,10 @@ export function Layout({ children }: { children: ReactNode }) {
       <main className="flex-1 overflow-y-auto rounded-shell bg-gradient-to-br from-warm-50 via-warm-100 to-warm-200 p-8">
         {/* Tope de ancho + centrado para pantallas anchas (retina Mac, >1280px): el
             contenido no se estira de borde a borde en monitores grandes. */}
-        <div className="mx-auto w-full max-w-[1600px]">{children}</div>
+        <div className="mx-auto w-full max-w-[1600px]">
+          <VerificationBanner />
+          {children}
+        </div>
       </main>
     </div>
   );

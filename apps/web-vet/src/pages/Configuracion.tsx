@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import { Card, PageHeader, SectionTitle, Spinner, ErrorNote } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { PlanSection } from '../components/PlanSection';
+import { VerificationSection } from '../components/Verification';
 import { LocationPicker } from '../components/LocationPicker';
 
 interface Hour {
@@ -191,6 +192,8 @@ export default function Configuracion() {
           </div>
         }
       />
+
+      <div className="mb-6"><VerificationSection /></div>
 
       <PlanSection />
 

@@ -107,6 +107,71 @@ function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+const button = (href: string, label: string) =>
+  `<div style="text-align:center;margin:20px 0 8px"><a href="${href}" style="display:inline-block;background:${BRAND};color:#fff;text-decoration:none;font-weight:700;border-radius:999px;padding:12px 26px">${label}</a></div>`;
+
+// ── Registro de clínicas ──────────────────────────────────────────────
+
+/** A la clínica: recibimos su solicitud y queda en revisión. */
+export async function sendClinicSignupReceivedEmail(to: string, name: string, clinicName: string) {
+  const first = name?.split(' ')[0] || '';
+  return sendEmail({
+    to,
+    subject: `Recibimos la solicitud de ${clinicName} 🐾`,
+    html: layout('Tu solicitud está en revisión',
+      p(`Hola${first ? ' ' + esc(first) : ''}, gracias por registrar <b>${esc(clinicName)}</b> en Migo.`) +
+      p('Nuestro equipo revisará tus datos y el RIF. Mientras tanto ya puedes entrar al panel para completar tu perfil, horarios, servicios y equipo.') +
+      p('Tu clínica aparecerá en la app para los dueños de mascotas en cuanto la aprobemos. Te avisaremos por este medio.') +
+      button(env.VET_PANEL_URL, 'Entrar al panel')),
+  });
+}
+
+/** Al equipo Migo: nueva solicitud pendiente de aprobar. */
+export async function sendClinicSignupAdminEmail(
+  to: string | string[],
+  d: { clinicName: string; orgName: string; rif: string; city?: string | null; ownerName: string; ownerEmail: string },
+) {
+  return sendEmail({
+    to,
+    subject: `Nueva solicitud de clínica: ${d.clinicName}`,
+    html: layout('Nueva clínica por aprobar',
+      `<div style="background:#F5EBFA;border-radius:12px;padding:16px;margin:6px 0 12px;font-size:14px;line-height:1.6">
+        <b>${esc(d.orgName)}</b> — ${esc(d.clinicName)}${d.city ? ` (${esc(d.city)})` : ''}<br>
+        RIF: ${esc(d.rif)}<br>
+        Responsable: ${esc(d.ownerName)} · ${esc(d.ownerEmail)}
+      </div>` +
+      p('Revisa los documentos y apruébala o recházala desde Gestión de Comercios.') +
+      button(`${env.ADMIN_PANEL_URL}/comercios`, 'Revisar solicitud')),
+  });
+}
+
+/** A la clínica: aprobada, ya visible en la app. */
+export async function sendClinicApprovedEmail(to: string, name: string, clinicName: string) {
+  const first = name?.split(' ')[0] || '';
+  return sendEmail({
+    to,
+    subject: `¡${clinicName} ya está en Migo! ✅`,
+    html: layout('¡Tu clínica fue aprobada!',
+      p(`Hola${first ? ' ' + esc(first) : ''}, aprobamos <b>${esc(clinicName)}</b>. Desde ahora aparece en la app Migo y puede recibir solicitudes de cita y urgencias.`) +
+      p('Revisa que tus horarios y servicios estén al día para que los dueños puedan agendar.') +
+      button(env.VET_PANEL_URL, 'Ir al panel')),
+  });
+}
+
+/** A la clínica: rechazada, con el motivo. */
+export async function sendClinicRejectedEmail(to: string, name: string, clinicName: string, reason: string) {
+  const first = name?.split(' ')[0] || '';
+  return sendEmail({
+    to,
+    subject: `Sobre la solicitud de ${clinicName}`,
+    html: layout('No pudimos aprobar tu solicitud',
+      p(`Hola${first ? ' ' + esc(first) : ''}, revisamos la solicitud de <b>${esc(clinicName)}</b> y por ahora no pudimos aprobarla.`) +
+      `<div style="background:#FEF2F2;border-radius:12px;padding:14px 16px;margin:6px 0 12px;font-size:14px;color:#991B1B"><b>Motivo:</b> ${esc(reason)}</div>` +
+      p('Puedes corregirlo desde el panel (Configuración) y responder a este correo para que la revisemos de nuevo.') +
+      button(env.VET_PANEL_URL, 'Ir al panel')),
+  });
+}
+
 export async function sendAppointmentConfirmedEmail(
   to: string,
   name: string,

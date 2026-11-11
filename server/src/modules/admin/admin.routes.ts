@@ -7,6 +7,7 @@ import { validate } from '../../middleware/validate';
 import { authenticate, requireRole } from '../../middleware/auth';
 import { ApiError } from '../../utils/ApiError';
 import { sendPush, sendBulkPush } from '../push/push.service';
+import { sendClinicApprovedEmail, sendClinicRejectedEmail } from '../mail/mail.service';
 import { distanceKm } from '../../lib/geo';
 import { listPlans, serializePlan, syncClinicCommission } from '../plans/plan.service';
 import { isStale, refreshBcvRate, refreshIfStale } from './bcv.service';
@@ -87,7 +88,17 @@ router.get(
         radarSuspended: true,
         plan: true,
         createdAt: true,
-        organization: { select: { rif: true, name: true, owner: { select: { fullName: true } } } },
+        address: true,
+        city: true,
+        state: true,
+        phone: true,
+        isOpen24_7: true,
+        acceptsEmergencies: true,
+        rejectionReason: true,
+        // Los documentos (data URI) NO van aquí: se piden aparte en /clinics/:id/documents.
+        organization: {
+          select: { rif: true, name: true, legalName: true, owner: { select: { fullName: true, email: true, phone: true } } },
+        },
         // Patrocinio vigente (si lo hay) para la tarjeta de gestión
         sponsorships: {
           where: { isActive: true, expiresAt: { gt: nowDate } },
@@ -104,6 +115,16 @@ router.get(
       representative: c.organization?.owner?.fullName ?? '—',
       rif: c.organization?.rif ?? '—',
       orgName: c.organization?.name ?? '—',
+      legalName: c.organization?.legalName ?? null,
+      ownerEmail: c.organization?.owner?.email ?? null,
+      ownerPhone: c.organization?.owner?.phone ?? null,
+      address: c.address,
+      city: c.city,
+      state: c.state,
+      phone: c.phone,
+      isOpen24_7: c.isOpen24_7,
+      acceptsEmergencies: c.acceptsEmergencies,
+      rejectionReason: c.rejectionReason,
       plan: c.plan,
       createdAt: c.createdAt,
       verificationStatus: c.verificationStatus,
@@ -126,30 +147,63 @@ router.post(
   '/clinics/:id/status',
   validate({
     params: z.object({ id: z.string().uuid() }),
-    body: z.object({ action: z.enum(['approve', 'reject', 'suspend', 'reactivate']), reason: z.string().optional() }),
+    body: z.object({ action: z.enum(['approve', 'reject', 'suspend', 'reactivate']), reason: z.string().trim().optional() }),
   }),
   asyncHandler(async (req, res) => {
-    const clinic = await prisma.clinic.findUnique({ where: { id: req.params.id }, select: { id: true, organizationId: true } });
+    const clinic = await prisma.clinic.findUnique({
+      where: { id: req.params.id },
+      select: {
+        id: true, name: true, organizationId: true, verificationStatus: true,
+        organization: { select: { owner: { select: { fullName: true, email: true } } } },
+      },
+    });
     if (!clinic) throw ApiError.notFound('Clínica no encontrada');
+
+    const action = req.body.action as 'approve' | 'reject' | 'suspend' | 'reactivate';
+    const reason = (req.body.reason as string | undefined) ?? '';
+    // El motivo del rechazo es lo que lee la clínica: obligatorio.
+    if (action === 'reject' && reason.length < 5) throw ApiError.badRequest('Escribe el motivo del rechazo (mín. 5 caracteres).');
 
     const now = new Date();
     const data =
-      req.body.action === 'approve'
-        ? { verificationStatus: 'VERIFIED' as const, verifiedAt: now, radarSuspended: false, suspendedAt: null }
-        : req.body.action === 'reject'
-        ? { verificationStatus: 'REJECTED' as const }
-        : req.body.action === 'suspend'
+      action === 'approve'
+        ? { verificationStatus: 'VERIFIED' as const, verifiedAt: now, radarSuspended: false, suspendedAt: null, rejectionReason: null }
+        : action === 'reject'
+        ? { verificationStatus: 'REJECTED' as const, rejectionReason: reason }
+        : action === 'suspend'
         ? { radarSuspended: true, suspendedAt: now }
-        : { radarSuspended: false, suspendedAt: null, verificationStatus: 'VERIFIED' as const, verifiedAt: now };
+        : { radarSuspended: false, suspendedAt: null, verificationStatus: 'VERIFIED' as const, verifiedAt: now, rejectionReason: null };
 
     const updated = await prisma.clinic.update({ where: { id: clinic.id }, data });
 
     // Al aprobar/reactivar, la organización también queda verificada
-    if (req.body.action === 'approve' || req.body.action === 'reactivate') {
+    if (action === 'approve' || action === 'reactivate') {
       await prisma.organization.update({ where: { id: clinic.organizationId }, data: { verificationStatus: 'VERIFIED', verifiedAt: now } });
     }
 
+    // Aviso por correo al responsable (solo en la primera aprobación y en el rechazo)
+    const owner = clinic.organization.owner;
+    if (action === 'approve' && clinic.verificationStatus !== 'VERIFIED') {
+      void sendClinicApprovedEmail(owner.email, owner.fullName, clinic.name).catch(() => {});
+    } else if (action === 'reject') {
+      void sendClinicRejectedEmail(owner.email, owner.fullName, clinic.name, reason).catch(() => {});
+    }
+
     res.json({ id: updated.id, verificationStatus: updated.verificationStatus, radarSuspended: updated.radarSuspended });
+  }),
+);
+
+// GET /admin/clinics/:id/documents -> RIF y permiso sanitario (data URI) para auditar la solicitud
+router.get(
+  '/clinics/:id/documents',
+  validate({ params: z.object({ id: z.string().uuid() }) }),
+  asyncHandler(async (req, res) => {
+    const clinic = await prisma.clinic.findUnique({
+      where: { id: req.params.id },
+      select: { organization: { select: { rifDocUrl: true, sanitaryPermitUrl: true } } },
+    });
+    if (!clinic) throw ApiError.notFound('Clínica no encontrada');
+    res.json({ rifDocUrl: clinic.organization.rifDocUrl, sanitaryPermitUrl: clinic.organization.sanitaryPermitUrl });
   }),
 );
 

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { validate } from '../../middleware/validate';
 import { authenticate } from '../../middleware/auth';
+import { rateLimit } from '../../middleware/rateLimit';
 import { ApiError } from '../../utils/ApiError';
 import { env } from '../../config/env';
 
@@ -17,7 +18,10 @@ import { env } from '../../config/env';
  *  - Si algún día cambiamos a Google Places, solo se toca este archivo.
  */
 const router = Router();
-router.use(authenticate);
+// Con sesión: autenticado. Sin sesión (formulario de registro de clínicas): se
+// permite, pero con un límite por IP para no abusar de Nominatim a través nuestro.
+const anonLimit = rateLimit({ windowMs: 60_000, max: 30 });
+router.use((req, res, next) => (req.headers.authorization ? authenticate(req, res, next) : anonLimit(req, res, next)));
 
 const NOMINATIM = 'https://nominatim.openstreetmap.org';
 // La política de uso de Nominatim exige identificar la aplicación con un

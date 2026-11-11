@@ -35,6 +35,12 @@ const schema = z.object({
   MAIL_FROM: z.string().default('Migo <onboarding@resend.dev>'),
   // URL pública del panel/app para enlaces dentro de los correos (si aplica).
   APP_PUBLIC_URL: z.string().default('https://migopet.app'),
+  // Paneles web (enlaces en los correos del registro de clínicas).
+  VET_PANEL_URL: z.string().default('https://migo-vet.vercel.app'),
+  ADMIN_PANEL_URL: z.string().default('https://migo-admin-tau.vercel.app'),
+  // Correo(s) del equipo Migo que reciben el aviso de nueva solicitud de clínica
+  // (separados por coma). Si no se define, se usa el correo de los SUPER_ADMIN.
+  ADMIN_NOTIFY_EMAIL: z.string().optional(),
 });
 
 const parsed = schema.safeParse(process.env);

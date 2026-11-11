@@ -10,7 +10,12 @@ import {
   ttlToDate,
 } from '../../utils/jwt';
 import { env } from '../../config/env';
-import { sendWelcomeEmail, sendPasswordResetEmail } from '../mail/mail.service';
+import {
+  sendWelcomeEmail,
+  sendPasswordResetEmail,
+  sendClinicSignupReceivedEmail,
+  sendClinicSignupAdminEmail,
+} from '../mail/mail.service';
 
 interface RegisterInput {
   email: string;
@@ -19,6 +24,44 @@ interface RegisterInput {
   phone?: string;
   nationalId?: string;
   role?: UserRole;
+}
+
+export interface ClinicSignupInput {
+  fullName: string;
+  email: string;
+  password: string;
+  phone: string;
+  nationalId?: string;
+  orgName: string;
+  legalName?: string;
+  rif: string;
+  rifDocUrl: string;
+  sanitaryPermitUrl?: string;
+  clinicName: string;
+  clinicPhone?: string;
+  address: string;
+  city: string;
+  state?: string;
+  latitude: number;
+  longitude: number;
+  isOpen24_7: boolean;
+  acceptsEmergencies: boolean;
+}
+
+/** "j123456789" / "J-12345678-9" -> "J-12345678-9". null si no parece un RIF venezolano. */
+export function normalizeRif(raw: string): string | null {
+  const m = raw.toUpperCase().replace(/[\s.]/g, '').match(/^([JGVEPC])-?(\d{8})-?(\d)$/);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
+}
+
+/** Avisa al equipo Migo (ADMIN_NOTIFY_EMAIL o, si no está, los SUPER_ADMIN). */
+export async function notifyAdminsOfClinicRequest(d: Parameters<typeof sendClinicSignupAdminEmail>[1]) {
+  let to = (env.ADMIN_NOTIFY_EMAIL ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  if (!to.length) {
+    const admins = await prisma.user.findMany({ where: { role: 'SUPER_ADMIN' }, select: { email: true } });
+    to = admins.map((a) => a.email);
+  }
+  if (to.length) await sendClinicSignupAdminEmail(to, d);
 }
 
 const publicUser = (u: {
@@ -69,6 +112,85 @@ export const authService = {
 
     // Correo de bienvenida (no bloquea el registro si el mail falla)
     void sendWelcomeEmail(user.email, user.fullName).catch(() => {});
+
+    const tokens = await issueTokens(user, userAgent);
+    return { user: publicUser(user), ...tokens };
+  },
+
+  /**
+   * Autoregistro de una clínica desde el panel web: crea el usuario responsable
+   * (CLINIC_ADMIN), la organización, la sede y su membresía como Admin Local.
+   * Todo nace PENDING: puede entrar al panel y prepararse, pero no aparece en la
+   * app (directorio/urgencias filtran VERIFIED) hasta que el Super Admin la aprueba.
+   */
+  async registerClinic(input: ClinicSignupInput, userAgent?: string) {
+    const email = input.email.trim().toLowerCase();
+    const rif = normalizeRif(input.rif);
+    if (!rif) throw ApiError.badRequest('El RIF no tiene un formato válido (ej. J-12345678-9)');
+
+    const [emailTaken, rifTaken] = await Promise.all([
+      prisma.user.findUnique({ where: { email }, select: { id: true } }),
+      prisma.organization.findUnique({ where: { rif }, select: { id: true } }),
+    ]);
+    if (emailTaken) throw ApiError.conflict('Ese correo ya tiene una cuenta en Migo. Inicia sesión o usa otro correo.');
+    if (rifTaken) throw ApiError.conflict('Ya existe una empresa registrada con ese RIF. Escríbenos si crees que es un error.');
+
+    const passwordHash = await hashPassword(input.password);
+    const { user, clinic } = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: { email, passwordHash, fullName: input.fullName.trim(), phone: input.phone, nationalId: input.nationalId, role: 'CLINIC_ADMIN' },
+      });
+      const org = await tx.organization.create({
+        data: {
+          ownerId: user.id,
+          name: input.orgName.trim(),
+          legalName: input.legalName?.trim() || null,
+          rif,
+          email,
+          phone: input.phone,
+          rifDocUrl: input.rifDocUrl,
+          sanitaryPermitUrl: input.sanitaryPermitUrl ?? null,
+        },
+      });
+      const clinic = await tx.clinic.create({
+        data: {
+          organizationId: org.id,
+          name: input.clinicName.trim(),
+          phone: input.clinicPhone || input.phone,
+          email,
+          address: input.address.trim(),
+          city: input.city.trim(),
+          state: input.state?.trim() || null,
+          latitude: input.latitude,
+          longitude: input.longitude,
+          isOpen24_7: input.isOpen24_7,
+          acceptsEmergencies: input.acceptsEmergencies,
+        },
+      });
+      await tx.clinicStaff.create({
+        data: { userId: user.id, clinicId: clinic.id, position: 'BRANCH_ADMIN', roleLabel: 'Administrador(a)' },
+      });
+      // Horario inicial editable desde Configuración (sin horario no se podrían pedir citas).
+      await tx.clinicHours.createMany({
+        data: [0, 1, 2, 3, 4, 5, 6].map((d) =>
+          input.isOpen24_7
+            ? { clinicId: clinic.id, dayOfWeek: d, opensAt: '00:00', closesAt: '23:59', isOpen: true }
+            : d === 0
+            ? { clinicId: clinic.id, dayOfWeek: d, opensAt: '09:00', closesAt: '13:00', isOpen: false }
+            : d === 6
+            ? { clinicId: clinic.id, dayOfWeek: d, opensAt: '09:00', closesAt: '13:00', isOpen: true }
+            : { clinicId: clinic.id, dayOfWeek: d, opensAt: '08:00', closesAt: '18:00', isOpen: true },
+        ),
+      });
+      return { user, clinic };
+    });
+
+    // Correos (no bloquean el registro si fallan)
+    void sendClinicSignupReceivedEmail(user.email, user.fullName, clinic.name).catch(() => {});
+    void notifyAdminsOfClinicRequest({
+      clinicName: clinic.name, orgName: input.orgName, rif, city: input.city,
+      ownerName: user.fullName, ownerEmail: user.email,
+    }).catch(() => {});
 
     const tokens = await issueTokens(user, userAgent);
     return { user: publicUser(user), ...tokens };
@@ -225,7 +347,14 @@ export const authService = {
       include: {
         staffProfile: {
           include: {
-            clinic: { include: { organization: true } },
+            // Sin los documentos (data URI pesados): solo lo que el panel necesita.
+            clinic: {
+              include: {
+                organization: {
+                  select: { id: true, name: true, legalName: true, rif: true, logoUrl: true, verificationStatus: true },
+                },
+              },
+            },
             shifts: {
               where: { date: { gte: dayStart, lt: dayEnd }, shift: { not: 'OFF' } },
               orderBy: { date: 'desc' },

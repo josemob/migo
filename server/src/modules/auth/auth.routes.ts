@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { validate } from '../../middleware/validate';
 import { authenticate } from '../../middleware/auth';
+import { rateLimit } from '../../middleware/rateLimit';
+import { docDataUri } from '../../utils/docDataUri';
 import { authService } from './auth.service';
 
 const router = Router();
@@ -31,6 +33,39 @@ router.post(
   validate({ body: registerSchema }),
   asyncHandler(async (req, res) => {
     const result = await authService.register(req.body, req.headers['user-agent']);
+    res.status(201).json(result);
+  }),
+);
+
+const clinicSignupSchema = z.object({
+  fullName: z.string().trim().min(3, 'Escribe tu nombre completo'),
+  email: z.string().trim().email('Correo no válido'),
+  password: z.string().min(8, 'La contraseña debe tener mínimo 8 caracteres'),
+  phone: z.string().trim().min(7, 'Escribe un teléfono de contacto'),
+  nationalId: z.string().trim().optional(),
+  orgName: z.string().trim().min(2, 'Escribe el nombre comercial'),
+  legalName: z.string().trim().optional(),
+  rif: z.string().trim().min(9, 'Escribe el RIF'),
+  rifDocUrl: docDataUri,
+  sanitaryPermitUrl: docDataUri.optional(),
+  clinicName: z.string().trim().min(2, 'Escribe el nombre de la sede'),
+  clinicPhone: z.string().trim().optional(),
+  address: z.string().trim().min(5, 'Escribe la dirección'),
+  city: z.string().trim().min(2, 'Escribe la ciudad'),
+  state: z.string().trim().optional(),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  isOpen24_7: z.boolean().default(false),
+  acceptsEmergencies: z.boolean().default(true),
+});
+
+// POST /auth/register-clinic -> autoregistro de clínica (queda en revisión del Super Admin)
+router.post(
+  '/register-clinic',
+  rateLimit({ windowMs: 60 * 60_000, max: 10 }),
+  validate({ body: clinicSignupSchema }),
+  asyncHandler(async (req, res) => {
+    const result = await authService.registerClinic(req.body, req.headers['user-agent']);
     res.status(201).json(result);
   }),
 );

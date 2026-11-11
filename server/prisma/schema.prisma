@@ -684,6 +684,10 @@ model Organization {
   phone     String?
   logoUrl   String?
 
+  // Documentos del autoregistro (data URI: imagen o PDF). Solo los lee el Super Admin.
+  rifDocUrl         String? // foto o PDF del RIF (obligatorio al registrarse)
+  sanitaryPermitUrl String? // permiso sanitario (opcional)
+
   verificationStatus VerificationStatus @default(PENDING)
   verifiedAt         DateTime?
 
@@ -745,6 +749,7 @@ model Clinic {
   // badge público de sucursal (deriva de la verificación del comercio)
   verificationStatus VerificationStatus @default(PENDING)
   verifiedAt         DateTime?
+  rejectionReason    String? // motivo que lee la clínica si el Super Admin rechaza su solicitud
   ratingAvg          Decimal            @default(0) @db.Decimal(3, 2)
   ratingCount        Int                @default(0)
 
