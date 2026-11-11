@@ -60,7 +60,8 @@ export default function NewConsultScreen({ navigation, route }: any) {
           const appts = await api<{ data: { id: string; status: string; pet: { id: string } }[] }>(
             `/appointments?from=${from.toISOString()}&to=${to.toISOString()}`,
           );
-          const match = appts.data.find((a) => a.pet?.id === petId && ['PENDING', 'CONFIRMED', 'IN_PROGRESS'].includes(a.status));
+          // Solo citas ya aceptadas (una solicitud sin aceptar no se concluye).
+          const match = appts.data.find((a) => a.pet?.id === petId && ['CONFIRMED', 'IN_PROGRESS'].includes(a.status));
           if (match) await api(`/appointments/${match.id}/status`, { method: 'POST', body: { status: 'COMPLETED' } });
         } catch { /* no bloquea la emisión del expediente */ }
       }

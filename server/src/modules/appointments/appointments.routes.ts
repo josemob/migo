@@ -132,9 +132,10 @@ router.patch(
 );
 
 // Transiciones válidas del ciclo de vida de una cita.
-// El vet puede "marcar concluida" desde cualquier estado activo (PENDING/CONFIRMED/IN_PROGRESS).
+// El vet puede "marcar concluida" una cita aceptada (CONFIRMED) o en atención (IN_PROGRESS).
 const TRANSITIONS: Record<string, string[]> = {
-  PENDING: ['CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW'],
+  // Una solicitud sin aceptar no se atiende ni se concluye: primero hay que aceptarla.
+  PENDING: ['CONFIRMED', 'CANCELLED', 'NO_SHOW'],
   CONFIRMED: ['IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW'],
   IN_PROGRESS: ['COMPLETED', 'CANCELLED'],
   COMPLETED: [],
@@ -164,6 +165,9 @@ router.post(
     // Ya la aceptó otro miembro del equipo (todo el equipo recibe la solicitud): mensaje claro.
     if (next === 'CONFIRMED' && appt.status !== 'PENDING') {
       throw ApiError.conflict(await alreadyHandledMessage(appt.id));
+    }
+    if (appt.status === 'PENDING' && (next === 'IN_PROGRESS' || next === 'COMPLETED')) {
+      throw ApiError.badRequest('Primero acepta la solicitud de cita: una cita sin aceptar no se puede atender ni concluir.');
     }
     const allowed = TRANSITIONS[appt.status] ?? [];
     if (!allowed.includes(next)) {
