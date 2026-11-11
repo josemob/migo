@@ -20,9 +20,14 @@ interface ReceiptDetailData {
     id: string;
     scheduledAt: string;
     service?: string | null;
+    serviceType?: string | null;
+    serviceDescription?: string | null;
+    durationMin?: number | null;
+    priceUsd?: number | null;
     status: string;
     paidInApp: boolean;
     vetName?: string | null;
+    vetRole?: string | null;
     recordId?: string | null;
     recordSigned: boolean;
     invoiceId?: string | null;
@@ -36,6 +41,13 @@ const SPECIES: Record<string, string> = {
 };
 const longDateTime = (iso: string) =>
   new Date(iso).toLocaleString('es-VE', { day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+function paymentLabel(r: ReceiptDetailData): string {
+  const m = r.paymentMethod?.trim();
+  if (r.source === 'APP' || m === 'app') return 'En la app Migo';
+  if (!m) return 'No indicado';
+  return m.charAt(0).toUpperCase() + m.slice(1);
+}
 
 function originLabel(r: ReceiptDetailData): { label: string; tone: string } {
   if (r.source === 'APP' || r.appointment?.paidInApp) return { label: 'Pagado en la app', tone: 'bg-green-100 text-green-700' };
@@ -99,9 +111,6 @@ export function ReceiptDrawer({
                 <div className="mt-1 font-heading text-4xl font-extrabold">{usd(r.amountUsd)}</div>
                 <div className="mt-3 flex flex-wrap gap-2 text-xs">
                   <span className={`rounded-full px-2.5 py-1 font-bold ${origin.tone}`}>{origin.label}</span>
-                  {r.paymentMethod && !['app', 'en el local'].includes(r.paymentMethod.toLowerCase()) && (
-                    <span className="rounded-full bg-white/15 px-2.5 py-1 font-semibold capitalize">{r.paymentMethod}</span>
-                  )}
                 </div>
               </div>
 
@@ -120,10 +129,37 @@ export function ReceiptDrawer({
               )}
 
               {r.appointment && (
-                <Section title="Cita">
-                  <Row label="Fecha" value={longDateTime(r.appointment.scheduledAt)} />
+                <Section title="Detalle del servicio">
+                  {r.appointment.serviceType && (
+                    <span className="mb-2 inline-block rounded-full bg-brand-50 px-2.5 py-1 text-xs font-bold text-migo-purple">
+                      {r.appointment.serviceType}
+                    </span>
+                  )}
                   <Row label="Servicio" value={r.appointment.service} strong />
-                  <Row label="Atendió" value={r.appointment.vetName} />
+                  {r.appointment.serviceDescription && (
+                    <p className="text-sm leading-relaxed text-slate-500">{r.appointment.serviceDescription}</p>
+                  )}
+                  <Row label="Fecha de la atención" value={longDateTime(r.appointment.scheduledAt)} />
+                  <Row label="Duración" value={r.appointment.durationMin ? `${r.appointment.durationMin} min` : null} />
+                  <Row
+                    label="Atendió"
+                    value={[r.appointment.vetName, r.appointment.vetRole].filter(Boolean).join(' · ') || null}
+                  />
+                  {/* Renglón facturado */}
+                  <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
+                    <div className="flex items-center justify-between bg-slate-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                      <span>Descripción</span>
+                      <span>Importe</span>
+                    </div>
+                    <div className="flex items-center justify-between px-4 py-3 text-sm">
+                      <span className="font-medium text-slate-700">{r.appointment.service ?? r.concept}</span>
+                      <span className="font-semibold text-slate-800">{usd(r.appointment.priceUsd ?? r.amountUsd)}</span>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-sm">
+                      <span className="font-bold text-slate-800">Total pagado</span>
+                      <span className="font-heading text-base font-extrabold text-brand-900">{usd(r.amountUsd)}</span>
+                    </div>
+                  </div>
                   {r.appointment.recordId && onOpenRecord && (
                     <button
                       type="button"
@@ -136,6 +172,10 @@ export function ReceiptDrawer({
                   )}
                 </Section>
               )}
+
+              <Section title="Pago">
+                <Row label="Método de pago" value={paymentLabel(r)} />
+              </Section>
 
               <Section title="Liquidación">
                 <Row label="Cobrado al cliente" value={usd(r.amountUsd)} />

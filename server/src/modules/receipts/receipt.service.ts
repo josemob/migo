@@ -13,6 +13,17 @@ interface IssueReceiptInput {
   amountUsd: number;
   source: 'APP' | 'MANUAL';
   paymentMethod?: string | null;
+  /** Detalle del servicio prestado (citas): va en el correo del comprobante. */
+  service?: ReceiptServiceDetail | null;
+}
+
+export interface ReceiptServiceDetail {
+  typeLabel: string; // "Peluquería y estética", "Consulta veterinaria"…
+  name: string;
+  description?: string | null;
+  durationMin?: number | null;
+  professional?: string | null; // "Dra. María Pérez · Médico veterinario"
+  dateLabel?: string | null; // fecha y hora de la cita
 }
 
 /**
@@ -54,6 +65,8 @@ export async function issueReceipt(input: IssueReceiptInput) {
       clinicName: receipt.clinic?.name ?? 'la clínica',
       dateLabel,
       petName: receipt.pet?.name ?? null,
+      paymentMethod: receipt.paymentMethod,
+      service: input.service ?? null,
     }).catch(() => {});
   }
 

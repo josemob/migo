@@ -12,6 +12,7 @@ import { sendPush } from '../push/push.service';
 import { sendAppointmentConfirmedEmail } from '../mail/mail.service';
 import { addChargeToOpenInvoice } from '../finance/invoice.service';
 import { issueReceipt, receiptNumber } from '../receipts/receipt.service';
+import { SERVICE_CATEGORY_LABEL, STAFF_POSITION_LABEL } from '../../lib/serviceLabels';
 
 const router = Router();
 router.use(authenticate, withClinicContext);
@@ -249,6 +250,16 @@ router.post(
           amountUsd: price,
           source: 'MANUAL',
           paymentMethod: 'en el local',
+          service: {
+            typeLabel: SERVICE_CATEGORY_LABEL[updated.service?.category ?? 'CONSULTATION'] ?? 'Servicio',
+            name: updated.service?.name ?? updated.reason ?? 'Consulta veterinaria',
+            description: updated.service?.description ?? null,
+            durationMin: updated.service?.durationMin ?? null,
+            professional: updated.vet
+              ? [updated.vet.user?.fullName, STAFF_POSITION_LABEL[updated.vet.position]].filter(Boolean).join(' · ')
+              : null,
+            dateLabel: formatWhen(updated.scheduledAt),
+          },
         });
         receiptLine = ` Total: $${price.toFixed(2)}. Te enviamos el comprobante ${receiptNumber(receipt.id)} a tu correo.`;
       } catch (e) {

@@ -256,23 +256,47 @@ export async function sendAppointmentConfirmedEmail(
 export async function sendOwnerReceiptEmail(
   to: string,
   name: string,
-  d: { number: string; concept: string; amountLabel: string; clinicName: string; dateLabel: string; petName?: string | null },
+  d: {
+    number: string; concept: string; amountLabel: string; clinicName: string; dateLabel: string; petName?: string | null;
+    paymentMethod?: string | null;
+    service?: {
+      typeLabel: string; name: string; description?: string | null; durationMin?: number | null;
+      professional?: string | null; dateLabel?: string | null;
+    } | null;
+  },
 ) {
   const first = name?.split(' ')[0] || '';
+  const row = (label: string, value?: string | null) =>
+    value ? `<div style="font-size:14px;color:#64748B">${label}</div><div style="font-weight:700;margin-bottom:8px">${esc(value)}</div>` : '';
+  const method = d.paymentMethod && d.paymentMethod !== 'app' ? d.paymentMethod : d.paymentMethod === 'app' ? 'En la app Migo' : null;
+  const s = d.service;
+  const serviceBlock = s
+    ? `<div style="border:1px solid #E9D5F2;border-radius:12px;padding:16px;margin:6px 0 12px">
+        <div style="font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:${BRAND};margin-bottom:10px">Detalle del servicio</div>
+        <span style="display:inline-block;background:#F5EBFA;color:${BRAND};border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;margin-bottom:10px">${esc(s.typeLabel)}</span>
+        ${row('Servicio', s.name)}
+        ${row('Descripción', s.description)}
+        ${row('Fecha de la atención', s.dateLabel)}
+        ${row('Duración', s.durationMin ? `${s.durationMin} min` : null)}
+        ${row('Atendió', s.professional)}
+      </div>`
+    : '';
   return sendEmail({
     to,
     subject: `Recibo ${d.number} · ${d.clinicName}`,
     html: layout('Recibo de tu pago',
-      p(`Hola${first ? ' ' + first : ''}, gracias por tu pago. Aquí está tu comprobante:`) +
+      p(`Hola${first ? ' ' + esc(first) : ''}, gracias por tu pago. Aquí está tu comprobante:`) +
       `<div style="background:#F5EBFA;border-radius:12px;padding:16px;margin:6px 0 12px">
-        <div style="font-size:14px;color:#64748B">Recibo</div><div style="font-weight:700;margin-bottom:8px">${d.number}</div>
-        <div style="font-size:14px;color:#64748B">Concepto</div><div style="font-weight:700;margin-bottom:8px">${d.concept}</div>
-        ${d.petName ? `<div style="font-size:14px;color:#64748B">Mascota</div><div style="font-weight:700;margin-bottom:8px">${d.petName}</div>` : ''}
-        <div style="font-size:14px;color:#64748B">Clínica</div><div style="font-weight:700;margin-bottom:8px">${d.clinicName}</div>
-        <div style="font-size:14px;color:#64748B">Fecha</div><div style="font-weight:700;margin-bottom:8px">${d.dateLabel}</div>
-        <div style="font-size:14px;color:#64748B">Total pagado</div><div style="font-weight:800;font-size:18px;color:${BRAND}">${d.amountLabel}</div>
+        ${row('Recibo', d.number)}
+        ${row('Concepto', d.concept)}
+        ${row('Mascota', d.petName)}
+        ${row('Clínica', d.clinicName)}
+        ${row('Fecha', d.dateLabel)}
+        ${row('Método de pago', method)}
+        <div style="font-size:14px;color:#64748B">Total pagado</div><div style="font-weight:800;font-size:18px;color:${BRAND}">${esc(d.amountLabel)}</div>
       </div>` +
-      p('Puedes ver y descargar este recibo desde la app Migo. ¡Gracias por confiar en nosotros! 💜')),
+      serviceBlock +
+      p('¡Gracias por confiar en nosotros! 💜')),
   });
 }
 

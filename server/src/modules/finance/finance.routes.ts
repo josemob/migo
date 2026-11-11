@@ -8,6 +8,7 @@ import { withClinicContext } from '../../middleware/clinicContext';
 import { sendInvoiceReceiptEmail } from '../mail/mail.service';
 import { issueReceipt, receiptNumber } from '../receipts/receipt.service';
 import { closeFinishedInvoices } from './invoice.service';
+import { SERVICE_CATEGORY_LABEL, STAFF_POSITION_LABEL } from '../../lib/serviceLabels';
 import { ApiError } from '../../utils/ApiError';
 
 const router = Router();
@@ -385,9 +386,9 @@ router.get(
       ? await prisma.appointment.findUnique({
           where: { id: r.appointmentId },
           select: {
-            id: true, scheduledAt: true, reason: true, status: true, paidInApp: true,
-            service: { select: { name: true } },
-            vet: { select: { user: { select: { fullName: true } } } },
+            id: true, scheduledAt: true, reason: true, status: true, paidInApp: true, priceUsd: true,
+            service: { select: { name: true, category: true, description: true, durationMin: true } },
+            vet: { select: { position: true, user: { select: { fullName: true } } } },
             ledgerEntry: { select: { migoFeeUsd: true, invoiceId: true } },
             record: { select: { id: true, signedAt: true } },
           },
@@ -411,9 +412,14 @@ router.get(
         id: appt.id,
         scheduledAt: appt.scheduledAt,
         service: appt.service?.name ?? appt.reason ?? null,
+        serviceType: SERVICE_CATEGORY_LABEL[appt.service?.category ?? 'CONSULTATION'] ?? 'Servicio',
+        serviceDescription: appt.service?.description ?? null,
+        durationMin: appt.service?.durationMin ?? null,
+        priceUsd: appt.priceUsd != null ? Number(appt.priceUsd) : null,
         status: appt.status,
         paidInApp: appt.paidInApp,
         vetName: appt.vet?.user.fullName ?? null,
+        vetRole: appt.vet ? STAFF_POSITION_LABEL[appt.vet.position] ?? null : null,
         recordId: appt.record?.id ?? null,
         recordSigned: !!appt.record?.signedAt,
         invoiceId: appt.ledgerEntry?.invoiceId ?? null,
