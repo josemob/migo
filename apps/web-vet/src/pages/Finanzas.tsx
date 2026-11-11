@@ -5,6 +5,8 @@ import { usd, date } from '../lib/format';
 import { Card, PageHeader, SectionTitle, Spinner, Badge, ErrorNote } from '../components/ui';
 import { Modal, Field } from '../components/Modal';
 import { Icon } from '../components/Icon';
+import { ReceiptDrawer } from '../components/ReceiptDetail';
+import { RecordDrawer } from '../components/RecordDetail';
 
 interface FinanceSummary {
   monthlyRevenueUsd: number;
@@ -113,6 +115,9 @@ export default function Finanzas() {
 
   const [payId, setPayId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  // ?recibo=<id> abre directamente el comprobante de ese cliente.
+  const [receiptId, setReceiptId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('recibo'));
+  const [recordId, setRecordId] = useState<string | null>(null);
   const [reference, setReference] = useState('');
   const [editSettlement, setEditSettlement] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
@@ -343,7 +348,7 @@ export default function Finanzas() {
                 <tr><td colSpan={6} className="py-6 text-center text-slate-400">Aún no hay recibos emitidos.</td></tr>
               )}
               {receipts.data?.data.map((r) => (
-                <tr key={r.id} className="border-b border-slate-50">
+                <tr key={r.id} onClick={() => setReceiptId(r.id)} className="cursor-pointer border-b border-slate-50 hover:bg-slate-50">
                   <td className="py-3 font-mono text-xs text-slate-500">{r.number}</td>
                   <td className="py-3 text-slate-500">{date(r.issuedAt)}</td>
                   <td className="py-3 font-semibold text-slate-800">{r.ownerName ?? '—'}{r.petName && <span className="font-normal text-slate-400"> · {r.petName}</span>}</td>
@@ -359,6 +364,12 @@ export default function Finanzas() {
 
       {/* Modal: registrar pago de factura */}
       <InvoiceDetail id={detailId} onClose={() => setDetailId(null)} />
+      <ReceiptDrawer
+        receiptId={receiptId}
+        onClose={() => setReceiptId(null)}
+        onOpenRecord={(id) => { setReceiptId(null); setRecordId(id); }}
+      />
+      <RecordDrawer recordId={recordId} onClose={() => setRecordId(null)} />
 
       <Modal
         open={!!payId}

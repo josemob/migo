@@ -364,4 +364,64 @@ router.get(
   }),
 );
 
+// GET /finance/receipts/:id -> comprobante completo de un cliente atendido:
+// cliente, mascota, cita (servicio, veterinario), monto, comisión Migo y neto de la clínica.
+router.get(
+  '/receipts/:id',
+  validate({ params: z.object({ id: z.string().uuid() }) }),
+  asyncHandler(async (req, res) => {
+    const r = await prisma.receipt.findFirst({
+      where: { id: req.params.id as string, clinicId: req.clinicId! },
+      include: {
+        owner: { select: { fullName: true, nationalId: true, phone: true, email: true } },
+        pet: { select: { name: true, breed: true, species: true } },
+        clinic: { select: { name: true } },
+      },
+    });
+    if (!r) throw ApiError.notFound('Recibo no encontrado');
+
+    // La cita (si el recibo viene de una) con su comisión e informe de consulta
+    const appt = r.appointmentId
+      ? await prisma.appointment.findUnique({
+          where: { id: r.appointmentId },
+          select: {
+            id: true, scheduledAt: true, reason: true, status: true, paidInApp: true,
+            service: { select: { name: true } },
+            vet: { select: { user: { select: { fullName: true } } } },
+            ledgerEntry: { select: { migoFeeUsd: true, invoiceId: true } },
+            record: { select: { id: true, signedAt: true } },
+          },
+        })
+      : null;
+
+    const amount = Number(r.amountUsd);
+    const migoFee = appt?.ledgerEntry ? Number(appt.ledgerEntry.migoFeeUsd) : null;
+    res.json({
+      id: r.id,
+      number: receiptNumber(r.id),
+      issuedAt: r.issuedAt,
+      concept: r.concept,
+      amountUsd: amount,
+      source: r.source,
+      paymentMethod: r.paymentMethod,
+      clinicName: r.clinic?.name ?? null,
+      owner: r.owner,
+      pet: r.pet,
+      appointment: appt && {
+        id: appt.id,
+        scheduledAt: appt.scheduledAt,
+        service: appt.service?.name ?? appt.reason ?? null,
+        status: appt.status,
+        paidInApp: appt.paidInApp,
+        vetName: appt.vet?.user.fullName ?? null,
+        recordId: appt.record?.id ?? null,
+        recordSigned: !!appt.record?.signedAt,
+        invoiceId: appt.ledgerEntry?.invoiceId ?? null,
+      },
+      migoFeeUsd: migoFee,
+      netUsd: migoFee != null ? Number((amount - migoFee).toFixed(2)) : amount,
+    });
+  }),
+);
+
 export default router;
