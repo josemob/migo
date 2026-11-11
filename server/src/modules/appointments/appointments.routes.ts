@@ -230,6 +230,22 @@ router.post(
         });
         if (!appt.paidInApp) await addChargeToOpenInvoice(tx, entry.id, req.clinicId!);
       }
+
+      // "Emitir consulta" en la app Vet crea el expediente y DESPUÉS concluye la cita, sin
+      // vincularlos. Al concluir, se vincula el expediente de hoy de esa mascota en esta
+      // clínica (el más reciente sin cita) para que el comprobante enlace el informe.
+      if (next === 'COMPLETED') {
+        const dayStart = new Date(Date.now() - 12 * 3600 * 1000);
+        const orphan = await tx.medicalRecord.findFirst({
+          where: { petId: appt.petId, clinicId: req.clinicId!, appointmentId: null, createdAt: { gte: dayStart } },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true },
+        });
+        const already = await tx.medicalRecord.findUnique({ where: { appointmentId: appt.id }, select: { id: true } });
+        if (orphan && !already) {
+          await tx.medicalRecord.update({ where: { id: orphan.id }, data: { appointmentId: appt.id } });
+        }
+      }
       return result;
     });
     // Otro miembro del equipo la movió entre la lectura y la escritura.
