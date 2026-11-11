@@ -4,6 +4,7 @@ import { prisma } from './config/prisma';
 import { expireStaleEmergencies } from './modules/emergencies/emergency.service';
 import { resetExpiredUnavailability } from './modules/clinics/availability.service';
 import { expirePendingAppointments } from './modules/appointments/appointment.service';
+import { closeFinishedInvoices } from './modules/finance/invoice.service';
 
 const server = app.listen(env.PORT, () => {
   console.log(`🐾 Migo API escuchando en http://localhost:${env.PORT} (${env.NODE_ENV})`);
@@ -41,11 +42,24 @@ const appointmentSweep = setInterval(() => {
 }, 60_000);
 appointmentSweep.unref?.();
 
+// Cierre de mes: las facturas Migo abiertas de meses ya terminados pasan a emitidas.
+// Cada hora y al arrancar (Render free se duerme; GET /finance/invoices también lo dispara).
+const runInvoiceClose = () =>
+  closeFinishedInvoices()
+    .then((n) => {
+      if (n > 0) console.log(`[finance] ${n} factura(s) del mes cerradas y emitidas`);
+    })
+    .catch((e) => console.error('[finance] cierre de facturas falló', e instanceof Error ? e.message : e));
+const invoiceSweep = setInterval(runInvoiceClose, 60 * 60_000);
+invoiceSweep.unref?.();
+void runInvoiceClose();
+
 const shutdown = async (signal: string) => {
   console.log(`\n${signal} recibido, cerrando...`);
   clearInterval(emergencySweep);
   clearInterval(availabilitySweep);
   clearInterval(appointmentSweep);
+  clearInterval(invoiceSweep);
   server.close(async () => {
     await prisma.$disconnect();
     process.exit(0);

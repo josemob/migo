@@ -10,6 +10,7 @@ import { env } from '../../config/env';
 import { verifyAccessToken } from '../../utils/jwt';
 import { bus, EMERGENCY_NEW, EMERGENCY_UPDATE, type EmergencyEvent } from '../../lib/events';
 import { emergencyService, expireStaleEmergencies } from './emergency.service';
+import { addChargeToOpenInvoice } from '../finance/invoice.service';
 
 const router = Router();
 
@@ -270,6 +271,8 @@ router.post(
       const ledger = await tx.ledgerEntry.create({
         data: { type: 'CPL', status: 'PENDING', clinicId: req.clinicId!, emergencyId: emergency.id, grossUsd: 0, migoFeeUsd: env.CPL_FEE_USD },
       });
+      // El CPL se suma a la factura abierta del mes de la clínica.
+      await addChargeToOpenInvoice(tx, ledger.id, req.clinicId!);
       if (hasClinical) {
         const record = await tx.medicalRecord.create({
           data: {

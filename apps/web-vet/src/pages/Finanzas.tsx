@@ -31,6 +31,17 @@ interface Invoice {
   dueAt?: string | null;
   paidAt?: string | null;
   reference?: string | null;
+  chargeCount?: number;
+}
+interface InvoiceLine {
+  id: string;
+  type: string;
+  date: string;
+  concept: string;
+  petName?: string | null;
+  ownerName?: string | null;
+  serviceUsd?: number | null;
+  migoFeeUsd: number;
 }
 interface Payout {
   id: string;
@@ -101,6 +112,7 @@ export default function Finanzas() {
   const receipts = useQuery({ queryKey: ['clinic-receipts'], queryFn: () => api<{ data: ReceiptRow[] }>('/finance/receipts') });
 
   const [payId, setPayId] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [reference, setReference] = useState('');
   const [editSettlement, setEditSettlement] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
@@ -145,16 +157,20 @@ export default function Finanzas() {
         </div>
       )}
 
-      {/* Facturas de Migo (CPL + plan) */}
+      {/* Facturas de Migo: una por mes; cada servicio concluido con costo suma un renglón */}
       <Card className="mb-6">
         <SectionTitle>Facturas de Migo</SectionTitle>
+        <p className="-mt-2 mb-4 text-sm text-slate-500">
+          Cada cita concluida con costo y cada urgencia atendida suma su cargo a la factura del mes. El día 1 se emite
+          con vencimiento a 10 días.
+        </p>
         {invoices.isLoading && <Spinner className="mx-auto my-6" />}
         {invoices.error && <ErrorNote error={invoices.error} />}
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 text-left text-slate-400">
               <th className="pb-2 font-medium">Período</th>
-              <th className="pb-2 font-medium">Leads</th>
+              <th className="pb-2 font-medium">Servicios</th>
               <th className="pb-2 font-medium">Vence</th>
               <th className="pb-2 font-medium">Estado</th>
               <th className="pb-2 text-right font-medium">Total</th>
@@ -165,29 +181,30 @@ export default function Finanzas() {
             {invoices.data?.data.length === 0 && (
               <tr>
                 <td colSpan={6} className="py-6 text-center text-slate-400">
-                  Aún no tienes facturas emitidas por Migo.
+                  Aún no hay cargos. La factura del mes aparece con el primer servicio concluido con costo.
                 </td>
               </tr>
             )}
             {invoices.data?.data.map((inv) => (
-              <tr key={inv.id} className="border-b border-slate-50">
-                <td className="py-3 text-slate-600">
-                  {date(inv.periodStart)} – {date(inv.periodEnd)}
-                </td>
-                <td className="py-3 text-slate-500">{inv.leadCount}</td>
+              <tr key={inv.id} onClick={() => setDetailId(inv.id)} className="cursor-pointer border-b border-slate-50 hover:bg-slate-50">
+                <td className="py-3 font-semibold capitalize text-slate-700">{monthLabel(inv.periodStart)}</td>
+                <td className="py-3 text-slate-500">{inv.chargeCount ?? inv.leadCount}</td>
                 <td className="py-3 text-slate-500">{inv.dueAt ? date(inv.dueAt) : '—'}</td>
                 <td className="py-3">
                   <Badge tone={INVOICE_TONE[inv.status]}>{INVOICE_LABEL[inv.status]}</Badge>
                 </td>
                 <td className="py-3 text-right font-bold text-slate-800">{usd(Number(inv.totalUsd))}</td>
-                <td className="py-3 text-right">
-                  {inv.status === 'ISSUED' || inv.status === 'OVERDUE' ? (
-                    <button className="btn-primary px-3 py-1.5 text-xs" onClick={() => setPayId(inv.id)}>
-                      Registrar pago
+                <td className="py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center justify-end gap-2">
+                    <button className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-migo-purple hover:bg-brand-50" onClick={() => setDetailId(inv.id)}>
+                      Ver detalle
                     </button>
-                  ) : (
-                    <span className="text-slate-300">—</span>
-                  )}
+                    {(inv.status === 'ISSUED' || inv.status === 'OVERDUE') && (
+                      <button className="btn-primary px-3 py-1.5 text-xs" onClick={() => setPayId(inv.id)}>
+                        Registrar pago
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -341,6 +358,8 @@ export default function Finanzas() {
       </Card>
 
       {/* Modal: registrar pago de factura */}
+      <InvoiceDetail id={detailId} onClose={() => setDetailId(null)} />
+
       <Modal
         open={!!payId}
         onClose={() => setPayId(null)}
@@ -525,5 +544,97 @@ function SettlementModal({ open, onClose, current }: { open: boolean; onClose: (
         Pago C2P interbancario habilitado
       </label>
     </Modal>
+  );
+}
+
+const monthLabel = (iso: string) =>
+  new Date(iso).toLocaleDateString('es-VE', { timeZone: 'America/Caracas', month: 'long', year: 'numeric' });
+
+/** Detalle de una factura Migo: un renglón por servicio cobrado. */
+function InvoiceDetail({ id, onClose }: { id: string | null; onClose: () => void }) {
+  const q = useQuery({
+    queryKey: ['finance-invoice', id],
+    queryFn: () => api<Invoice & { lines: InvoiceLine[] }>(`/finance/invoices/${id}`),
+    enabled: !!id,
+  });
+  if (!id) return null;
+  const inv = q.data;
+  const fees = inv?.lines.filter((l) => l.type !== 'CPL') ?? [];
+  const cpls = inv?.lines.filter((l) => l.type === 'CPL') ?? [];
+  const sum = (ls: InvoiceLine[]) => ls.reduce((acc, l) => acc + l.migoFeeUsd, 0);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={onClose}>
+      <div className="flex max-h-[88vh] w-full max-w-3xl flex-col rounded-card bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between border-b border-slate-100 px-6 py-4">
+          <div>
+            <h3 className="text-lg font-bold text-migo-heading">
+              Factura de <span className="capitalize">{inv ? monthLabel(inv.periodStart) : '…'}</span>
+            </h3>
+            {inv && (
+              <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+                <span>N.º {inv.id.slice(0, 8).toUpperCase()}</span>
+                <Badge tone={INVOICE_TONE[inv.status]}>{INVOICE_LABEL[inv.status]}</Badge>
+                <span>{inv.dueAt ? `Vence ${date(inv.dueAt)}` : inv.status === 'OPEN' ? 'Se emite el día 1 del próximo mes' : ''}</span>
+              </p>
+            )}
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">✕</button>
+        </div>
+        <div className="overflow-y-auto px-6 py-5">
+          {q.isLoading && <Spinner className="mx-auto my-6" />}
+          {q.error && <ErrorNote error={q.error} />}
+          {inv && (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 text-left text-slate-400">
+                  <th className="pb-2 font-medium">Fecha</th>
+                  <th className="pb-2 font-medium">Servicio</th>
+                  <th className="pb-2 font-medium">Paciente</th>
+                  <th className="pb-2 text-right font-medium">Cobrado</th>
+                  <th className="pb-2 text-right font-medium">Cargo Migo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inv.lines.length === 0 && (
+                  <tr><td colSpan={5} className="py-6 text-center text-slate-400">Sin cargos.</td></tr>
+                )}
+                {inv.lines.map((l) => (
+                  <tr key={l.id} className="border-b border-slate-50">
+                    <td className="py-2.5 text-slate-500">{date(l.date)}</td>
+                    <td className="py-2.5 font-medium text-slate-700">{l.concept}</td>
+                    <td className="py-2.5 text-slate-500">
+                      {l.petName ?? '—'}
+                      {l.ownerName ? <span className="text-slate-400"> · {l.ownerName}</span> : null}
+                    </td>
+                    <td className="py-2.5 text-right text-slate-500">{l.serviceUsd != null ? usd(l.serviceUsd) : '—'}</td>
+                    <td className="py-2.5 text-right font-semibold text-slate-800">{usd(l.migoFeeUsd)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        {inv && (
+          <div className="space-y-1 border-t border-slate-100 px-6 py-4 text-sm">
+            {fees.length > 0 && (
+              <div className="flex justify-between text-slate-500">
+                <span>Comisiones por citas ({fees.length})</span>
+                <span>{usd(sum(fees))}</span>
+              </div>
+            )}
+            {cpls.length > 0 && (
+              <div className="flex justify-between text-slate-500">
+                <span>Urgencias atendidas – CPL ({cpls.length})</span>
+                <span>{usd(sum(cpls))}</span>
+              </div>
+            )}
+            <div className="flex justify-between pt-1 text-base font-bold text-slate-900">
+              <span>Total</span>
+              <span>{usd(Number(inv.totalUsd))}</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

@@ -10,6 +10,8 @@ import { ApiError } from '../../utils/ApiError';
 import { env } from '../../config/env';
 import { sendPush } from '../push/push.service';
 import { sendAppointmentConfirmedEmail } from '../mail/mail.service';
+import { addChargeToOpenInvoice } from '../finance/invoice.service';
+import { issueReceipt, receiptNumber } from '../receipts/receipt.service';
 
 const router = Router();
 router.use(authenticate, withClinicContext);
@@ -203,8 +205,10 @@ router.post(
       if (count === 0) return null;
       const result = await tx.appointment.findUniqueOrThrow({ where: { id: appt.id }, include: detailInclude });
 
-      // Al completar una cita pagada en la app, Migo registra su comisión
-      if (req.body.status === 'COMPLETED' && appt.paidInApp && appt.priceUsd) {
+      // Toda cita concluida con costo genera la comisión de Migo (tasa del plan de la clínica).
+      //  - pagada en la app: Migo ya la retuvo (va a la liquidación).
+      //  - pagada en el local: se suma a la factura abierta del mes de la clínica.
+      if (next === 'COMPLETED' && appt.priceUsd && Number(appt.priceUsd) > 0) {
         const gross = Number(appt.priceUsd);
         const clinic = await tx.clinic.findUnique({
           where: { id: req.clinicId! },
@@ -213,20 +217,44 @@ router.post(
         const rate = clinic?.bookingCommissionRate
           ? Number(clinic.bookingCommissionRate)
           : env.BOOKING_COMMISSION_RATE;
-        await tx.ledgerEntry.create({
+        const entry = await tx.ledgerEntry.create({
           data: {
             type: 'BOOKING_COMMISSION',
             clinicId: req.clinicId!,
             appointmentId: appt.id,
             grossUsd: gross,
             migoFeeUsd: Number((gross * rate).toFixed(2)),
+            notes: appt.paidInApp ? 'Pagada en la app' : 'Pagada en el local',
           },
         });
+        if (!appt.paidInApp) await addChargeToOpenInvoice(tx, entry.id, req.clinicId!);
       }
       return result;
     });
     // Otro miembro del equipo la movió entre la lectura y la escritura.
     if (!updated) throw ApiError.conflict(await alreadyHandledMessage(appt.id));
+
+    // Cita concluida con costo y pagada en el local: comprobante al dueño (correo +
+    // notificación). Si pagó en la app, el recibo ya se emitió al reservar.
+    let receiptLine = '';
+    const price = updated.priceUsd ? Number(updated.priceUsd) : 0;
+    if (next === 'COMPLETED' && price > 0 && !updated.paidInApp && updated.pet?.owner?.id) {
+      try {
+        const receipt = await issueReceipt({
+          clinicId: req.clinicId!,
+          ownerId: updated.pet.owner.id,
+          petId: updated.petId,
+          appointmentId: updated.id,
+          concept: updated.service?.name ?? updated.reason ?? 'Consulta veterinaria',
+          amountUsd: price,
+          source: 'MANUAL',
+          paymentMethod: 'en el local',
+        });
+        receiptLine = ` Total: $${price.toFixed(2)}. Te enviamos el comprobante ${receiptNumber(receipt.id)} a tu correo.`;
+      } catch (e) {
+        console.error('[appointments] no se pudo emitir el comprobante', e instanceof Error ? e.message : e);
+      }
+    }
 
     // Notifica al dueño el cambio de estado (no bloquea la respuesta)
     const ownerId = updated.pet?.owner?.id;
@@ -242,7 +270,9 @@ router.post(
           body: `${updated.clinic?.name ?? 'La clínica'} confirmó la cita de ${petName} para el ${when}`,
         },
         IN_PROGRESS: { title: 'En atención 🩺', body: `${petName} está siendo atendido(a) ahora.` },
-        COMPLETED: { title: '¡Cita completada! 🎉', body: `La cita de ${petName} finalizó. Cuéntanos cómo te fue y califícala.` },
+        COMPLETED: receiptLine
+          ? { title: '¡Cita completada! 🧾', body: `La cita de ${petName} finalizó.${receiptLine}` }
+          : { title: '¡Cita completada! 🎉', body: `La cita de ${petName} finalizó. Cuéntanos cómo te fue y califícala.` },
         CANCELLED: rejecting
           ? { title: 'La clínica no pudo aceptar tu cita', body: `${petName} (${when}).${reasonTxt} Puedes elegir otro horario.` }
           : { title: 'Cita cancelada', body: `La cita de ${petName} (${when}) fue cancelada.${reasonTxt}` },

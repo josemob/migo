@@ -7,6 +7,8 @@ import { authenticate, requireRole } from '../../middleware/auth';
 import { withClinicContext } from '../../middleware/clinicContext';
 import { sendInvoiceReceiptEmail } from '../mail/mail.service';
 import { issueReceipt, receiptNumber } from '../receipts/receipt.service';
+import { closeFinishedInvoices } from './invoice.service';
+import { ApiError } from '../../utils/ApiError';
 
 const router = Router();
 router.use(authenticate, withClinicContext);
@@ -90,11 +92,65 @@ router.get(
 router.get(
   '/invoices',
   asyncHandler(async (req, res) => {
+    // Si el mes ya terminó, la factura abierta pasa a emitida antes de mostrarla
+    // (el barrido horario puede no haber corrido si el servidor estaba dormido).
+    await closeFinishedInvoices().catch(() => 0);
     const invoices = await prisma.invoice.findMany({
       where: { clinicId: req.clinicId! },
       orderBy: { periodStart: 'desc' },
+      include: { _count: { select: { ledgerEntries: true } } },
     });
-    res.json({ data: invoices });
+    res.json({
+      data: invoices.map(({ _count, ...inv }) => ({ ...inv, chargeCount: _count.ledgerEntries })),
+    });
+  }),
+);
+
+// GET /finance/invoices/:id -> detalle: un renglón por servicio cobrado (cita o urgencia)
+router.get(
+  '/invoices/:id',
+  validate({ params: z.object({ id: z.string().uuid() }) }),
+  asyncHandler(async (req, res) => {
+    const invoice = await prisma.invoice.findFirst({
+      where: { id: req.params.id as string, clinicId: req.clinicId! },
+      include: {
+        ledgerEntries: {
+          orderBy: { createdAt: 'asc' },
+          select: {
+            id: true, type: true, grossUsd: true, migoFeeUsd: true, createdAt: true,
+            appointment: {
+              select: {
+                scheduledAt: true, reason: true,
+                service: { select: { name: true } },
+                pet: { select: { name: true, owner: { select: { fullName: true } } } },
+              },
+            },
+            emergency: {
+              select: { createdAt: true, pet: { select: { name: true, owner: { select: { fullName: true } } } } },
+            },
+          },
+        },
+      },
+    });
+    if (!invoice) throw ApiError.notFound('Factura no encontrada');
+    const lines = invoice.ledgerEntries.map((e) => {
+      const isCpl = e.type === 'CPL';
+      const pet = isCpl ? e.emergency?.pet : e.appointment?.pet;
+      return {
+        id: e.id,
+        type: e.type,
+        date: (isCpl ? e.emergency?.createdAt : e.appointment?.scheduledAt) ?? e.createdAt,
+        concept: isCpl
+          ? 'Urgencia atendida (CPL)'
+          : e.appointment?.service?.name ?? e.appointment?.reason ?? 'Cita',
+        petName: pet?.name ?? null,
+        ownerName: pet?.owner?.fullName ?? null,
+        serviceUsd: isCpl ? null : Number(e.grossUsd),
+        migoFeeUsd: Number(e.migoFeeUsd),
+      };
+    });
+    const { ledgerEntries: _omit, ...rest } = invoice;
+    res.json({ ...rest, lines });
   }),
 );
 
@@ -158,6 +214,15 @@ router.post(
   }),
   asyncHandler(async (req, res) => {
     const clinicId = req.clinicId!;
+    // Solo facturas de esta clínica y ya emitidas (la del mes en curso sigue abierta).
+    const current = await prisma.invoice.findFirst({
+      where: { id: req.params.id as string, clinicId },
+      select: { status: true },
+    });
+    if (!current) throw ApiError.notFound('Factura no encontrada');
+    if (current.status !== 'ISSUED' && current.status !== 'OVERDUE') {
+      throw ApiError.conflict(current.status === 'OPEN' ? 'La factura del mes en curso aún está abierta.' : 'Esta factura ya fue pagada.');
+    }
     const invoice = await prisma.$transaction(async (tx) => {
       const inv = await tx.invoice.update({
         where: { id: req.params.id },
