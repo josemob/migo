@@ -162,6 +162,44 @@ export default function Finanzas() {
         </div>
       )}
 
+      {/* Recibos a clientes (dueños) */}
+      <Card className="mb-6">
+        <div className="mb-2 flex items-center justify-between">
+          <SectionTitle>Recibos a clientes</SectionTitle>
+          <button className="btn-primary" onClick={() => setShowReceipt(true)}>+ Emitir recibo</button>
+        </div>
+        <p className="mb-3 text-sm text-slate-500">Comprobantes emitidos al dueño (automáticos por pago en la app y manuales). Se envían por correo.</p>
+        {receipts.isLoading ? <Spinner className="mx-auto my-6" /> : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 text-left text-slate-400">
+                <th className="pb-2 font-medium">Nº</th>
+                <th className="pb-2 font-medium">Fecha</th>
+                <th className="pb-2 font-medium">Cliente</th>
+                <th className="pb-2 font-medium">Concepto</th>
+                <th className="pb-2 font-medium">Origen</th>
+                <th className="pb-2 text-right font-medium">Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              {receipts.data?.data.length === 0 && (
+                <tr><td colSpan={6} className="py-6 text-center text-slate-400">Aún no hay recibos emitidos.</td></tr>
+              )}
+              {receipts.data?.data.map((r) => (
+                <tr key={r.id} onClick={() => setReceiptId(r.id)} className="cursor-pointer border-b border-slate-50 hover:bg-slate-50">
+                  <td className="py-3 font-mono text-xs text-slate-500">{r.number}</td>
+                  <td className="py-3 text-slate-500">{date(r.issuedAt)}</td>
+                  <td className="py-3 font-semibold text-slate-800">{r.ownerName ?? '—'}{r.petName && <span className="font-normal text-slate-400"> · {r.petName}</span>}</td>
+                  <td className="py-3 text-slate-500">{r.concept}</td>
+                  <td className="py-3"><Badge tone={r.source === 'APP' ? 'green' : 'slate'}>{r.source === 'APP' ? 'App' : 'Manual'}</Badge></td>
+                  <td className="py-3 text-right font-bold text-migo-purple">{usd(r.amountUsd)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+
       {/* Facturas de Migo: una por mes; cada servicio concluido con costo suma un renglón */}
       <Card className="mb-6">
         <SectionTitle>Facturas de Migo</SectionTitle>
@@ -322,44 +360,6 @@ export default function Finanzas() {
             ))}
           </tbody>
         </table>
-      </Card>
-
-      {/* Recibos a clientes (dueños) */}
-      <Card className="mt-6">
-        <div className="mb-2 flex items-center justify-between">
-          <SectionTitle>Recibos a clientes</SectionTitle>
-          <button className="btn-primary" onClick={() => setShowReceipt(true)}>+ Emitir recibo</button>
-        </div>
-        <p className="mb-3 text-sm text-slate-500">Comprobantes emitidos al dueño (automáticos por pago en la app y manuales). Se envían por correo.</p>
-        {receipts.isLoading ? <Spinner className="mx-auto my-6" /> : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-100 text-left text-slate-400">
-                <th className="pb-2 font-medium">Nº</th>
-                <th className="pb-2 font-medium">Fecha</th>
-                <th className="pb-2 font-medium">Cliente</th>
-                <th className="pb-2 font-medium">Concepto</th>
-                <th className="pb-2 font-medium">Origen</th>
-                <th className="pb-2 text-right font-medium">Monto</th>
-              </tr>
-            </thead>
-            <tbody>
-              {receipts.data?.data.length === 0 && (
-                <tr><td colSpan={6} className="py-6 text-center text-slate-400">Aún no hay recibos emitidos.</td></tr>
-              )}
-              {receipts.data?.data.map((r) => (
-                <tr key={r.id} onClick={() => setReceiptId(r.id)} className="cursor-pointer border-b border-slate-50 hover:bg-slate-50">
-                  <td className="py-3 font-mono text-xs text-slate-500">{r.number}</td>
-                  <td className="py-3 text-slate-500">{date(r.issuedAt)}</td>
-                  <td className="py-3 font-semibold text-slate-800">{r.ownerName ?? '—'}{r.petName && <span className="font-normal text-slate-400"> · {r.petName}</span>}</td>
-                  <td className="py-3 text-slate-500">{r.concept}</td>
-                  <td className="py-3"><Badge tone={r.source === 'APP' ? 'green' : 'slate'}>{r.source === 'APP' ? 'App' : 'Manual'}</Badge></td>
-                  <td className="py-3 text-right font-bold text-migo-purple">{usd(r.amountUsd)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
       </Card>
 
       {/* Modal: registrar pago de factura */}
