@@ -9,7 +9,18 @@ export function mailConfigured(): boolean {
   return !!env.RESEND_API_KEY;
 }
 
-export async function sendEmail(params: { to: string | string[]; subject: string; html: string }): Promise<boolean> {
+export interface MailAttachment {
+  filename: string;
+  /** Contenido en base64. */
+  content: string;
+}
+
+export async function sendEmail(params: {
+  to: string | string[];
+  subject: string;
+  html: string;
+  attachments?: MailAttachment[];
+}): Promise<boolean> {
   if (!mailConfigured()) {
     console.log('[mail] RESEND_API_KEY no configurada — se omite el envío a', params.to);
     return false;
@@ -21,7 +32,13 @@ export async function sendEmail(params: { to: string | string[]; subject: string
         Authorization: `Bearer ${env.RESEND_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ from: env.MAIL_FROM, to: params.to, subject: params.subject, html: params.html }),
+      body: JSON.stringify({
+        from: env.MAIL_FROM,
+        to: params.to,
+        subject: params.subject,
+        html: params.html,
+        ...(params.attachments?.length ? { attachments: params.attachments } : {}),
+      }),
     });
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
@@ -109,6 +126,38 @@ function esc(s: string): string {
 
 const button = (href: string, label: string) =>
   `<div style="text-align:center;margin:20px 0 8px"><a href="${href}" style="display:inline-block;background:${BRAND};color:#fff;text-decoration:none;font-weight:700;border-radius:999px;padding:12px 26px">${label}</a></div>`;
+
+// ── Informe de consulta (expediente firmado, PDF adjunto) ─────────────
+
+export async function sendRecordReportEmail(
+  to: string,
+  d: {
+    petName: string; clinicName: string; dateLabel: string; reason?: string | null; diagnosis?: string | null;
+    vetName?: string | null; message?: string; isOwner: boolean; ownerName: string; attachment: MailAttachment;
+  },
+) {
+  const first = d.ownerName?.split(' ')[0] || '';
+  const greeting = d.isOwner
+    ? `Hola${first ? ' ' + esc(first) : ''}, ${esc(d.clinicName)} te envía el informe de la consulta de <b>${esc(d.petName)}</b>.`
+    : `${esc(d.clinicName)} te comparte el informe de consulta de <b>${esc(d.petName)}</b> (tutor: ${esc(d.ownerName)}).`;
+  const row = (label: string, value?: string | null) =>
+    value ? `<div style="font-size:13px;color:#64748B">${label}</div><div style="font-weight:700;margin-bottom:8px">${esc(value)}</div>` : '';
+  return sendEmail({
+    to,
+    subject: `Informe de consulta de ${d.petName} · ${d.clinicName}`,
+    html: layout(`Informe de consulta de ${esc(d.petName)}`,
+      p(greeting) +
+      (d.message ? `<div style="border-left:3px solid ${BRAND};padding:6px 12px;margin:0 0 12px;color:#334155;font-size:14px;white-space:pre-line">${esc(d.message)}</div>` : '') +
+      `<div style="background:#F5EBFA;border-radius:12px;padding:16px;margin:6px 0 12px">
+        ${row('Fecha', d.dateLabel)}
+        ${row('Motivo', d.reason)}
+        ${row('Diagnóstico', d.diagnosis)}
+        ${row('Firmado por', d.vetName)}
+      </div>` +
+      p('El informe completo, con el tratamiento y el récipe, va adjunto en PDF.')),
+    attachments: [d.attachment],
+  });
+}
 
 // ── Registro de clínicas ──────────────────────────────────────────────
 

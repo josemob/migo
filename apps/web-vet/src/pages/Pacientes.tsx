@@ -1,8 +1,12 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '../lib/auth';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { date } from '../lib/format';
 import { Card, PageHeader, SectionTitle, Spinner, Badge, ErrorNote } from '../components/ui';
+import { Icon } from '../components/Icon';
+import { RecordDrawer } from '../components/RecordDetail';
 
 interface PetRow {
   id: string;
@@ -22,7 +26,7 @@ interface Ficha {
   conditions: { name: string }[];
   vaccinations: { vaccineName: string; nextDueAt?: string; kind?: 'VACCINE' | 'DEWORMING'; recordedByOwner?: boolean }[];
   prescriptions: { drug: string; frequency?: string; durationDays?: number }[];
-  records: { id: string; visitedAt: string; reason?: string; diagnosis?: string }[];
+  records: { id: string; visitedAt: string; reason?: string; diagnosis?: string; signedAt?: string | null; clinicId?: string | null; clinic?: { name: string } | null }[];
 }
 
 const statusMap: Record<string, { tone: string; label: string }> = {
@@ -36,7 +40,24 @@ const statusMap: Record<string, { tone: string; label: string }> = {
 export default function Pacientes() {
   const [search, setSearch] = useState('');
   const [by, setBy] = useState<'name' | 'nationalId' | 'microchip'>('name');
-  const [selected, setSelected] = useState<string | null>(null);
+  // ?pet=…&record=… (desde 'Últimos historiales' del Resumen): abre la ficha y la consulta.
+  const { user } = useAuth();
+  const myClinicId = user?.staffProfile?.clinicId;
+  const [params, setParams] = useSearchParams();
+  const [selected, setSelectedState] = useState<string | null>(() => params.get('pet'));
+  const openRecord = params.get('record');
+  const [showAll, setShowAll] = useState(false);
+  const setSelected = (id: string) => {
+    setSelectedState(id);
+    setShowAll(false);
+    setParams({ pet: id }, { replace: true });
+  };
+  const setOpenRecord = (id: string | null) => {
+    const next = new URLSearchParams(params);
+    if (id) next.set('record', id);
+    else next.delete('record');
+    setParams(next, { replace: true });
+  };
 
   const list = useQuery({
     queryKey: ['patients', search, by],
@@ -128,14 +149,35 @@ export default function Pacientes() {
 
               <Block title="Historial de Visitas">
                 {ficha.data.records.length === 0 && <p className="text-sm text-slate-400">Sin visitas.</p>}
-                {ficha.data.records.slice(0, 4).map((r) => (
-                  <div key={r.id} className="mb-2">
-                    <div className="text-sm font-semibold text-slate-800">{r.reason ?? 'Consulta'}</div>
-                    <div className="text-xs text-slate-500">
-                      {date(r.visitedAt)}{r.diagnosis && ` - ${r.diagnosis}`}
+                {(showAll ? ficha.data.records : ficha.data.records.slice(0, 4)).map((r) => {
+                  const other = !!myClinicId && !!r.clinicId && r.clinicId !== myClinicId;
+                  return (
+                  <button
+                    disabled={other}
+                    title={other ? 'Consulta registrada por otra clínica' : undefined}
+                    key={r.id}
+                    type="button"
+                    onClick={() => setOpenRecord(r.id)}
+                    className={`group -mx-2 mb-1 flex w-[calc(100%+1rem)] items-center gap-2 rounded-xl px-2 py-1.5 text-left transition enabled:hover:bg-brand-50/70 disabled:cursor-default ${openRecord === r.id ? 'bg-brand-50/70' : ''}`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+                        <span className="truncate">{r.reason ?? 'Consulta'}</span>
+                        {!other && !r.signedAt && <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-px text-[10px] font-bold text-amber-700">Borrador</span>}
+                      </div>
+                      <div className="truncate text-xs text-slate-500">
+                        {date(r.visitedAt)}{other ? ` · ${r.clinic?.name ?? 'Otra clínica'}` : r.diagnosis && ` - ${r.diagnosis}`}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                    {!other && <Icon name="chevronRight" className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:text-migo-purple" />}
+                  </button>
+                  );
+                })}
+                {ficha.data.records.length > 4 && (
+                  <button type="button" onClick={() => setShowAll((v) => !v)} className="mt-1 text-xs font-semibold text-migo-purple hover:underline">
+                    {showAll ? 'Ver menos' : `Ver todas (${ficha.data.records.length})`}
+                  </button>
+                )}
               </Block>
 
               <Block title="Esquema de Vacunación">
@@ -185,6 +227,8 @@ export default function Pacientes() {
           ) : null}
         </Card>
       </div>
+
+      <RecordDrawer recordId={openRecord} onClose={() => setOpenRecord(null)} />
     </div>
   );
 }

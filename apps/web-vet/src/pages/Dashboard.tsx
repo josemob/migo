@@ -29,7 +29,7 @@ interface Summary {
     pet: { name: string; breed?: string; owner: { fullName: string } };
     service?: { name: string };
   }[];
-  recentRecords: { id: string; visitedAt: string; reason?: string; pet: { name: string; breed?: string } }[];
+  recentRecords: { id: string; petId: string; visitedAt: string; reason?: string; pet: { name: string; breed?: string } }[];
 }
 
 const statusTone: Record<string, string> = {
@@ -197,16 +197,23 @@ export default function Dashboard() {
           ) : (
             <ul className="mt-4 grid gap-2 sm:grid-cols-2">
               {recent.map((r) => (
-                <li key={r.id} className="flex items-center gap-3 rounded-2xl bg-slate-50/80 px-4 py-3">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-migo-purple">
-                    <Icon name="paw" className="h-4 w-4" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-semibold text-slate-800">
-                      {r.pet?.name} <span className="font-normal text-slate-400">{r.pet?.breed ? `(${r.pet.breed})` : ''}</span>
+                <li key={r.id}>
+                  {/* Abre Pacientes con la mascota seleccionada y el detalle de esta consulta */}
+                  <Link
+                    to={`/pacientes?pet=${r.petId}&record=${r.id}`}
+                    className="group flex items-center gap-3 rounded-2xl bg-slate-50/80 px-4 py-3 transition hover:bg-brand-50/70"
+                  >
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-migo-purple">
+                      <Icon name="paw" className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold text-slate-800">
+                        {r.pet?.name} <span className="font-normal text-slate-400">{r.pet?.breed ? `(${r.pet.breed})` : ''}</span>
+                      </div>
+                      <div className="truncate text-xs text-slate-500">{r.reason ?? 'Consulta'}</div>
                     </div>
-                    <div className="truncate text-xs text-slate-500">{r.reason ?? 'Consulta'}</div>
-                  </div>
+                    <Icon name="chevronRight" className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:text-migo-purple" />
+                  </Link>
                 </li>
               ))}
             </ul>

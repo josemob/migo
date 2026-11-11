@@ -45,6 +45,8 @@ app.use(
   cors({
     origin: env.corsOrigins.length ? env.corsOrigins : true,
     credentials: true,
+    // El panel lee el nombre del PDF descargado (informe de consulta).
+    exposedHeaders: ['Content-Disposition'],
   }),
 );
 // Captura el cuerpo crudo (para verificar la firma HMAC del webhook de Stream).

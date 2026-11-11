@@ -36,6 +36,7 @@
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
+    "pdfkit": "^0.15.0",
     "stream-chat": "^9.50.2",
     "zod": "^3.24.1"
   },
@@ -46,6 +47,7 @@
     "@types/jsonwebtoken": "^9.0.7",
     "@types/morgan": "^1.9.9",
     "@types/node": "^20.17.10",
+    "@types/pdfkit": "^0.13.5",
     "prisma": "^5.22.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"

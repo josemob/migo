@@ -8,6 +8,7 @@ export interface AuthUser {
   role: string;
   avatarUrl?: string | null;
   staffProfile?: {
+    clinicId?: string;
     position: string;
     roleLabel?: string | null;
     clinic?: { name: string; organization?: { name: string } };

@@ -7,6 +7,8 @@ import { validate } from '../../middleware/validate';
 import { authenticate } from '../../middleware/auth';
 import { withClinicContext } from '../../middleware/clinicContext';
 import { ApiError } from '../../utils/ApiError';
+import { sendRecordReportEmail } from '../mail/mail.service';
+import { buildRecordPdf, loadRecordForReport, longDate, reportFileName } from './recordPdf.service';
 
 const router = Router();
 router.use(authenticate, withClinicContext);
@@ -75,7 +77,11 @@ router.get(
         prescriptions: { orderBy: { createdAt: 'desc' }, take: 10 },
         records: {
           orderBy: { visitedAt: 'desc' },
-          include: { vet: { include: { user: { select: { fullName: true } } } } },
+          include: {
+            vet: { include: { user: { select: { fullName: true } } } },
+            // Para distinguir las consultas de otras clínicas (solo se abren las propias)
+            clinic: { select: { name: true } },
+          },
         },
       },
     });
@@ -272,20 +278,59 @@ router.get(
 );
 
 // GET /patients/records/:recordId -> detalle completo de un expediente
+// (incluye contacto del tutor y datos de la clínica: lo usa el panel para el informe)
 router.get(
   '/records/:recordId',
   validate({ params: z.object({ recordId: z.string().uuid() }) }),
   asyncHandler(async (req, res) => {
-    const rec = await prisma.medicalRecord.findFirst({
-      where: { id: req.params.recordId, clinicId: req.clinicId! },
-      include: {
-        pet: { select: { name: true, species: true, breed: true, owner: { select: { fullName: true } } } },
-        prescriptions: { orderBy: { createdAt: 'asc' } },
-        clinic: { select: { name: true } },
-      },
-    });
+    const rec = await loadRecordForReport(req.params.recordId as string, req.clinicId!);
     if (!rec) throw ApiError.notFound('Expediente no encontrado');
     res.json(rec);
+  }),
+);
+
+// GET /patients/records/:recordId/pdf -> informe de consulta en PDF (los borradores salen marcados)
+router.get(
+  '/records/:recordId/pdf',
+  validate({ params: z.object({ recordId: z.string().uuid() }) }),
+  asyncHandler(async (req, res) => {
+    const rec = await loadRecordForReport(req.params.recordId as string, req.clinicId!);
+    if (!rec) throw ApiError.notFound('Expediente no encontrado');
+    const pdf = await buildRecordPdf(rec);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${reportFileName(rec)}"`);
+    res.setHeader('Content-Length', String(pdf.length));
+    res.send(pdf);
+  }),
+);
+
+// POST /patients/records/:recordId/send -> envía el informe (PDF adjunto) por correo.
+// Solo expedientes FIRMADOS: nunca sale un informe no oficial.
+router.post(
+  '/records/:recordId/send',
+  validate({
+    params: z.object({ recordId: z.string().uuid() }),
+    body: z.object({ to: z.string().trim().email('Correo no válido'), message: z.string().trim().max(500).optional() }),
+  }),
+  asyncHandler(async (req, res) => {
+    const rec = await loadRecordForReport(req.params.recordId as string, req.clinicId!);
+    if (!rec) throw ApiError.notFound('Expediente no encontrado');
+    if (!rec.signedAt) throw ApiError.conflict('Firma el expediente antes de enviarlo.');
+    const pdf = await buildRecordPdf(rec);
+    const sent = await sendRecordReportEmail(req.body.to, {
+      petName: rec.pet.name,
+      clinicName: rec.clinic?.name ?? 'la clínica',
+      dateLabel: longDate(rec.visitedAt),
+      reason: rec.reason,
+      diagnosis: rec.diagnosis,
+      vetName: rec.signedByName,
+      message: req.body.message,
+      isOwner: req.body.to.toLowerCase() === rec.pet.owner.email.toLowerCase(),
+      ownerName: rec.pet.owner.fullName,
+      attachment: { filename: reportFileName(rec), content: pdf.toString('base64') },
+    });
+    if (!sent) throw new ApiError(502, 'No se pudo enviar el correo. Intenta de nuevo en unos minutos.');
+    res.json({ ok: true, to: req.body.to });
   }),
 );
 

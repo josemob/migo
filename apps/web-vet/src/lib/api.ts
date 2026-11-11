@@ -83,3 +83,24 @@ export async function api<T = unknown>(path: string, opts: RequestOptions = {}):
   }
   return data as T;
 }
+
+/** Descarga un archivo autenticado (ej. el PDF de un expediente) y lo guarda con su nombre. */
+export async function downloadFile(path: string, fallbackName: string, _retried = false): Promise<void> {
+  const res = await fetch(`${BASE}${path}`, {
+    headers: tokens.access ? { Authorization: `Bearer ${tokens.access}` } : {},
+  });
+  if (res.status === 401 && !_retried && (await refreshTokens())) return downloadFile(path, fallbackName, true);
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data?.error?.message ?? 'No se pudo descargar el archivo');
+  }
+  const name = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? fallbackName;
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
